@@ -29,12 +29,13 @@ function App() {
   const [scrollProgress, setScrollProgress] = useState(0);
 
   useEffect(() => {
+    // Ultra smooth Lenis configuration for premium feel
     const lenis = new Lenis({
-      duration: 1.12,
-      lerp: 0.09,
+      duration: 1.5,
+      lerp: 0.05,
       smoothWheel: true,
-      wheelMultiplier: 0.92,
-      touchMultiplier: 1.1,
+      wheelMultiplier: 0.8,
+      touchMultiplier: 1.2,
       infinite: false
     });
 
@@ -61,7 +62,7 @@ function App() {
     };
 
     const closeOnResize = () => {
-      if (window.innerWidth >= 980) {
+      if (window.innerWidth >= 1024) {
         setMenuOpen(false);
       }
     };
@@ -78,81 +79,75 @@ function App() {
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
+      // Intro fade
       gsap.from('.site-shell', {
         autoAlpha: 0,
-        y: 16,
-        duration: 1,
+        y: 20,
+        duration: 1.5,
         ease: 'power3.out'
       });
 
+      // Hero Text Lines Smooth Reveal
       gsap.from('.hero-line', {
         yPercent: 120,
-        duration: 1,
-        stagger: 0.1,
-        ease: 'power4.out'
+        skewY: 3,
+        autoAlpha: 0,
+        duration: 1.6,
+        stagger: 0.15,
+        ease: 'power4.out',
+        delay: 0.2
       });
 
+      // General Reveal Elements
       gsap.utils.toArray<HTMLElement>('.reveal').forEach((item) => {
         gsap.from(item, {
           autoAlpha: 0,
-          y: 60,
-          duration: 1.05,
+          y: 80,
+          duration: 1.5,
           ease: 'power3.out',
           scrollTrigger: {
             trigger: item,
-            start: 'top 84%',
+            start: 'top 85%',
             once: true
           }
         });
       });
 
+      // Stagger Groups (Cards, Lists)
       gsap.utils.toArray<HTMLElement>('[data-stagger-group]').forEach((group) => {
         const elements = group.querySelectorAll<HTMLElement>('.stagger-item');
         gsap.from(elements, {
           autoAlpha: 0,
-          y: 36,
-          duration: 0.9,
+          y: 40,
+          duration: 1.2,
           ease: 'power2.out',
-          stagger: 0.11,
+          stagger: 0.15,
           scrollTrigger: {
             trigger: group,
-            start: 'top 82%',
+            start: 'top 85%',
             once: true
           }
         });
       });
 
-      gsap.utils.toArray<HTMLElement>('[data-parallax]').forEach((layer) => {
-        const speed = Number(layer.dataset.parallax ?? 0.18);
-        gsap.to(layer, {
-          yPercent: speed * -50,
-          ease: 'none',
-          scrollTrigger: {
-            trigger: layer,
-            start: 'top bottom',
-            end: 'bottom top',
-            scrub: true
-          }
-        });
-      });
-
-      gsap.to('.floating-orb', {
-        y: -14,
-        duration: 4.8,
+      // Surreal 3D Animations
+      gsap.to('.surreal-orb', {
+        y: -30,
+        rotation: 2,
+        duration: 5,
         repeat: -1,
         yoyo: true,
         ease: 'sine.inOut'
       });
 
-      gsap.to('.floating-monolith', {
-        y: 18,
-        rotation: 1.6,
-        duration: 6.2,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut'
+      gsap.to('.sea-grid', {
+        backgroundPosition: '0px 100px',
+        duration: 4,
+        ease: 'none',
+        repeat: -1
       });
 
+      // Signal Path Animation
       const signalPath = gsap.utils.toArray<SVGPathElement>('.signal-path')[0];
       if (signalPath) {
         const pathLength = signalPath.getTotalLength();
@@ -199,15 +194,15 @@ function App() {
 
       <header className="topbar">
         <a href="#vision" className="brand" onClick={handleNavClick('vision')}>
-          <span className="brand-mark" aria-hidden="true" />
-          <span>
+          <div className="brand-mark" aria-hidden="true" />
+          <div>
             HOLLOW BITS
-            <small>ALLYX x Ethereal Sounds</small>
-          </span>
+            <small>ALLYX x Ethereal</small>
+          </div>
         </a>
 
         <button className="menu-toggle" onClick={() => setMenuOpen((prev) => !prev)} aria-expanded={menuOpen}>
-          Menu
+          {menuOpen ? 'CERRAR' : 'MENU'}
         </button>
 
         <nav className={`nav ${menuOpen ? 'nav-open' : ''}`}>
@@ -223,26 +218,21 @@ function App() {
       </header>
 
       <main>
+        {/* Full Bleed Surreal Hero */}
         <section id="vision" className="hero section-frame">
           <div className="hero-copy reveal">
-            <p className="kicker">Escaparate tecnico + comercial</p>
+            <p className="kicker">Escaparate Tecnico + Comercial</p>
             <h1>
-              <span className="line-wrap">
-                <span className="hero-line">El nuevo DAW de precision</span>
-              </span>
-              <span className="line-wrap">
-                <span className="hero-line">para productores que exigen</span>
-              </span>
-              <span className="line-wrap">
-                <span className="hero-line">estetica, potencia y control.</span>
-              </span>
+              <span className="line-wrap"><span className="hero-line">El nuevo DAW</span></span>
+              <span className="line-wrap"><span className="hero-line">de precision</span></span>
+              <span className="line-wrap"><span className="hero-line">absoluta.</span></span>
             </h1>
-            <p>
+            <p className="reveal" style={{ animationDelay: '0.4s' }}>
               HOLLOW BITS es un entorno desktop-first creado por ALLYX y Ethereal Sounds para competir con
-              flujo pro, estabilidad de alto nivel y una identidad sonora/visual radicalmente refinada.
+              flujo pro, estabilidad inquebrantable y una identidad estetica radicalmente superior.
             </p>
 
-            <div className="hero-actions">
+            <div className="hero-actions reveal" style={{ animationDelay: '0.6s' }}>
               <a href="#hollow-bits" onClick={handleNavClick('hollow-bits')} className="button-primary">
                 Explorar plataforma
               </a>
@@ -251,25 +241,21 @@ function App() {
               </a>
             </div>
 
-            <ul className="pillar-list" data-stagger-group>
+            <ul className="pillar-list reveal" style={{ animationDelay: '0.8s' }}>
               {pillars.map((pillar) => (
-                <li key={pillar} className="stagger-item">
-                  {pillar}
-                </li>
+                <li key={pillar}>{pillar}</li>
               ))}
             </ul>
           </div>
 
           <div className="hero-visual reveal" aria-hidden="true">
-            <div className="horizon" data-parallax="0.08" />
-            <div className="void-orb floating-orb" data-parallax="0.22" />
-            <div className="monolith floating-monolith" data-parallax="0.26" />
-            <div className="glow-band" data-parallax="0.13" />
-            <div className="grid-haze" data-parallax="0.18" />
+            <div className="sea-grid" />
+            <div className="horizon-line" />
+            <div className="surreal-orb" />
           </div>
         </section>
 
-        <section className="section-frame metrics reveal" data-stagger-group>
+        <section className="metrics reveal" data-stagger-group>
           {heroStats.map((item) => (
             <article key={item.label} className="metric-card stagger-item">
               <strong>{item.value}</strong>
@@ -282,10 +268,10 @@ function App() {
         <section id="hollow-bits" className="section-frame reveal">
           <div className="section-head">
             <p className="kicker">HOLLOW BITS Platform</p>
-            <h2>Un DAW completo con narrativa de producto y validacion real.</h2>
+            <h2>Un ecosistema magnetico y validado.</h2>
             <p>
-              Esta web presenta a HOLLOW BITS como producto tecnico-comercial: lo que hace, por que importa,
-              y como habilita resultados de estudio con una experiencia premium.
+              Diseñado no solo para verse bien, sino para habilitar un performance sin fricciones.
+              Aqui es donde el audio puro se encuentra con la estetica hiper-moderna.
             </p>
           </div>
 
@@ -306,11 +292,11 @@ function App() {
 
         <section id="engine" className="section-frame reveal">
           <div className="section-head">
-            <p className="kicker">Engine and Quality</p>
-            <h2>Arquitectura de audio orientada a datos, no a promesas vacias.</h2>
+            <p className="kicker">Engine Architecture</p>
+            <h2>Performance orientado a la realidad, no promesas vacias.</h2>
             <p>
-              La propuesta tecnica esta traducida a lenguaje comercial comprensible: estabilidad comprobable,
-              comparativas claras y criterios de release que elevan confianza para usuarios profesionales.
+              Construimos HOLLOW BITS con metricas duras en mente: benchmarks A/B extremos, tolerancias minimas
+              y fallback estructurados para garantizar confianza.
             </p>
           </div>
 
@@ -324,28 +310,29 @@ function App() {
               ))}
             </div>
 
-            <div className="signal-panel">
-              <svg viewBox="0 0 640 260" role="img" aria-label="Flujo de telemetria del audio engine">
+            <div className="signal-panel reveal">
+              <svg viewBox="0 0 640 260" role="img" aria-label="Flujo de telemetria del audio engine" style={{ width: '100%', height: 'auto', filter: 'drop-shadow(0 0 40px rgba(255, 77, 0, 0.4))' }}>
                 <defs>
                   <linearGradient id="signal-gradient" x1="0" x2="1" y1="0" y2="0">
-                    <stop offset="0%" stopColor="#ff914d" />
-                    <stop offset="52%" stopColor="#e54b6f" />
-                    <stop offset="100%" stopColor="#84a6ff" />
+                    <stop offset="0%" stopColor="#ff4d00" />
+                    <stop offset="52%" stopColor="#c8102e" />
+                    <stop offset="100%" stopColor="#ffffff" />
                   </linearGradient>
                 </defs>
-                <rect x="8" y="8" width="624" height="244" rx="24" className="signal-plate" />
+                <rect x="8" y="8" width="624" height="244" rx="24" fill="rgba(10,5,5,0.8)" stroke="rgba(255,255,255,0.05)" />
                 <path
                   className="signal-path"
                   d="M 24 152 C 88 152, 108 84, 160 84 C 212 84, 224 184, 292 184 C 362 184, 376 58, 430 58 C 484 58, 502 198, 568 198 C 604 198, 614 126, 618 126"
+                  fill="none" stroke="url(#signal-gradient)" strokeWidth="4" strokeLinecap="round"
                 />
-                <circle className="signal-dot" cx="160" cy="84" r="6" />
-                <circle className="signal-dot" cx="292" cy="184" r="6" />
-                <circle className="signal-dot" cx="430" cy="58" r="6" />
-                <circle className="signal-dot" cx="568" cy="198" r="6" />
+                <circle cx="160" cy="84" r="6" fill="#ff4d00" />
+                <circle cx="292" cy="184" r="6" fill="#ff4d00" />
+                <circle cx="430" cy="58" r="6" fill="#ff4d00" />
+                <circle cx="568" cy="198" r="6" fill="#ff4d00" />
               </svg>
               <div className="signal-caption">
-                <strong>Performance Gate</strong>
-                <span>drift p95 36ms / p99 95ms / lag p95 32ms / loop p99 34ms</span>
+                <strong>Telemetria de Rendering</strong>
+                <span>drift p95 36ms / p99 95ms / lag p95 32ms</span>
               </div>
             </div>
           </div>
@@ -363,40 +350,46 @@ function App() {
 
         <section id="ecosistema" className="section-frame reveal">
           <div className="section-head">
-            <p className="kicker">Ethereal Sounds Ecosystem</p>
-            <h2>Servicio integral para artistas, sellos y marcas sonoras.</h2>
+            <p className="kicker">Ethereal Sounds Integration</p>
+            <h2>Un ecosistema disrruptivo impulsado por talento real.</h2>
             <p>
-              HOLLOW BITS es el centro tecnologico del ecosistema. Ethereal Sounds aporta direccion de talento,
-              produccion discografica y ejecucion de proyectos con estandar premium.
+              Ethereal Sounds lidera la direccion de audio aportando recursos y produccion pura para enriquecer
+              todo el entorno de HOLLOW BITS en un entorno sin limites.
             </p>
           </div>
 
-          <div className="service-grid" data-stagger-group>
-            {services.map((service) => (
-              <article key={service.title} className="service-card stagger-item">
-                <h3>{service.title}</h3>
-                <p>{service.body}</p>
-                <ul>
-                  {service.outcomes.map((outcome) => (
-                    <li key={outcome}>{outcome}</li>
-                  ))}
-                </ul>
-              </article>
-            ))}
+          <div className="engine-layout">
+            <div className="surreal-gem-container reveal">
+              <div className="surreal-gem" />
+            </div>
+
+            <div className="service-grid" style={{ gridTemplateColumns: '1fr', padding: 0 }} data-stagger-group>
+              {services.map((service) => (
+                <article key={service.title} className="service-card stagger-item">
+                  <h3>{service.title}</h3>
+                  <p>{service.body}</p>
+                  <ul>
+                    {service.outcomes.map((outcome) => (
+                      <li key={outcome}>{outcome}</li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
           </div>
 
-          <div className="platform-row" data-stagger-group>
+          <div className="platform-row" style={{ marginTop: '3rem' }} data-stagger-group>
             <article className="platform-card stagger-item">
               <h3>Windows First</h3>
-              <p>Objetivo principal actual: rendimiento estable para produccion diaria en desktop nativo.</p>
+              <p>Optimizacion profunda para produccion extrema en entornos nativos desktop de Windows.</p>
             </article>
             <article className="platform-card stagger-item">
-              <h3>Linux Next</h3>
-              <p>Fase de expansion para estudios y perfiles tecnicos que buscan un stack abierto y potente.</p>
+              <h3>Linux Expansion</h3>
+              <p>Escalabilidad lista para usuarios avanzados que priorizan un stack audiófilo sin sobrecarga.</p>
             </article>
             <article className="platform-card stagger-item">
-              <h3>macOS Incoming</h3>
-              <p>Compatibilidad prevista para integrar flujos creativos mixtos en equipos de alto rendimiento.</p>
+              <h3>macOS Ready (Próximamente)</h3>
+              <p>Compatibilidad nativa con flujos universales y hardware Apple Silicon en fases venideras.</p>
             </article>
           </div>
         </section>
@@ -404,10 +397,10 @@ function App() {
         <section id="roadmap" className="section-frame reveal">
           <div className="section-head">
             <p className="kicker">Roadmap</p>
-            <h2>Plan de evolucion anual para paridad pro y diferenciacion.</h2>
+            <h2>Construido por etapas bajo protocolos inflexibles.</h2>
             <p>
-              El roadmap comunica una direccion clara: primero determinismo y estabilidad, luego profundidad pro,
-              finalmente diferenciacion por AI accionable y colaboracion de nueva generacion.
+              Evolucion trimestral definida. Sin especulacion, cada fase esta ligada a metas precisas de
+              adopcion de workflow y estabilidad global.
             </p>
           </div>
 
@@ -429,7 +422,7 @@ function App() {
         <section className="section-frame reveal faq-section">
           <div className="section-head">
             <p className="kicker">FAQ</p>
-            <h2>Preguntas clave del publico tecnico y comercial.</h2>
+            <h2>Dudas frecuentes resueltas directamente.</h2>
           </div>
           <div className="faq-list" data-stagger-group>
             {faqs.map((item) => (
@@ -443,25 +436,25 @@ function App() {
 
         <section id="contacto" className="section-frame contact reveal">
           <div className="contact-copy">
-            <p className="kicker">Launch and partnerships</p>
-            <h2>Listos para presentar HOLLOW BITS en mercado global.</h2>
+            <p className="kicker">Connect</p>
+            <h2>Hagamos contacto en la frontera creativa.</h2>
             <p>
-              El sitio ya queda preparado como base para GitHub + Vercel: storytelling, contenido tecnico-comercial,
-              animacion premium y estructura escalable para futuras versiones.
+              Estamos listos para el rollout y pruebas en ambientes profesionales.
+              Descubre las capacidades que haran la diferencia.
             </p>
           </div>
           <div className="contact-actions">
             <a href="mailto:hollowbits@allyxorb.com" className="button-primary">Agendar reunion</a>
             <a href="https://github.com/aldonovar/hollow-web" target="_blank" rel="noreferrer" className="button-ghost">
-              Ver repositorio
+              Visitar Repositorio
             </a>
           </div>
         </section>
       </main>
 
       <footer className="footer">
-        <p>HOLLOW BITS - producido por ALLYX, diseno sonoro y talento por Ethereal Sounds.</p>
-        <span>Desktop-first DAW. Windows ahora. Linux y macOS proximamente.</span>
+        <p>HOLLOW BITS by ALLYX & Ethereal Sounds.</p>
+        <span>Redefiniendo la plataforma de creación en Windows.</span>
       </footer>
     </div>
   );
