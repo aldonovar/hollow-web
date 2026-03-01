@@ -84,6 +84,7 @@ h6 {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  z-index: 1;
 }
 
 /* ========================================================================= */
@@ -209,11 +210,13 @@ h6 {
 /* ========================================================================= */
 .hero {
   min-height: 100vh;
-  padding-top: 120px;
+  padding-top: 150px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   position: relative;
+  z-index: 2;
+  /* keep text above background but allow mixing if needed */
 }
 
 .hero-content {

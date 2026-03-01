@@ -12,6 +12,7 @@ import {
   roadmap,
   services
 } from './content';
+import { AnimatedBackground } from './AnimatedBackground';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -78,7 +79,35 @@ function App() {
           { autoAlpha: 0, scale: 0.9 },
           { autoAlpha: 1, scale: 1, duration: 2, ease: 'power2.out' },
           '-=1.2'
-        );
+        )
+        .to('.spectral-line', {
+          scaleX: 1,
+          duration: 1.5,
+          stagger: 0.2,
+          ease: 'power3.inOut'
+        }, '-=1.0');
+
+      // 1.5 Scroll Parallax for Hero
+      gsap.to('.hero-content', {
+        y: 100, // Move down slightly as user scrolls down
+        ease: 'none',
+        scrollTrigger: {
+          trigger: '.hero',
+          start: 'top top',
+          end: 'bottom top',
+          scrub: true
+        }
+      });
+      gsap.to('.hero-visual', {
+        y: 200, // Moves down faster than content for deep parallax
+        ease: 'none',
+        scrollTrigger: {
+          trigger: '.hero',
+          start: 'top top',
+          end: 'bottom top',
+          scrub: true
+        }
+      });
 
       // 2. Scroll Reveal for Sections
       gsap.utils.toArray<HTMLElement>('.reveal').forEach((elem) => {
@@ -118,6 +147,20 @@ function App() {
         );
       });
 
+      // 4. Continuous Flow Animations
+      gsap.to('.data-stream', {
+        strokeDashoffset: -100,
+        duration: 2,
+        ease: 'none',
+        repeat: -1
+      });
+      gsap.to('.data-stream-2', {
+        strokeDashoffset: 100,
+        duration: 4,
+        ease: 'none',
+        repeat: -1
+      });
+
     }, rootRef);
 
     return () => ctx.revert();
@@ -134,6 +177,7 @@ function App() {
 
   return (
     <div ref={rootRef} className="app-shell">
+      <AnimatedBackground />
       {/* --- ABLETON INSPIRED NAVBAR --- */}
       <nav className={`global-nav ${isScrolled ? 'scrolled' : ''}`}>
         <div className="nav-brand">
@@ -175,7 +219,11 @@ function App() {
               HOLLOW BITS is a desktop-first environment created by ALLYX and Ethereal Sounds. Engineered for professional workflows, unyielding stability, and a radically superior aesthetic identity.
             </p>
           </div>
-          <div className="hero-visual" aria-hidden="true"></div>
+          <div className="hero-visual" aria-hidden="true" style={{ position: 'relative' }}>
+            {/* Adding subtle animated elements mimicking high-end DAW spectral analysis */}
+            <div className="spectral-line" style={{ width: '100%', height: '1px', background: 'var(--text-secondary)', position: 'absolute', top: '30%', transform: 'scaleX(0)', transformOrigin: 'left' }} />
+            <div className="spectral-line" style={{ width: '100%', height: '1px', background: 'var(--text-secondary)', position: 'absolute', top: '60%', transform: 'scaleX(0)', transformOrigin: 'right' }} />
+          </div>
         </section>
 
         {/* --- STATS GRID --- */}
@@ -237,8 +285,16 @@ function App() {
             </div>
 
             <div className="reveal" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ height: '300px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>Telemetry Visualizer Placeholder</span>
+              <div style={{ height: '300px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-secondary)', position: 'relative', overflow: 'hidden' }}>
+                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--border-strong)" strokeWidth="1" />
+                  </pattern>
+                  <rect width="100%" height="100%" fill="url(#grid)" />
+                  <path className="data-stream" d="M 0 150 Q 100 50 200 150 T 400 150 T 600 150 T 800 150" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeDasharray="10 10" />
+                  <path className="data-stream-2" d="M 0 200 Q 150 250 300 100 T 600 200 T 900 100" fill="none" stroke="var(--text-secondary)" strokeWidth="1" strokeDasharray="5 15" />
+                </svg>
+                <div style={{ position: 'absolute', top: '1rem', left: '1rem', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>TELEMETRY.VISUALIZER [LIVE]</div>
               </div>
               <div className="grid-3 stagger-group" style={{ gap: '1rem' }}>
                 {matrixLegend.map(lg => (
