@@ -1,11 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Lenis from 'lenis';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { User, Menu, X, ArrowRight } from 'lucide-react';
 import {
   capabilities,
   engineHighlights,
-  faqs,
   heroStats,
   matrixLegend,
   navItems,
@@ -15,274 +15,200 @@ import {
 
 gsap.registerPlugin(ScrollTrigger);
 
-const pillars = [
-  'Engine reliability como feature de producto.',
-  'Pro workflow para producir con menos clicks.',
-  'Creative power para sesion, mix y performance.',
-  'Intelligence accionable con foco en estudio real.',
-  'Desktop quality con prioridad en Windows.'
-];
-
 function App() {
   const rootRef = useRef<HTMLDivElement>(null);
+  const [isScrolled, setIsScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [scrollProgress, setScrollProgress] = useState(0);
 
+  // Initialize smooth scrolling and GSAP animations
   useEffect(() => {
-    // Ultra smooth Lenis configuration for premium feel
     const lenis = new Lenis({
-      duration: 1.5,
-      lerp: 0.05,
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // Custom ease
       smoothWheel: true,
-      wheelMultiplier: 0.8,
-      touchMultiplier: 1.2,
-      infinite: false
+      wheelMultiplier: 1,
+      touchMultiplier: 2,
     });
 
     lenis.on('scroll', ScrollTrigger.update);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    lenis.on('scroll', (e: any) => {
+      setIsScrolled(e.scroll > 50);
+    });
 
-    const updateLenis = (time: number) => {
+    gsap.ticker.add((time) => {
       lenis.raf(time * 1000);
-    };
-
-    gsap.ticker.add(updateLenis);
+    });
     gsap.ticker.lagSmoothing(0);
 
     return () => {
-      gsap.ticker.remove(updateLenis);
       lenis.destroy();
+      gsap.ticker.remove(lenis.raf);
     };
   }, []);
 
+  // Global Animations Setup
   useEffect(() => {
-    const updateScrollProgress = () => {
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = maxScroll > 0 ? window.scrollY / maxScroll : 0;
-      setScrollProgress(progress);
-    };
+    if (!rootRef.current) return;
 
-    const closeOnResize = () => {
-      if (window.innerWidth >= 1024) {
-        setMenuOpen(false);
-      }
-    };
-
-    window.addEventListener('scroll', updateScrollProgress, { passive: true });
-    window.addEventListener('resize', closeOnResize);
-    updateScrollProgress();
-
-    return () => {
-      window.removeEventListener('scroll', updateScrollProgress);
-      window.removeEventListener('resize', closeOnResize);
-    };
-  }, []);
-
-  useLayoutEffect(() => {
     const ctx = gsap.context(() => {
-      // Intro fade
-      gsap.from('.site-shell', {
-        autoAlpha: 0,
-        y: 20,
-        duration: 1.5,
-        ease: 'power3.out'
-      });
+      // 1. Initial Hero Reveal
+      const tl = gsap.timeline({ defaults: { ease: 'power4.out' } });
 
-      // Hero Text Lines Smooth Reveal
-      gsap.from('.hero-line', {
-        yPercent: 120,
-        skewY: 3,
-        autoAlpha: 0,
-        duration: 1.6,
-        stagger: 0.15,
-        ease: 'power4.out',
-        delay: 0.2
-      });
+      tl.fromTo('.global-nav',
+        { yPercent: -100, autoAlpha: 0 },
+        { yPercent: 0, autoAlpha: 1, duration: 1, delay: 0.2 }
+      )
+        .fromTo('.hero-subtitle',
+          { autoAlpha: 0, y: 20 },
+          { autoAlpha: 1, y: 0, duration: 0.8 },
+          '-=0.4'
+        )
+        .fromTo('.hero-line',
+          { yPercent: 120, autoAlpha: 0 },
+          { yPercent: 0, autoAlpha: 1, stagger: 0.1, duration: 1.2 },
+          '-=0.6'
+        )
+        .fromTo('.hero-description',
+          { autoAlpha: 0, y: 30 },
+          { autoAlpha: 1, y: 0, duration: 1 },
+          '-=0.8'
+        )
+        .fromTo('.hero-visual',
+          { autoAlpha: 0, scale: 0.9 },
+          { autoAlpha: 1, scale: 1, duration: 2, ease: 'power2.out' },
+          '-=1.2'
+        );
 
-      // General Reveal Elements
-      gsap.utils.toArray<HTMLElement>('.reveal').forEach((item) => {
-        gsap.from(item, {
-          autoAlpha: 0,
-          y: 80,
-          duration: 1.5,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: item,
-            start: 'top 85%',
-            once: true
+      // 2. Scroll Reveal for Sections
+      gsap.utils.toArray<HTMLElement>('.reveal').forEach((elem) => {
+        gsap.fromTo(elem,
+          { autoAlpha: 0, y: 60 },
+          {
+            autoAlpha: 1,
+            y: 0,
+            duration: 1.2,
+            ease: 'power3.out',
+            scrollTrigger: {
+              trigger: elem,
+              start: 'top 85%',
+              once: true
+            }
           }
-        });
+        );
       });
 
-      // Stagger Groups (Cards, Lists)
-      gsap.utils.toArray<HTMLElement>('[data-stagger-group]').forEach((group) => {
-        const elements = group.querySelectorAll<HTMLElement>('.stagger-item');
-        gsap.from(elements, {
-          autoAlpha: 0,
-          y: 40,
-          duration: 1.2,
-          ease: 'power2.out',
-          stagger: 0.15,
-          scrollTrigger: {
-            trigger: group,
-            start: 'top 85%',
-            once: true
+      // 3. Stagger Groups (Cards, Lists)
+      gsap.utils.toArray<HTMLElement>('.stagger-group').forEach((group) => {
+        const items = group.querySelectorAll('.stagger-item');
+        gsap.fromTo(items,
+          { autoAlpha: 0, y: 40 },
+          {
+            autoAlpha: 1,
+            y: 0,
+            duration: 1,
+            stagger: 0.1,
+            ease: 'power3.out',
+            scrollTrigger: {
+              trigger: group,
+              start: 'top 85%',
+              once: true
+            }
           }
-        });
+        );
       });
 
-      // Surreal 3D Animations
-      gsap.to('.surreal-orb', {
-        y: -30,
-        rotation: 2,
-        duration: 5,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut'
-      });
-
-      gsap.to('.sea-grid', {
-        backgroundPosition: '0px 100px',
-        duration: 4,
-        ease: 'none',
-        repeat: -1
-      });
-
-      // Signal Path Animation
-      const signalPath = gsap.utils.toArray<SVGPathElement>('.signal-path')[0];
-      if (signalPath) {
-        const pathLength = signalPath.getTotalLength();
-        gsap.set(signalPath, {
-          strokeDasharray: pathLength,
-          strokeDashoffset: pathLength
-        });
-
-        gsap.to(signalPath, {
-          strokeDashoffset: 0,
-          ease: 'none',
-          scrollTrigger: {
-            trigger: '.signal-panel',
-            start: 'top 75%',
-            end: 'bottom 35%',
-            scrub: true
-          }
-        });
-      }
     }, rootRef);
 
-    return () => {
-      ctx.revert();
-    };
+    return () => ctx.revert();
   }, []);
 
-  const handleNavClick = (id: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
+  const handleNavClick = (id: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
     const target = document.getElementById(id);
     if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      target.scrollIntoView({ behavior: 'smooth' });
+      setMenuOpen(false);
     }
-    setMenuOpen(false);
   };
 
   return (
-    <div ref={rootRef} className="site-shell">
-      <div className="ambient-noise" aria-hidden="true" />
-      <div
-        className="progress-line"
-        style={{ transform: `scaleX(${Math.max(0, Math.min(1, scrollProgress))})` }}
-        aria-hidden="true"
-      />
+    <div ref={rootRef} className="app-shell">
+      {/* --- ABLETON INSPIRED NAVBAR --- */}
+      <nav className={`global-nav ${isScrolled ? 'scrolled' : ''}`}>
+        <div className="nav-brand">
+          <div className="brand-dot"></div>
+          <span>HOLLOW BITS</span>
+        </div>
 
-      <header className="topbar">
-        <a href="#vision" className="brand" onClick={handleNavClick('vision')}>
-          <div className="brand-mark" aria-hidden="true" />
-          <div>
-            HOLLOW BITS
-            <small>ALLYX x Ethereal</small>
-          </div>
-        </a>
-
-        <button className="menu-toggle" onClick={() => setMenuOpen((prev) => !prev)} aria-expanded={menuOpen}>
-          {menuOpen ? 'CERRAR' : 'MENU'}
-        </button>
-
-        <nav className={`nav ${menuOpen ? 'nav-open' : ''}`}>
-          {navItems.map((item) => (
-            <a key={item.id} href={`#${item.id}`} onClick={handleNavClick(item.id)}>
+        <div className={`nav-links ${menuOpen ? 'mobile-open' : ''}`}>
+          {navItems.map(item => (
+            <a key={item.id} href={`#${item.id}`} className="nav-link" onClick={handleNavClick(item.id)}>
               {item.label}
             </a>
           ))}
-          <a href="#contacto" className="nav-cta" onClick={handleNavClick('contacto')}>
-            Solicitar acceso
-          </a>
-        </nav>
-      </header>
+        </div>
+
+        <div className="nav-actions">
+          <button className="nav-button ghost">
+            <User size={16} />
+          </button>
+          <button className="nav-button primary">
+            Get Access
+          </button>
+          <button className="mobile-menu-toggle" onClick={() => setMenuOpen(!menuOpen)} style={{ display: 'none', background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}>
+            {menuOpen ? <X /> : <Menu />}
+          </button>
+        </div>
+      </nav>
 
       <main>
-        {/* Full Bleed Surreal Hero */}
-        <section id="vision" className="hero section-frame">
-          <div className="hero-copy reveal">
-            <p className="kicker">Escaparate Tecnico + Comercial</p>
-            <h1>
-              <span className="line-wrap"><span className="hero-line">El nuevo DAW</span></span>
-              <span className="line-wrap"><span className="hero-line">de precision</span></span>
-              <span className="line-wrap"><span className="hero-line">absoluta.</span></span>
+        {/* --- KYMA INSPIRED HERO --- */}
+        <section id="vision" className="hero container">
+          <div className="hero-content">
+            <span className="hero-subtitle">Technical & Commercial Display</span>
+            <h1 className="hero-title">
+              <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>The standard for</span></span>
+              <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>absolute precision.</span></span>
             </h1>
-            <p className="reveal" style={{ animationDelay: '0.4s' }}>
-              HOLLOW BITS es un entorno desktop-first creado por ALLYX y Ethereal Sounds para competir con
-              flujo pro, estabilidad inquebrantable y una identidad estetica radicalmente superior.
-            </p>
-
-            <div className="hero-actions reveal" style={{ animationDelay: '0.6s' }}>
-              <a href="#hollow-bits" onClick={handleNavClick('hollow-bits')} className="button-primary">
-                Explorar plataforma
-              </a>
-              <a href="#engine" onClick={handleNavClick('engine')} className="button-ghost">
-                Ver stack tecnico
-              </a>
-            </div>
-
-            <ul className="pillar-list reveal" style={{ animationDelay: '0.8s' }}>
-              {pillars.map((pillar) => (
-                <li key={pillar}>{pillar}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="hero-visual reveal" aria-hidden="true">
-            <div className="sea-grid" />
-            <div className="horizon-line" />
-            <div className="surreal-orb" />
-          </div>
-        </section>
-
-        <section className="metrics reveal" data-stagger-group>
-          {heroStats.map((item) => (
-            <article key={item.label} className="metric-card stagger-item">
-              <strong>{item.value}</strong>
-              <h3>{item.label}</h3>
-              <p>{item.detail}</p>
-            </article>
-          ))}
-        </section>
-
-        <section id="hollow-bits" className="section-frame reveal">
-          <div className="section-head">
-            <p className="kicker">HOLLOW BITS Platform</p>
-            <h2>Un ecosistema magnetico y validado.</h2>
-            <p>
-              Diseñado no solo para verse bien, sino para habilitar un performance sin fricciones.
-              Aqui es donde el audio puro se encuentra con la estetica hiper-moderna.
+            <p className="hero-description">
+              HOLLOW BITS is a desktop-first environment created by ALLYX and Ethereal Sounds. Engineered for professional workflows, unyielding stability, and a radically superior aesthetic identity.
             </p>
           </div>
+          <div className="hero-visual" aria-hidden="true"></div>
+        </section>
 
-          <div className="card-grid" data-stagger-group>
-            {capabilities.map((item) => (
-              <article key={item.title} className="glass-card stagger-item">
-                <h3>{item.title}</h3>
-                <p>{item.body}</p>
-                <ul>
-                  {item.bullets.map((bullet) => (
-                    <li key={bullet}>{bullet}</li>
+        {/* --- STATS GRID --- */}
+        <div className="container" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+          <div className="stats-grid stagger-group">
+            {heroStats.map(stat => (
+              <div key={stat.label} className="stat-item stagger-item">
+                <span className="stat-value">{stat.value}</span>
+                <span className="stat-label">{stat.label}</span>
+                <span className="stat-detail">{stat.detail}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* --- PLATFORM ECOSYSTEM --- */}
+        <section id="hollow-bits" className="section container">
+          <header className="section-header reveal">
+            <span className="section-label">Hollow Bits Platform</span>
+            <h2 className="section-title">A magnetic and validated ecosystem.</h2>
+            <p className="section-description">
+              Designed not just to look pristine, but to enable frictionless performance. Where pure audio meets hyper-modern aesthetics.
+            </p>
+          </header>
+
+          <div className="card-grid stagger-group">
+            {capabilities.map(cap => (
+              <article key={cap.title} className="card stagger-item">
+                <h3 className="card-title">{cap.title}</h3>
+                <p className="card-text">{cap.body}</p>
+                <ul className="card-list">
+                  {cap.bullets.map((bullet, idx) => (
+                    <li key={idx} className="card-list-item">{bullet}</li>
                   ))}
                 </ul>
               </article>
@@ -290,128 +216,58 @@ function App() {
           </div>
         </section>
 
-        <section id="engine" className="section-frame reveal">
-          <div className="section-head">
-            <p className="kicker">Engine Architecture</p>
-            <h2>Performance orientado a la realidad, no promesas vacias.</h2>
-            <p>
-              Construimos HOLLOW BITS con metricas duras en mente: benchmarks A/B extremos, tolerancias minimas
-              y fallback estructurados para garantizar confianza.
+        {/* --- ENGINE ARCHITECTURE --- */}
+        <section id="engine" className="section container">
+          <header className="section-header reveal">
+            <span className="section-label">Engine Architecture</span>
+            <h2 className="section-title">Performance defined by reality, not promises.</h2>
+            <p className="section-description">
+              Built with hard metrics: extreme A/B benchmarks, minimal tolerances, and structured fallbacks for absolute confidence.
             </p>
-          </div>
+          </header>
 
-          <div className="engine-layout">
-            <div className="engine-list" data-stagger-group>
-              {engineHighlights.map((item) => (
-                <article key={item.title} className="engine-item stagger-item">
-                  <h3>{item.title}</h3>
-                  <p>{item.body}</p>
-                </article>
+          <div className="grid-2">
+            <div className="timeline">
+              {engineHighlights.map((hl, idx) => (
+                <div key={hl.title} className={`timeline-item ${idx === 0 ? 'active' : ''} reveal`}>
+                  <h3 className="timeline-focus" style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{hl.title}</h3>
+                  <p className="card-text">{hl.body}</p>
+                </div>
               ))}
             </div>
 
-            <div className="signal-panel reveal">
-              <svg viewBox="0 0 640 260" role="img" aria-label="Flujo de telemetria del audio engine" style={{ width: '100%', height: 'auto', filter: 'drop-shadow(0 0 40px rgba(255, 77, 0, 0.4))' }}>
-                <defs>
-                  <linearGradient id="signal-gradient" x1="0" x2="1" y1="0" y2="0">
-                    <stop offset="0%" stopColor="#ff4d00" />
-                    <stop offset="52%" stopColor="#c8102e" />
-                    <stop offset="100%" stopColor="#ffffff" />
-                  </linearGradient>
-                </defs>
-                <rect x="8" y="8" width="624" height="244" rx="24" fill="rgba(10,5,5,0.8)" stroke="rgba(255,255,255,0.05)" />
-                <path
-                  className="signal-path"
-                  d="M 24 152 C 88 152, 108 84, 160 84 C 212 84, 224 184, 292 184 C 362 184, 376 58, 430 58 C 484 58, 502 198, 568 198 C 604 198, 614 126, 618 126"
-                  fill="none" stroke="url(#signal-gradient)" strokeWidth="4" strokeLinecap="round"
-                />
-                <circle cx="160" cy="84" r="6" fill="#ff4d00" />
-                <circle cx="292" cy="184" r="6" fill="#ff4d00" />
-                <circle cx="430" cy="58" r="6" fill="#ff4d00" />
-                <circle cx="568" cy="198" r="6" fill="#ff4d00" />
-              </svg>
-              <div className="signal-caption">
-                <strong>Telemetria de Rendering</strong>
-                <span>drift p95 36ms / p99 95ms / lag p95 32ms</span>
+            <div className="reveal" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ height: '300px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>Telemetry Visualizer Placeholder</span>
+              </div>
+              <div className="grid-3 stagger-group" style={{ gap: '1rem' }}>
+                {matrixLegend.map(lg => (
+                  <div key={lg.value} className="card stagger-item" style={{ padding: '1.5rem' }}>
+                    <span className="stat-label" style={{ color: lg.value === 'PASS' ? 'var(--text-primary)' : lg.value === 'WARN' ? 'var(--accent-primary)' : '#ff2a00' }}>{lg.value}</span>
+                    <h4 style={{ fontSize: '1rem', marginTop: '0.5rem', marginBottom: '0.5rem' }}>{lg.label}</h4>
+                    <p className="stat-detail" style={{ fontSize: '0.75rem' }}>{lg.detail}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-
-          <div className="legend-grid" data-stagger-group>
-            {matrixLegend.map((item) => (
-              <article key={item.value} className="legend-card stagger-item">
-                <strong>{item.value}</strong>
-                <h3>{item.label}</h3>
-                <p>{item.detail}</p>
-              </article>
-            ))}
-          </div>
         </section>
 
-        <section id="ecosistema" className="section-frame reveal">
-          <div className="section-head">
-            <p className="kicker">Ethereal Sounds Integration</p>
-            <h2>Un ecosistema disrruptivo impulsado por talento real.</h2>
-            <p>
-              Ethereal Sounds lidera la direccion de audio aportando recursos y produccion pura para enriquecer
-              todo el entorno de HOLLOW BITS en un entorno sin limites.
-            </p>
-          </div>
+        {/* --- ECOSYSTEM (Ethereal Sounds) --- */}
+        <section id="ecosistema" className="section container">
+          <header className="section-header reveal">
+            <span className="section-label">Integration</span>
+            <h2 className="section-title">Driven by real talent.</h2>
+          </header>
 
-          <div className="engine-layout">
-            <div className="surreal-gem-container reveal">
-              <div className="surreal-gem" />
-            </div>
-
-            <div className="service-grid" style={{ gridTemplateColumns: '1fr', padding: 0 }} data-stagger-group>
-              {services.map((service) => (
-                <article key={service.title} className="service-card stagger-item">
-                  <h3>{service.title}</h3>
-                  <p>{service.body}</p>
-                  <ul>
-                    {service.outcomes.map((outcome) => (
-                      <li key={outcome}>{outcome}</li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
-            </div>
-          </div>
-
-          <div className="platform-row" style={{ marginTop: '3rem' }} data-stagger-group>
-            <article className="platform-card stagger-item">
-              <h3>Windows First</h3>
-              <p>Optimizacion profunda para produccion extrema en entornos nativos desktop de Windows.</p>
-            </article>
-            <article className="platform-card stagger-item">
-              <h3>Linux Expansion</h3>
-              <p>Escalabilidad lista para usuarios avanzados que priorizan un stack audiófilo sin sobrecarga.</p>
-            </article>
-            <article className="platform-card stagger-item">
-              <h3>macOS Ready (Próximamente)</h3>
-              <p>Compatibilidad nativa con flujos universales y hardware Apple Silicon en fases venideras.</p>
-            </article>
-          </div>
-        </section>
-
-        <section id="roadmap" className="section-frame reveal">
-          <div className="section-head">
-            <p className="kicker">Roadmap</p>
-            <h2>Construido por etapas bajo protocolos inflexibles.</h2>
-            <p>
-              Evolucion trimestral definida. Sin especulacion, cada fase esta ligada a metas precisas de
-              adopcion de workflow y estabilidad global.
-            </p>
-          </div>
-
-          <div className="timeline" data-stagger-group>
-            {roadmap.map((item) => (
-              <article key={item.phase} className="timeline-item stagger-item">
-                <h3>{item.phase}</h3>
-                <p>{item.focus}</p>
-                <ul>
-                  {item.deliverables.map((deliverable) => (
-                    <li key={deliverable}>{deliverable}</li>
+          <div className="card-grid stagger-group">
+            {services.map(srv => (
+              <article key={srv.title} className="card stagger-item" style={{ background: 'transparent', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderRadius: 0, borderBottom: '1px solid var(--border-subtle)', paddingBottom: '3rem' }}>
+                <h3 className="card-title">{srv.title}</h3>
+                <p className="card-text">{srv.body}</p>
+                <ul className="card-list">
+                  {srv.outcomes.map((out, idx) => (
+                    <li key={idx} className="card-list-item">{out}</li>
                   ))}
                 </ul>
               </article>
@@ -419,42 +275,44 @@ function App() {
           </div>
         </section>
 
-        <section className="section-frame reveal faq-section">
-          <div className="section-head">
-            <p className="kicker">FAQ</p>
-            <h2>Dudas frecuentes resueltas directamente.</h2>
-          </div>
-          <div className="faq-list" data-stagger-group>
-            {faqs.map((item) => (
-              <details key={item.question} className="faq-item stagger-item">
-                <summary>{item.question}</summary>
-                <p>{item.answer}</p>
-              </details>
+        {/* --- ROADMAP --- */}
+        <section id="roadmap" className="section container">
+          <header className="section-header reveal">
+            <span className="section-label">Roadmap</span>
+            <h2 className="section-title">Built in stages under inflexible protocols.</h2>
+          </header>
+
+          <div className="timeline stagger-group" style={{ maxWidth: '800px' }}>
+            {roadmap.map((rm) => (
+              <div key={rm.phase} className="timeline-item stagger-item">
+                <div className="timeline-phase">{rm.phase}</div>
+                <h3 className="timeline-focus">{rm.focus}</h3>
+                <ul className="timeline-list">
+                  {rm.deliverables.map((del, i) => (
+                    <li key={i} className="timeline-list-item">{del}</li>
+                  ))}
+                </ul>
+              </div>
             ))}
           </div>
         </section>
 
-        <section id="contacto" className="section-frame contact reveal">
-          <div className="contact-copy">
-            <p className="kicker">Connect</p>
-            <h2>Hagamos contacto en la frontera creativa.</h2>
-            <p>
-              Estamos listos para el rollout y pruebas en ambientes profesionales.
-              Descubre las capacidades que haran la diferencia.
-            </p>
-          </div>
-          <div className="contact-actions">
-            <a href="mailto:hollowbits@allyxorb.com" className="button-primary">Agendar reunion</a>
-            <a href="https://github.com/aldonovar/hollow-web" target="_blank" rel="noreferrer" className="button-ghost">
-              Visitar Repositorio
-            </a>
+        {/* --- CTA --- */}
+        <section id="contacto" className="section container reveal" style={{ borderBottom: 'none', textAlign: 'center', padding: '12rem 0' }}>
+          <h2 className="section-title" style={{ maxWidth: '800px', margin: '0 auto 2rem' }}>Ready for the frontier?</h2>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <button className="nav-button primary" style={{ padding: '1rem 2rem', fontSize: '1rem' }}>
+              Schedule Meeting <ArrowRight size={18} style={{ display: 'inline', verticalAlign: 'text-bottom', marginLeft: '0.5rem' }} />
+            </button>
           </div>
         </section>
+
       </main>
 
-      <footer className="footer">
-        <p>HOLLOW BITS by ALLYX & Ethereal Sounds.</p>
-        <span>Redefiniendo la plataforma de creación en Windows.</span>
+      {/* --- FOOTER --- */}
+      <footer className="global-footer">
+        <div>HOLLOW BITS by ALLYX & Ethereal Sounds.</div>
+        <div>Redefiniendo la plataforma de creación en Windows.</div>
       </footer>
     </div>
   );
