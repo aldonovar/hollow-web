@@ -54,7 +54,7 @@ export function Engine() {
         <div style={{ paddingTop: '150px' }}>
             <section className="section container">
                 <header className="section-header reveal">
-                    <span className="section-label">THE ENGINE</span>
+                    <span className="section-label">[ 002 ] CORE ARCHITECTURE</span>
                     <h2 className="section-title">Precisión<br /><span style={{ color: 'var(--text-tertiary)' }}>Matemática.</span></h2>
                     <p className="section-description">
                         Scheduler Dual (Worklet-node nativo), buffers de latencia cero y recuperación iterativa en hilo secundario. El estándar profesional indiscutible.
@@ -71,23 +71,28 @@ export function Engine() {
                         ))}
                     </div>
 
-                    <div className="reveal" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <div style={{ height: '300px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-secondary)', position: 'relative', overflow: 'hidden' }}>
-                            <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--border-strong)" strokeWidth="1" />
-                                </pattern>
-                                <rect width="100%" height="100%" fill="url(#grid)" />
-                                <path className="data-stream" d="M 0 150 Q 100 50 200 150 T 400 150 T 600 150 T 800 150" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeDasharray="10 10" />
-                                <path className="data-stream-2" d="M 0 200 Q 150 250 300 100 T 600 200 T 900 100" fill="none" stroke="var(--text-secondary)" strokeWidth="1" strokeDasharray="5 15" />
-                            </svg>
-                            <div style={{ position: 'absolute', top: '1rem', left: '1rem', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>LIVE A/B BENCHMARK - WORKLET VS INTERVAL</div>
+                    <div className="reveal" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                        <div style={{ padding: '2px', background: 'var(--border-strong)' }}>
+                            <div style={{ height: '300px', background: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
+                                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--border-strong)" strokeWidth="1" />
+                                    </pattern>
+                                    <rect width="100%" height="100%" fill="url(#grid)" />
+                                    <path className="data-stream" d="M 0 150 Q 100 50 200 150 T 400 150 T 600 150 T 800 150" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeDasharray="10 10" />
+                                    <path className="data-stream-2" d="M 0 200 Q 150 250 300 100 T 600 200 T 900 100" fill="none" stroke="var(--text-secondary)" strokeWidth="1" strokeDasharray="5 15" />
+                                </svg>
+                                <div style={{ position: 'absolute', top: '1rem', left: '1rem', padding: '0.25rem 0.75rem', border: '1px solid var(--border-strong)', background: 'rgba(0,0,0,0.8)', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>LIVE A/B BENCHMARK - WORKLET VS INTERVAL</div>
+                            </div>
                         </div>
-                        <div className="grid-3 stagger-group" style={{ gap: '1rem' }}>
+                        <div className="grid-3 stagger-group" style={{ gap: '1px', background: 'var(--border-strong)', border: '1px solid var(--border-strong)' }}>
                             {matrixLegend.map(lg => (
-                                <div key={lg.value} className="card stagger-item" style={{ padding: '1.5rem' }}>
-                                    <span className="stat-label" style={{ color: lg.value === 'PASS' ? 'var(--text-primary)' : lg.value === 'WARN' ? 'var(--accent-primary)' : '#ff2a00' }}>{lg.value}</span>
-                                    <h4 style={{ fontSize: '1rem', marginTop: '0.5rem', marginBottom: '0.5rem' }}>{lg.label}</h4>
+                                <div key={lg.value} className="card stagger-item" style={{ padding: '2rem 1.5rem', borderRadius: 0, border: 'none' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                        <span className="stat-label" style={{ color: lg.value === 'PASS' ? 'var(--text-primary)' : lg.value === 'WARN' ? 'var(--accent-primary)' : '#ff2a00', margin: 0 }}>{lg.value}</span>
+                                        <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>[ SYS_ACTIVE ]</span>
+                                    </div>
+                                    <h4 style={{ fontSize: '1rem', marginTop: '0.5rem', marginBottom: '0.5rem', textTransform: 'uppercase' }}>{lg.label}</h4>
                                     <p className="stat-detail" style={{ fontSize: '0.75rem' }}>{lg.detail}</p>
                                 </div>
                             ))}

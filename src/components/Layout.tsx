@@ -31,8 +31,13 @@ export function Layout() {
             <nav className={`global-nav ${isScrolled ? 'scrolled' : ''}`}>
                 {/* Left: Logo */}
                 <Link to="/" className="nav-brand">
-                    <span className="brand-tag">[ HB ]</span>
-                    <span className="brand-name">HOLLOW BITS</span>
+                    <img
+                        src="/hollow-bits-logo.svg"
+                        alt="HOLLOW BITS"
+                        className="brand-logo"
+                        width={160}
+                        height={50}
+                    />
                 </Link>
 
                 {/* Center: Nav links */}

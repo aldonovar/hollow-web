@@ -1,9 +1,11 @@
 :root {
-  /* DAW Synchronization / Kode Immersive Schema */
-  --bg-primary: #050505;
-  --bg-secondary: #0a0a0a;
-  --bg-tertiary: #111111;
-  --bg-elevated: #1a1a1a;
+  /* ------------------------------------------------------------------ */
+  /* HOLLOW BITS — PREMIUM DAW COLOR SYSTEM                             */
+  /* ------------------------------------------------------------------ */
+  --bg-primary: #020202;
+  --bg-secondary: #080808;
+  --bg-tertiary: #0e0e0e;
+  --bg-elevated: #141414;
 
   --text-primary: #f2f2f2;
   --text-secondary: #a3a3a3;
@@ -76,9 +78,9 @@ h5,
 h6 {
   font-family: var(--font-display);
   margin: 0;
-  font-weight: 800;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
 }
 
 /* Shell & Texture */
@@ -105,6 +107,25 @@ h6 {
   mix-blend-mode: overlay;
 }
 
+/* Advanced Interlocking DAW Grid */
+body::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-image:
+    linear-gradient(var(--border-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-strong) 1px, transparent 1px),
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.2;
+}
+
 /* ========================================================================= */
 /* NAVBAR (Kode Immersive HUD Style)                                         */
 /* ========================================================================= */
@@ -113,11 +134,11 @@ h6 {
   top: 0;
   left: 0;
   width: 100%;
-  height: 56px;
+  height: 68px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2rem;
+  padding: 0 2.5rem;
   background-color: transparent;
   border-bottom: 1px solid var(--border-subtle);
   z-index: 100;
@@ -126,33 +147,31 @@ h6 {
 
 .global-nav.scrolled {
   border-bottom-color: var(--border-subtle);
-  background-color: rgba(5, 5, 5, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background-color: rgba(2, 2, 2, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 /* Brand — left anchor */
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
   text-decoration: none;
   color: var(--text-primary);
+  flex-shrink: 0;
 }
 
-.brand-tag {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--accent-primary);
-  letter-spacing: 0.1em;
+.brand-logo {
+  display: block;
+  height: 44px;
+  width: auto;
+  object-fit: contain;
+  filter: brightness(1);
+  transition: filter 0.2s ease;
 }
 
-.brand-name {
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
+.brand-logo:hover {
+  filter: brightness(1.15);
 }
 
 /* Nav links — center cluster */
@@ -273,7 +292,7 @@ h6 {
 /* ========================================================================= */
 .hero {
   min-height: 100vh;
-  padding-top: 120px;
+  padding-top: 80px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -284,7 +303,7 @@ h6 {
 }
 
 .hero-content {
-  padding-bottom: 6rem;
+  padding-bottom: 5rem;
   z-index: 2;
   position: relative;
 }
@@ -303,11 +322,11 @@ h6 {
 
 .hero-title {
   font-family: var(--font-display);
-  font-size: clamp(5rem, 13vw, 13rem);
+  font-size: clamp(6rem, 18vw, 22rem);
   font-weight: 900;
-  line-height: 0.9;
-  letter-spacing: -0.03em;
-  margin-bottom: 3rem;
+  line-height: 0.85;
+  letter-spacing: -0.04em;
+  margin-bottom: 2.5rem;
   text-transform: uppercase;
 }
 
@@ -361,11 +380,11 @@ h6 {
 /* Crosshair visual object */
 .hero-visual {
   position: absolute;
-  right: 8%;
+  right: 4%;
   top: 50%;
   transform: translateY(-50%);
-  width: 300px;
-  height: 300px;
+  width: 480px;
+  height: 480px;
   pointer-events: none;
   z-index: 1;
 }
@@ -395,7 +414,7 @@ h6 {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 120px;
+  width: 160px;
   height: 120px;
   border: 1px solid var(--border-strong);
 }
@@ -452,13 +471,28 @@ h6 {
 /* SECTIONS                                                                  */
 /* ========================================================================= */
 .section {
-  padding: 8rem 0;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 10rem 0;
+  border-bottom: 1px solid var(--border-strong);
+  position: relative;
+  background: linear-gradient(180deg, transparent 0%, rgba(10, 10, 10, 0.8) 100%);
+}
+
+.section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: repeating-linear-gradient(90deg, var(--border-strong) 0, var(--border-strong) 2px, transparent 2px, transparent 10px);
 }
 
 .section-header {
-  margin-bottom: 5rem;
-  max-width: 800px;
+  margin-bottom: 6rem;
+  max-width: 900px;
+  position: relative;
+  padding-left: 2rem;
+  border-left: 4px solid var(--accent-primary);
 }
 
 .section-label {
@@ -473,11 +507,11 @@ h6 {
 
 .section-title {
   font-family: var(--font-display);
-  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  font-size: clamp(3.5rem, 7vw, 8rem);
   font-weight: 900;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  margin-bottom: 1.5rem;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  margin-bottom: 2rem;
   text-transform: uppercase;
 }
 
@@ -494,37 +528,93 @@ h6 {
 }
 
 /* ========================================================================= */
-/* CARDS & BLOCKS (Minimal Grid)                                             */
+/* DAW MODULE PANELS (Replaces basic Cards)                                  */
 /* ========================================================================= */
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1px;
+  background-color: var(--border-strong);
+  border: 1px solid var(--border-strong);
 }
 
 .card {
-  padding: 2.5rem;
+  padding: 3rem;
   background-color: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  position: relative;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: transparent;
+  transition: background-color 0.3s ease;
 }
 
 .card:hover {
   background-color: var(--bg-tertiary);
-  border-color: var(--border-strong);
+}
+
+.card:hover::before {
+  background-color: var(--accent-primary);
+}
+
+/* Faux VU Meter on card hover */
+.card::after {
+  content: '';
+  position: absolute;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  width: 4px;
+  height: 30px;
+  background: var(--border-strong);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.card:hover::after {
+  opacity: 1;
+  background: linear-gradient(0deg, #10b981 0%, #10b981 60%, #eab308 60%, #eab308 85%, #ef4444 85%);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+}
+
+.card-index {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--accent-primary);
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0.5rem;
+}
+
+.card-index::after {
+  content: 'CH_ON //';
+  color: var(--text-tertiary);
+  font-size: 0.65rem;
 }
 
 .card-title {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  font-weight: 500;
+  font-size: clamp(1.5rem, 2.5vw, 2.2rem);
+  margin-bottom: 1.5rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
 }
 
 .card-text {
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.7;
   margin-bottom: 2rem;
+  font-weight: 300;
 }
 
 .card-list {
@@ -533,42 +623,54 @@ h6 {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 1.5rem;
 }
 
 .card-list-item {
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: 0.875rem;
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
   line-height: 1.5;
+  font-family: var(--font-mono);
 }
 
 .card-list-item::before {
-  content: '—';
+  content: '[*]';
   color: var(--accent-primary);
+  opacity: 0.7;
 }
 
 /* ========================================================================= */
-/* STATS NUMBERS                                                             */
+/* METRICS BAR                                                               */
 /* ========================================================================= */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 2rem;
-  padding: 4rem 0;
-  border-bottom: 1px solid var(--border-subtle);
+  gap: 1px;
+  background-color: var(--border-strong);
+  border: 1px solid var(--border-strong);
+  margin: 4rem 0;
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
+  background-color: var(--bg-primary);
+  padding: 3rem 2rem;
+  position: relative;
+}
+
+.stat-item:hover {
+  background-color: var(--bg-secondary);
 }
 
 .stat-value {
-  font-size: 4rem;
-  font-weight: 300;
+  font-size: clamp(3rem, 6vw, 6rem);
+  font-weight: 900;
   letter-spacing: -0.05em;
   margin-bottom: 0.5rem;
   line-height: 1;

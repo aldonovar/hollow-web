@@ -121,10 +121,14 @@ export function Home() {
             </section>
 
             {/* Stats strip */}
-            <div className="container">
-                <div className="stats-grid stagger-group">
+            <div className="container" style={{ marginTop: '2rem' }}>
+                <div className="stats-grid stagger-group" style={{ position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: '-20px', left: '2rem', background: 'var(--bg-primary)', padding: '0 10px', fontSize: '0.65rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', letterSpacing: '0.2em' }}>
+                        SYS_METRICS_V0.9
+                    </div>
                     {heroStats.map(stat => (
                         <div key={stat.label} className="stat-item stagger-item">
+                            <span style={{ fontSize: '0.6rem', color: '#10b981', fontFamily: 'var(--font-mono)', marginBottom: '1rem' }}>[ ONLINE ]</span>
                             <span className="stat-value">{stat.value}</span>
                             <span className="stat-label">{stat.label}</span>
                             <span className="stat-detail">{stat.detail}</span>
@@ -136,7 +140,7 @@ export function Home() {
             {/* Capabilities section */}
             <section className="section container">
                 <header className="section-header reveal">
-                    <span className="section-label">[ 001 ] EL DAW DEFINITIVO</span>
+                    <span className="section-label">[ 001 ] EL DAW DEFINITIVO // CAPABILITIES</span>
                     <h2 className="section-title">Workflow diseñado<br /><span style={{ color: 'var(--text-tertiary)' }}>para tu inspiración.</span></h2>
                     <p className="section-description">
                         Combina la inmediatez de la vista de sesión con la profundidad de un arreglo tradicional.
