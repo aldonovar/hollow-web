@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { User, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { navItems } from '../content';
 import { AnimatedBackground } from '../AnimatedBackground';
 
@@ -24,40 +24,42 @@ export function Layout() {
 
     return (
         <div className="app-shell">
+            <div className="noise-overlay"></div>
             <AnimatedBackground />
 
-            {/* Global Navigation */}
+            {/* HUD Navigation */}
             <nav className={`global-nav ${isScrolled ? 'scrolled' : ''}`}>
+                {/* Left: Logo */}
                 <Link to="/" className="nav-brand">
-                    <div className="brand-dot"></div>
-                    <span>HOLLOW BITS</span>
+                    <span className="brand-tag">[ HB ]</span>
+                    <span className="brand-name">HOLLOW BITS</span>
                 </Link>
 
+                {/* Center: Nav links */}
                 <div className={`nav-links ${menuOpen ? 'mobile-open' : ''}`}>
-                    {navItems.map(item => (
+                    {navItems.map((item, idx) => (
                         <Link
                             key={item.id}
                             to={item.path}
                             className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
                         >
+                            <span className="nav-link-index">{String(idx + 1).padStart(2, '0')}</span>
                             {item.label}
                         </Link>
                     ))}
                 </div>
 
+                {/* Right: Status indicator */}
                 <div className="nav-actions">
-                    <button className="nav-button ghost" title="Client Portal">
-                        <User size={16} />
-                    </button>
-                    <Link to="/contact" className="nav-button primary">
-                        Obtener Acceso
-                    </Link>
+                    <div className="nav-status">
+                        <span className="status-dot"></span>
+                        <span className="status-text">DAW v0.9 ALPHA</span>
+                    </div>
                     <button
                         className="mobile-menu-toggle"
                         onClick={() => setMenuOpen(!menuOpen)}
-                        style={{ display: 'none', background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}
                     >
-                        {menuOpen ? <X /> : <Menu />}
+                        {menuOpen ? <X size={18} /> : <Menu size={18} />}
                     </button>
                 </div>
             </nav>
@@ -67,10 +69,11 @@ export function Layout() {
                 <Outlet />
             </main>
 
-            {/* Global Footer */}
+            {/* Global Footer — HUD bottom bar */}
             <footer className="global-footer">
-                <div>HOLLOW BITS by ALLYX & Ethereal Sounds.</div>
-                <div>Redefiniendo el estándar técnico de producción DAW.</div>
+                <span>HOLLOW BITS — ALLYX × ETHEREAL SOUNDS</span>
+                <span className="footer-mid">AUDIO ENGINE ARCHITECTURE</span>
+                <span>© 2025 — ALL RIGHTS RESERVED</span>
             </footer>
         </div>
     );
