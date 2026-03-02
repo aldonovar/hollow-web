@@ -31,15 +31,12 @@ function App() {
       touchMultiplier: 2,
     });
 
-    const raf = (time: number) => {
+    function raf(time: number) {
       lenis.raf(time);
       requestAnimationFrame(raf);
-    };
+    }
 
     requestAnimationFrame(raf);
-
-    // Provide Lenis instance to the window obj for GSAP ScrollTrigger if necessary
-    (window as any).lenis = lenis;
 
     return () => {
       lenis.destroy();
