@@ -28,9 +28,9 @@
   --radius-pill: 0px;
 
   /* Premium DAW Typography */
-  --font-sans: 'Syne', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Outfit', system-ui, -apple-system, sans-serif;
   --font-mono: 'Space Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --font-display: 'Syne', system-ui, sans-serif;
+  --font-display: 'Outfit', system-ui, sans-serif;
   --font-script: 'Brittany', cursive;
 }
 
@@ -337,9 +337,9 @@ body::before {
 
 .hero-title {
   font-family: var(--font-display);
-  font-size: clamp(6rem, 18vw, 22rem);
+  font-size: clamp(4.5rem, 13vw, 14rem);
   font-weight: 800;
-  line-height: 0.85;
+  line-height: 0.95;
   letter-spacing: -0.03em;
   margin-bottom: 2.5rem;
   text-transform: uppercase;
