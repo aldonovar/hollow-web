@@ -52,7 +52,7 @@ export function Ecosystem() {
             <section className="section container">
                 <header className="section-header reveal">
                     <span className="section-label">Tu Estudio Reimaginado</span>
-                    <h2 className="section-title">Herramientas para Artistas.</h2>
+                    <h2 className="section-title">Herramientas<br /><span style={{ color: 'var(--text-tertiary)' }}>Para Artistas.</span></h2>
                     <p className="section-description">
                         Desde la composición hasta el master final. HOLLOW BITS te entrega un ecosistema integrado que potencia cada etapa de tu proceso creativo, sin compromisos acústicos ni barreras de procesamiento.
                     </p>

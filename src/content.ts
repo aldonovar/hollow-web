@@ -72,39 +72,39 @@ export const heroStats: StatItem[] = [
 
 export const capabilities: CapabilityItem[] = [
   {
-    title: 'De la Idea al Master, sin interrupciones',
-    body: 'Integramos la improvisación de una vista de sesión con el rigor de un arrangement tradicional. Compón, destruye y reconstruye bucles al vuelo con un motor que nunca se detiene.',
+    title: 'Flujo Ininterrumpido',
+    body: 'Integramos la improvisación de una vista de sesión con el rigor de un arrangement tradicional. Compón y reconstruye al vuelo con un motor asíncrono.',
     bullets: [
-      'Micro-cuantización expresiva para mantener el "groove" humano intacto.',
-      'Warping y time-stretching transparente, procesado en hilos secundarios.',
-      'Bounce de precisión matemática para capturar tu mezcla exactamente como la escuchas.'
+      'Micro-cuantización expresiva avanzada.',
+      'Warping multiproceso transparente.',
+      'Bounce de precisión matemática.'
     ]
   },
   {
-    title: 'Diseñado para el Escenario (Cero Fallos)',
-    body: 'Tu directo no puede depender de plataformas inestables. HOLLOW BITS ejecuta telemetría continua para garantizar que cada lanzamiento de clip y cada automatización ocurran con fiabilidad de nivel hardware.',
+    title: 'Estabilidad de Escenario',
+    body: 'Telemetría continua para garantizar que cada lanzamiento de clip y cada automatización ocurran con fiabilidad de hardware. Diseñado para el directo.',
     bullets: [
-      'Motor aislado (Sandbox) para que un plugin problemático nunca tire tu sesión.',
-      'Recuperación asíncrona: si algo falla en el buffer, el motor lo corrige sin interrumpir el audio.',
-      'Monitoreo visual de la salud de tu CPU y Buffer para total tranquilidad.'
+      'Motor aislado (Sandbox) anti-cuelgues.',
+      'Recuperación asíncrona de buffers.',
+      'Monitoreo visual táctico de salud.'
     ]
   },
   {
-    title: 'Ruteo Creativo Ilimitado',
-    body: 'Crea cadenas de señal alienígenas, procesa envíos de retornos infinitos y experimenta con diseño sonoro extremo. No hay límites artificiales en tus buses.',
+    title: 'Ruteo Modular Libre',
+    body: 'Crea cadenas de señal alienígenas y procesa envíos infinitos. Diseño sonoro extremo sin los límites artificiales de los buses tradicionales.',
     bullets: [
-      'Conexiones multi-nodo modulares directas e intuitivas.',
-      'Automatización curva ultra-suave (spline 64-bits) para transiciones de filtro orgánicas.',
-      'Conversión AD/DA pura, respetando el carácter analógico de tus sintes.'
+      'Conexiones multi-nodo directas.',
+      'Automatización spline 64-bits ultra-suave.',
+      'Conversión AD/DA de emulación pura.'
     ]
   },
   {
-    title: 'Asistencia Inteligente, Control Absoluto',
-    body: 'Nuestras herramientas de análisis te ayudan a limpiar la mezcla y afinar frecuencias, pero la decisión creativa siempre es tuya. Es un copiloto técnico, no un escritor fantasma.',
+    title: 'Asistencia Analítica',
+    body: 'Herramientas de análisis forense que limpian la mezcla mientras mantienes el control creativo absoluto.',
     bullets: [
-      'Alineación de transitorios rápida para grabar baterías perfectas.',
-      'Análisis de espectro proyectivo para identificar enmascaramiento frecuencial.',
-      'Extracción Audio-a-MIDI orgánica para expandir tus samples rápidamente.'
+      'Alineación de transitorios rápida.',
+      'Análisis de espectro proyectivo.',
+      'Extracción Audio-a-MIDI orgánica.'
     ]
   }
 ];

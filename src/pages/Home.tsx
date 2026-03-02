@@ -86,7 +86,7 @@ export function Home() {
                     <span className="hero-subtitle">// CREA SIN CORTES — V0.9 ALPHA</span>
                     <h1 className="hero-title">
                         <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>COMPÓN</span></span>
-                        <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}><em>SIN</em></span></span>
+                        <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block', color: 'var(--text-tertiary)' }}>SIN</span></span>
                         <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>LÍMITES.</span></span>
                     </h1>
                     <p className="hero-description">
@@ -137,7 +137,7 @@ export function Home() {
             <section className="section container">
                 <header className="section-header reveal">
                     <span className="section-label">[ 001 ] EL DAW DEFINITIVO</span>
-                    <h2 className="section-title">Workflow diseñado<br /><em>para tu inspiración.</em></h2>
+                    <h2 className="section-title">Workflow diseñado<br /><span style={{ color: 'var(--text-tertiary)' }}>para tu inspiración.</span></h2>
                     <p className="section-description">
                         Combina la inmediatez de la vista de sesión con la profundidad de un arreglo tradicional.
                         HOLLOW BITS funde ambos mundos en un entorno creativo fluido e inquebrantable.

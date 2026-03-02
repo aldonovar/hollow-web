@@ -54,10 +54,10 @@ export function Engine() {
         <div style={{ paddingTop: '150px' }}>
             <section className="section container">
                 <header className="section-header reveal">
-                    <span className="section-label">Audio Engine Architecture</span>
-                    <h2 className="section-title">El abismo técnico entre ellos y nosotros.</h2>
+                    <span className="section-label">THE ENGINE</span>
+                    <h2 className="section-title">Precisión<br /><span style={{ color: 'var(--text-tertiary)' }}>Matemática.</span></h2>
                     <p className="section-description">
-                        Mostramos nuestra telemetría porque somos el estándar real. Scheduler Dual (Worklet-node nativo), buffers intocables y recuperación en hilo secundario.
+                        Scheduler Dual (Worklet-node nativo), buffers de latencia cero y recuperación iterativa en hilo secundario. El estándar profesional indiscutible.
                     </p>
                 </header>
 

@@ -33,7 +33,7 @@ export function Roadmap() {
             <section className="section container">
                 <header className="section-header reveal">
                     <span className="section-label">Nuestro Camino</span>
-                    <h2 className="section-title">Evolución Continua.</h2>
+                    <h2 className="section-title">Evolución<br /><span style={{ color: 'var(--text-tertiary)' }}>Continua.</span></h2>
                     <p className="section-description">
                         Nuestro compromiso es contigo. Una hoja de ruta clara enfocada en revolucionar las herramientas creativas, actualizando el core DAW con precisión.
                     </p>
