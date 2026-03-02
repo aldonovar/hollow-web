@@ -1,18 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Sora:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  /* Minimalist Monochromatic Scheme */
-  --bg-primary: #050505;
-  --bg-secondary: #0a0a0a;
-  --bg-tertiary: #111111;
-  --bg-elevated: #1a1a1a;
+  /* Minimalist Monochromatic Scheme with DAW Accents */
+  --bg-primary: #090a10;
+  --bg-secondary: #0d0e14;
+  --bg-tertiary: #101119;
+  --bg-elevated: #1a1a24;
 
   --text-primary: #ffffff;
   --text-secondary: #a3a3a3;
   --text-tertiary: #525252;
 
-  /* Surgical Accents */
-  --accent-primary: #ff4d00;
+  /* DAW Surgical Accents */
+  --accent-primary: #a855f7;
+  --accent-secondary: #f43f5e;
 
   /* Strictly functional lines */
   --border-subtle: rgba(255, 255, 255, 0.05);
