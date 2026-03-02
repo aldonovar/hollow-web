@@ -198,7 +198,7 @@ function App() {
             <User size={16} />
           </button>
           <button className="nav-button primary">
-            Get Access
+            Obtener Acceso
           </button>
           <button className="mobile-menu-toggle" onClick={() => setMenuOpen(!menuOpen)} style={{ display: 'none', background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}>
             {menuOpen ? <X /> : <Menu />}
@@ -210,13 +210,13 @@ function App() {
         {/* --- KYMA INSPIRED HERO --- */}
         <section id="vision" className="hero container">
           <div className="hero-content">
-            <span className="hero-subtitle">Technical & Commercial Display</span>
+            <span className="hero-subtitle">Muestra Técnica & Comercial</span>
             <h1 className="hero-title">
-              <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>The standard for</span></span>
-              <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>absolute precision.</span></span>
+              <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>El estándar de</span></span>
+              <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>precisión absoluta.</span></span>
             </h1>
             <p className="hero-description">
-              HOLLOW BITS is a desktop-first environment created by ALLYX and Ethereal Sounds. Engineered for professional workflows, unyielding stability, and a radically superior aesthetic identity.
+              HOLLOW BITS es un entorno desktop-first creado por ALLYX y Ethereal Sounds. Diseñado para flujos de trabajo profesionales, estabilidad inquebrantable y una identidad estética radicalmente superior.
             </p>
           </div>
           <div className="hero-visual" aria-hidden="true" style={{ position: 'relative' }}>
@@ -242,10 +242,10 @@ function App() {
         {/* --- PLATFORM ECOSYSTEM --- */}
         <section id="hollow-bits" className="section container">
           <header className="section-header reveal">
-            <span className="section-label">Hollow Bits Platform</span>
-            <h2 className="section-title">A magnetic and validated ecosystem.</h2>
+            <span className="section-label">Plataforma Hollow Bits</span>
+            <h2 className="section-title">Un ecosistema magnético y validado.</h2>
             <p className="section-description">
-              Designed not just to look pristine, but to enable frictionless performance. Where pure audio meets hyper-modern aesthetics.
+              Diseñado no solo para lucir impecable, sino para permitir un rendimiento sin fricciones. Donde el audio puro se encuentra con la estética hiper-moderna.
             </p>
           </header>
 
@@ -267,10 +267,10 @@ function App() {
         {/* --- ENGINE ARCHITECTURE --- */}
         <section id="engine" className="section container">
           <header className="section-header reveal">
-            <span className="section-label">Engine Architecture</span>
-            <h2 className="section-title">Performance defined by reality, not promises.</h2>
+            <span className="section-label">Arquitectura del Motor</span>
+            <h2 className="section-title">Rendimiento definido por la realidad, no por promesas.</h2>
             <p className="section-description">
-              Built with hard metrics: extreme A/B benchmarks, minimal tolerances, and structured fallbacks for absolute confidence.
+              Construido con métricas duras: benchmarks A/B extremos, tolerancias mínimas y respaldos estructurados para una confianza absoluta.
             </p>
           </header>
 
@@ -312,8 +312,8 @@ function App() {
         {/* --- ECOSYSTEM (Ethereal Sounds) --- */}
         <section id="ecosistema" className="section container">
           <header className="section-header reveal">
-            <span className="section-label">Integration</span>
-            <h2 className="section-title">Driven by real talent.</h2>
+            <span className="section-label">Integración</span>
+            <h2 className="section-title">Impulsado por talento real.</h2>
           </header>
 
           <div className="card-grid stagger-group">
@@ -334,8 +334,8 @@ function App() {
         {/* --- ROADMAP --- */}
         <section id="roadmap" className="section container">
           <header className="section-header reveal">
-            <span className="section-label">Roadmap</span>
-            <h2 className="section-title">Built in stages under inflexible protocols.</h2>
+            <span className="section-label">Hoja de Ruta</span>
+            <h2 className="section-title">Construido en etapas bajo protocolos inflexibles.</h2>
           </header>
 
           <div className="timeline stagger-group" style={{ maxWidth: '800px' }}>
@@ -355,10 +355,10 @@ function App() {
 
         {/* --- CTA --- */}
         <section id="contacto" className="section container reveal" style={{ borderBottom: 'none', textAlign: 'center', padding: '12rem 0' }}>
-          <h2 className="section-title" style={{ maxWidth: '800px', margin: '0 auto 2rem' }}>Ready for the frontier?</h2>
+          <h2 className="section-title" style={{ maxWidth: '800px', margin: '0 auto 2rem' }}>¿Listo para la frontera?</h2>
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
             <button className="nav-button primary" style={{ padding: '1rem 2rem', fontSize: '1rem' }}>
-              Schedule Meeting <ArrowRight size={18} style={{ display: 'inline', verticalAlign: 'text-bottom', marginLeft: '0.5rem' }} />
+              Agendar Reunión <ArrowRight size={18} style={{ display: 'inline', verticalAlign: 'text-bottom', marginLeft: '0.5rem' }} />
             </button>
           </div>
         </section>
