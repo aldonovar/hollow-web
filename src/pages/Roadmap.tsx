@@ -32,10 +32,10 @@ export function Roadmap() {
         <div style={{ paddingTop: '150px' }}>
             <section className="section container">
                 <header className="section-header reveal">
-                    <span className="section-label">Trajectory & Focus</span>
-                    <h2 className="section-title">Roadmap Inflexible.</h2>
+                    <span className="section-label">Nuestro Camino</span>
+                    <h2 className="section-title">Evolución Continua.</h2>
                     <p className="section-description">
-                        Sin promesas de vaporware comercial. Entregables de grado de investigación, escalonados para la purga gradual del software heredado.
+                        Nuestro compromiso es contigo. Una hoja de ruta clara enfocada en revolucionar las herramientas creativas, actualizando el core DAW con precisión.
                     </p>
                 </header>
 

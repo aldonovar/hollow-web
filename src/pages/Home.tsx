@@ -83,15 +83,15 @@ export function Home() {
             {/* HERO — Giant Editorial */}
             <section className="hero container">
                 <div className="hero-content">
-                    <span className="hero-subtitle">// LA MÁQUINA PERFECTA — V0.9 ALPHA</span>
+                    <span className="hero-subtitle">// CREA SIN CORTES — V0.9 ALPHA</span>
                     <h1 className="hero-title">
-                        <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>SILENCIA</span></span>
-                        <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}><em>A LOS</em></span></span>
-                        <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>MONOLÍTICOS.</span></span>
+                        <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>COMPÓN</span></span>
+                        <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}><em>SIN</em></span></span>
+                        <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>LÍMITES.</span></span>
                     </h1>
                     <p className="hero-description">
-                        HOLLOW BITS es la arquitectura DAW donde la latencia muere y el ruteo matemático puro florece.
-                        Desarrollado por ALLYX &amp; Ethereal Sounds para ingenieros cansados de motores heredados colapsando bajo carga profesional.
+                        HOLLOW BITS es el DAW diseñado para que la inspiración fluya sin barreras técnicas.
+                        Un motor nativo inquebrantable construido para músicos y sound designers que exigen latencia cero y libertad creativa pura.
                     </p>
 
                     <div className="hero-meta stagger-group">
@@ -103,7 +103,7 @@ export function Home() {
                         ))}
                         <div className="hero-meta-item stagger-item" style={{ marginLeft: 'auto' }}>
                             <Link to="/engine" className="hud-link">
-                                VER BENCHMARKS →
+                                EXPLORAR EL MOTOR →
                             </Link>
                         </div>
                     </div>
@@ -136,11 +136,11 @@ export function Home() {
             {/* Capabilities section */}
             <section className="section container">
                 <header className="section-header reveal">
-                    <span className="section-label">[ 001 ] SUPERIORIDAD FUNCIONAL</span>
-                    <h2 className="section-title">Workflow diseñado<br /><em>contra la ineficiencia.</em></h2>
+                    <span className="section-label">[ 001 ] EL DAW DEFINITIVO</span>
+                    <h2 className="section-title">Workflow diseñado<br /><em>para tu inspiración.</em></h2>
                     <p className="section-description">
-                        Logic Pro te ata al arrangement. Ableton Live colapsa en mezclas de post-producción.
-                        HOLLOW BITS funde los mundos en un motor asíncrono infalible.
+                        Combina la inmediatez de la vista de sesión con la profundidad de un arreglo tradicional.
+                        HOLLOW BITS funde ambos mundos en un entorno creativo fluido e inquebrantable.
                     </p>
                 </header>
 

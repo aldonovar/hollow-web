@@ -40,92 +40,92 @@ export interface FaqItem {
 }
 
 export const navItems: NavItem[] = [
-  { id: 'home', label: 'HOLLOW BITS', path: '/' },
-  { id: 'engine', label: 'Engine Core', path: '/engine' },
-  { id: 'ecosistema', label: 'Ecosistema', path: '/ecosystem' },
-  { id: 'roadmap', label: 'Roadmap', path: '/roadmap' },
-  { id: 'contacto', label: 'Contacto B2B', path: '/contact' }
+  { id: 'home', label: 'Inicio', path: '/' },
+  { id: 'engine', label: 'El Motor', path: '/engine' },
+  { id: 'ecosistema', label: 'Flujo de Trabajo', path: '/ecosystem' },
+  { id: 'roadmap', label: 'Evolución', path: '/roadmap' },
+  { id: 'contacto', label: 'Acceso Temprano', path: '/contact' }
 ];
 
 export const heroStats: StatItem[] = [
   {
     value: '0ms',
     label: 'Jitter de Transporte',
-    detail: 'Determinismo de fase absoluto. A diferencia de motores heredados dictados por el SO, nuestro reloj maestro es inquebrantable.'
+    detail: 'Determinismo de fase absoluto. Un reloj maestro que fluye al ritmo exacto de tu inspiración, sin titubeos del sistema.'
   },
   {
-    value: '6',
-    label: 'Escenarios Benchmark A/B',
-    detail: 'Destrozando las limitaciones del Interval Clock. Worklet-node asíncrono puro bajo cargas extremas sin degradación.'
+    value: 'Nativo',
+    label: 'Desempeño Asíncrono',
+    detail: 'Construido sobre Web Audio API Worklets. El límite de tu proyecto ahora es pura imaginación, no la sobrecarga del CPU.'
   },
   {
     value: '160+',
-    label: 'Pistas Audio/MIDI x Sesión',
-    detail: 'Performance estable sin dropouts en arreglos densos. Donde las arquitecturas de 20 años colapsan, nosotros escalamos.'
+    label: 'Pistas Fluidas',
+    detail: 'Arreglos orquestales o diseño sonoro extremo sin un solo dropout. Escala tus ideas sin miedo a que el motor colapse.'
   },
   {
     value: '<30ms',
-    label: 'Latency Roundtrip p99',
-    detail: 'Monitoreo a través de capas de efectos en tiempo real con matemática de precisión de 64-bits. Estándar de la industria, redefinido.'
+    label: 'Roundtrip en Directo',
+    detail: 'Toca instrumentos virtuales y monitorea efectos en tiempo real con latencia imperceptible. Siente la música, no el software.'
   }
 ];
 
 export const capabilities: CapabilityItem[] = [
   {
-    title: 'Flujo Lineal y No Lineal Perfeccionado',
-    body: 'El caos de clips y la rigidez de las líneas de tiempo rígidas son reliquias. Integramos Session View y Arrangement en un tejido conectivo sin fricción para prototipado balístico y finalización estricta.',
+    title: 'De la Idea al Master, sin interrupciones',
+    body: 'Integramos la improvisación de una vista de sesión con el rigor de un arrangement tradicional. Compón, destruye y reconstruye bucles al vuelo con un motor que nunca se detiene.',
     bullets: [
-      'Cuantización no destructiva con micro-timing de precisión de muestreo.',
-      'Operaciones de clip instantáneas: consolidación asíncrona y warping transparente.',
-      'Bounce-in-place y masterización offline determinista a velocidades extremas.'
+      'Micro-cuantización expresiva para mantener el "groove" humano intacto.',
+      'Warping y time-stretching transparente, procesado en hilos secundarios.',
+      'Bounce de precisión matemática para capturar tu mezcla exactamente como la escuchas.'
     ]
   },
   {
-    title: 'Auditoría Técnica Continua (Performance Gate)',
-    body: 'Los DAWs tradicionales mienten sobre la latencia y dropean samples silenciosamente. HOLLOW BITS ejecuta telemetría real. Si falla el benchmark p99, no lo lanzamos. Construido para no fallar en el escenario.',
+    title: 'Diseñado para el Escenario (Cero Fallos)',
+    body: 'Tu directo no puede depender de plataformas inestables. HOLLOW BITS ejecuta telemetría continua para garantizar que cada lanzamiento de clip y cada automatización ocurran con fiabilidad de nivel hardware.',
     bullets: [
-      'Reportes SR x Buffer en tiempo real, visibles sin ocultar fallas.',
-      'Puntos de restauración asíncronos distribuidos en worker threads.',
-      'Aislamiento de crash de plugins VST3/AU encapsulados (sandbox).'
+      'Motor aislado (Sandbox) para que un plugin problemático nunca tire tu sesión.',
+      'Recuperación asíncrona: si algo falla en el buffer, el motor lo corrige sin interrumpir el audio.',
+      'Monitoreo visual de la salud de tu CPU y Buffer para total tranquilidad.'
     ]
   },
   {
-    title: 'Enrutamiento y DSP Puro',
-    body: 'Arquitectura de señal diseñada contra el aliasing y la distorsión de fase. No más sumas opacas ni motores de audio coloreados por defecto.',
+    title: 'Ruteo Creativo Ilimitado',
+    body: 'Crea cadenas de señal alienígenas, procesa envíos de retornos infinitos y experimenta con diseño sonoro extremo. No hay límites artificiales en tus buses.',
     bullets: [
-      'Matriz de ruteo N-a-N, paralela e ilimitada.',
-      'Automatización con interpolación spline de 64-bits (Touch, Latch, Write de grado cirujano).',
-      'Motor ADC/DAC nativo puenteado a WASAPI/ASIO sin cuellos de botella del OS.'
+      'Conexiones multi-nodo modulares directas e intuitivas.',
+      'Automatización curva ultra-suave (spline 64-bits) para transiciones de filtro orgánicas.',
+      'Conversión AD/DA pura, respetando el carácter analógico de tus sintes.'
     ]
   },
   {
-    title: 'Augmentación Inteligente (No Gimmicks)',
-    body: 'La IA integrada en HOLLOW BITS no escribe canciones por ti, destruye el trabajo tedioso. Herramientas técnicas para mentes creativas superiores.',
+    title: 'Asistencia Inteligente, Control Absoluto',
+    body: 'Nuestras herramientas de análisis te ayudan a limpiar la mezcla y afinar frecuencias, pero la decisión creativa siempre es tuya. Es un copiloto técnico, no un escritor fantasma.',
     bullets: [
-      'Detección de fase y alineación transitoria automática multi-track.',
-      'Análisis de espectro proyectivo y deducción espectral para limpieza de mezcla.',
-      'Transposición Audio-to-MIDI algorítmica sin artefactos perceptibles.'
+      'Alineación de transitorios rápida para grabar baterías perfectas.',
+      'Análisis de espectro proyectivo para identificar enmascaramiento frecuencial.',
+      'Extracción Audio-a-MIDI orgánica para expandir tus samples rápidamente.'
     ]
   }
 ];
 
 export const engineHighlights: EngineItem[] = [
   {
-    title: 'El fin del cuello de botella monolítico',
-    titleEng: 'Ending the Monolithic Bottleneck',
-    body: 'Mientras competidores atrapan el pipeline DSP en el hilo principal o hilos de UI acoplados, nuestro Scheduler Dual distribuye la carga en Web Audio API Worklets estructurados para evitar GC pauses. Máxima fluidez garantizada.'
+    title: 'Liberando a tus Plugins',
+    titleEng: 'Ending the DSP Bottleneck',
+    body: 'Los DAWs antiguos obligan a todos tus sintetizadores pesados a hacer fila en el mismo procesador. Nuestro Scheduler Dual reparte la carga creativamente en múltiples Worklets de audio. Simplemente funciona más rápido y más suave.'
   },
   {
-    title: 'Validación Matemática de Audio',
-    body: 'No confíes en tus oídos si el motor hace dithering sin permiso. Exportamos JSON arrays con el histórico de compensación de latencia, drift asíncrono, y phase-cancel testing.'
+    title: 'Confianza Absoluta en tu Mezcla',
+    body: 'Exporta cada stem con la tranquilidad de que la compensación de latencia fue exacta al bit. El motor compensa el retardo de cada cadena de plugins sin desalinear la fase de tus cajas y bombos.'
   },
   {
-    title: 'Acuerdos de Nivel de Servicio Técnico (SLAs)',
-    body: 'Estamos tan confiados que exponemos nuestras métricas internas: p95 drift <= 36ms, lag p95 <= 32ms. Si Logic Pro o Ableton publicaran esto, tendrían que reescribir sus motores core.'
+    title: 'Transparencia de Rendimiento',
+    body: 'Mientras otros ocultan los cuellos de botella mediante suavizados que arruinan la transiente, HOLLOW BITS muestra su latencia interna real. El resultado es un sonido más punzante, táctil y directo.'
   },
   {
-    title: 'Arquitectura Nativa para Sistemas Pesados',
-    body: 'Nacido en Windows porque es donde habitan los entusiastas del silicio real y las cargas pesadas. Planeado para expandir su hegemonía a macOS y Linux bajo el mismo framework binario.'
+    title: 'Poder Bruto para Windows',
+    body: 'Nacido en Windows para aprovechar hardware de alto rendimiento y CPUs masivos. Pronto disponible en macOS, expandiendo este estricto ecosistema a todos los estudios modernos.'
   }
 ];
 
@@ -133,100 +133,100 @@ export const matrixLegend: StatItem[] = [
   {
     value: 'PASS',
     label: 'Cálculo Isocrónico',
-    detail: 'Pipeline DSP operando dentro de umbrales asíncronos estrictos de microsegundos.'
+    detail: 'Fluidez impecable donde el procesamiento y la reproducción de audio están sincronizados a nivel milisegundo.'
   },
   {
     value: 'WARN',
     label: 'Drift Dinámico',
-    detail: 'Compensación de latencia automática en efecto debido a sobrecarga de thread perimetral.'
+    detail: 'El motor detecta cargas pesadas (buses complejos) y se estabiliza internamente sin interrumpir la música.'
   },
   {
     value: 'FAIL',
-    label: 'Corte Quirúrgico',
-    detail: 'Aborte de render. Salvado automático preventivo. Protegiendo la integridad estricta del archivo.'
+    label: 'Protección Creativa',
+    detail: 'Intervención extrema en caso de un pico letal. Congela plugins en el aire protegiendo el oído y los altavoces.'
   }
 ];
 
 export const services: ServiceItem[] = [
   {
-    title: 'Post-Producción Hiperdimensional',
-    body: 'Traspasando la simple "mezcla". Ethereal Sounds esculpe topologías sonoras con precisión forense y dirección creativa para discos que definen la era, no que la siguen.',
+    title: 'Composición Intuitiva y Modular',
+    body: 'Rompe el lienzo lineal. Un sistema de clips interconectado que incita a los "accidentes felices". Toca en vivo tus arreglos, reestructura canciones completas arrastrando macros y mantente siempre en ritmo.',
     outcomes: [
-      'Claridad implacable en todos los medios (Club, Dolby, Mobile).',
-      'Modelado de transitorios y espectros para peso comercial real.',
-      'Preparación integral CUE, STEMS y Deliverables MQA.'
+      'Lanzamiento de escenas sin cortes de audio perceptibles.',
+      'Integración profunda de controladores MIDI y superficies de control.',
+      'Escritura de MIDI fluida, inspirada en las mejores cajas de ritmos.'
     ]
   },
   {
-    title: 'Modelado Sonoro (Sound Design B2B)',
-    body: 'Marcas top, sellos boutique y publishers no usan presets públicos. Diseñamos la química base desde los osciladores hasta el timbre final usando HOLLOW BITS.',
+    title: 'Sound Design Forense',
+    body: 'Sintetizadores modulares integrados, manipulación espectral y cadenas de efectos que puedes guardar, compartir e invocar con un arrastrar-y-soltar.',
     outcomes: [
-      'Identidad sonora patentable (Audio Branding).',
-      'Bibliotecas privadas de assets DSP generativos.',
-      'Integración Wwise/FMOD para interactividad nativa.'
+      'Rack de procesamiento profundo con macros mapeables.',
+      'Resampling al vuelo: captura cualquier señal y trátala como audio fresco al instante.',
+      'Librería base curada: sin relleno, solo sonidos listos para el club.'
     ]
   },
   {
-    title: 'Optimización Live Performance Stage',
-    body: 'Fallar en vivo no es una opción. Auditamos arquitecturas de sets complejos de Ableton y realizamos migraciones al entorno HOLLOW BITS para redundancia cero-fallos.',
+    title: 'Performance en Directo (Live Stage)',
+    body: 'Diseñado no solo para crear en casa, sino para llevarse a estadios. Interfaces legibles en la oscuridad y una respuesta táctil que rivaliza con el equipo analógico.',
     outcomes: [
-      'Sistemas de failover nativos para rigs de hardware y MIDI.',
-      'Distribución de carga de plugins pesados y limitación técnica.',
-      'Protocolos de ensayo y latencia medida en arenas de gran escala.'
+      'Mapeo MIDI al vuelo con feedback visual instantáneo.',
+      'Motor inquebrantable para correr stems base junto a sintetizadores en vivo.',
+      'Manejo avanzado de tempo master e integración Ableton Link.'
     ]
   }
 ];
 
 export const roadmap: RoadmapItem[] = [
   {
-    phase: 'Q1 [La Purga]',
-    focus: 'Demostrar superioridad en el Determinismo de Transporte y Estabilidad de Archivo.',
+    phase: 'Versión V1 [Fundación]',
+    focus: 'Establecer y pulir el motor de audio central. Confianza creativa total.',
     deliverables: [
-      'Gestor asíncrono de eventos MIDI a prueba de stress.',
-      'Undo-history infinito almacenado en buffer diferencial (Zero RAM Leak).',
-      'Ruta de guardado y checksum validado por bloque.'
+      'Manejo de Instrumentos VST3 y AU con bridge ultra-rápido.',
+      'Sistema nativo de warping de audio elástico.',
+      'Bounce y Exportación hiper-rápida offline.'
     ]
   },
   {
-    phase: 'Q2 [La Amenaza (Pipeline Pro)]',
-    focus: 'Implementación del routing monstruoso y motor de automatización Bezier puro.',
+    phase: 'Versión V1.5 [El Flujo]',
+    focus: 'Expansión de herramientas de arreglo y mezcla enfocadas en el productor.',
     deliverables: [
-      'Latencia de matriz de envío reducida a 0.2ms inter-track.',
-      'Automatizaciones visuales hiper-fluidas a 60fps usando Lenis API.',
-      'Sistemas de bus paralelo pre-fader real.'
+      'Curvas de automatización avanzadas y modulación LFO global.',
+      'Vista de mezcla rediseñada para análisis espectral rápido.',
+      'Buses y envíos paralelos de ruteo libre.'
     ]
   },
   {
-    phase: 'Q3 [El Reemplazo (Session V2)]',
-    focus: 'Asalto directo al Session View tradicional. Lanzamiento de clips sin saltos de fase audible en modo quantize-off.',
+    phase: 'Versión V2 [El Escenario]',
+    focus: 'Herramientas absolutas para live-performance y lanzar clips.',
     deliverables: [
-      'Interpolación en vivo de clips de audio y warp adaptativo.',
-      'Crossfades de lanzamiento automáticos de 5ms.',
-      'Rendimiento estático bajo cargas de CPU L3 Cache complejas (Multi-Core).'
+      'Session View optimizada para pantallas táctiles y Push.',
+      'Mapeos MIDI avanzados de multiparámetro (Macros).',
+      'Sincronización multi-dispositivo y latencia cero para sets conjuntos.'
     ]
   },
   {
-    phase: 'Q4 [El Estándar (IA & Rollout)]',
-    focus: 'Herramientas analíticas y de soporte IA nativo, no intrusivo.',
+    phase: 'Versión V3 [Futuro]',
+    focus: 'Copiloto de mezcla y aceleradores de producción innovadores.',
     deliverables: [
-      'Análisis predictivo de frecuencias resonantes molestas (Visual EQ).',
-      'Smart-Comping de tomas vocales basado en micro-variaciones paramétricas.',
-      'Extracción modular y licencia comercial de Enterprise.'
+      'Alineación de fase predictiva para grabaciones de multi-micrófono.',
+      'Matching de EQ entre pistas referencia.',
+      'Ecosistema en la nube integrado para colaboraciones remotas sin pérdida.'
     ]
   }
 ];
 
 export const faqs: FaqItem[] = [
   {
-    question: 'Si son tan buenos, ¿por qué no corren en Mac desde el día 1?',
-    answer: 'La supremacía requiere enfoque. Windows provee el acceso a hardware bruto y paralelismo brutal necesario para forjar nuestro Engine Dual inicial. Una vez validada nuestra tasa matemática de win-rate (99.8%), la arquitectura agnóstica dominará macOS sin el legacy core-audio baggage de GarageBand/Logic.'
+    question: '¿Por qué aprender otro DAW cuando uso Ableton/Logic todos los días?',
+    answer: 'Porque tu flujo de trabajo merece evolucionar. HOLLOW BITS toma la vista de sesión rápida que amas y le inyecta un motor de cálculo crudo donde los proyectos gigantes no causan ralentizaciones. Es un upgrade técnico envuelto en el workflow del futuro.'
   },
   {
-    question: 'No creo sus métricas contra Ableton/Logic. ¿Tienen pruebas?',
-    answer: 'Sí. A diferencia de nuestros competidores cerrados, HOLLOW BITS incluye un módulo generador de reportes JSON nativos. Tú mismo puedes correr nuestra matriz Benchmark y comparar cómo ellos "suavizan" audio para ocultar dropouts mientras nosotros arrojamos VERDAD absoluta bit a bit.'
+    question: '¿Es realmente más estable para presentaciones en vivo?',
+    answer: 'Absolutamente. Mientras otros DAWs compiten en integrar mil funciones, nosotros construimos nuestra base alrededor del "Zero Dropout". El corazón de HOLLOW BITS utiliza Worklets en hilos secundarios para que, pase lo que pase en la UI, la música jamás se detenga.'
   },
   {
-    question: 'Ethereal Sounds es un estudio. ALLYX desarrolla. ¿Quién manda?',
-    answer: 'Es una simbiosis despiadada. Ethereal inyecta el requerimiento elitista y musical de altas ligas. ALLYX responde con la matemática C++/WebAudio. Este DAW no lo hicieron programadores sordos ni productores que no saben codear. Es el pináculo táctico.'
+    question: 'Soy un sound designer. ¿Qué tiene para mí?',
+    answer: 'Una caja de arena modular donde el ruteo no tiene reglas obligatorias. Puedes enviar retornos a otros retornos, automatizar con curvas de spline infinitamente suaves, y resamplear en segundos. Todo esto con fidelidad de 64 bits pura.'
   }
 ];

@@ -51,10 +51,10 @@ export function Ecosystem() {
         <div style={{ paddingTop: '150px' }}>
             <section className="section container">
                 <header className="section-header reveal">
-                    <span className="section-label">Ecosistema Ethereal Sounds</span>
-                    <h2 className="section-title">Ingeniería Humana en Simbiosis.</h2>
+                    <span className="section-label">Tu Estudio Reimaginado</span>
+                    <h2 className="section-title">Herramientas para Artistas.</h2>
                     <p className="section-description">
-                        El software es solo la mitad. Nuestros equipos despliegan producción sonora clase A e integración comercial bajo la marca Ethereal Sounds, forjando un pipeline sin pérdidas.
+                        Desde la composición hasta el master final. HOLLOW BITS te entrega un ecosistema integrado que potencia cada etapa de tu proceso creativo, sin compromisos acústicos ni barreras de procesamiento.
                     </p>
                 </header>
 
