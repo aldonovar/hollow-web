@@ -1,85 +1,98 @@
-import { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
 import { Menu, X } from 'lucide-react';
-import { navItems } from '../content';
+import { Link, Outlet, useLocation } from 'react-router-dom';
+
 import { AnimatedBackground } from '../AnimatedBackground';
+import { routeMeta } from '../content';
 
 export function Layout() {
-    const [isScrolled, setIsScrolled] = useState(false);
-    const [menuOpen, setMenuOpen] = useState(false);
-    const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const location = useLocation();
 
-    useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 50);
-        };
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 40);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
-    // Close mobile menu on route change
-    useEffect(() => {
-        setMenuOpen(false);
-    }, [location]);
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
 
-    return (
-        <div className="app-shell">
-            <div className="noise-overlay"></div>
-            <AnimatedBackground />
+  const activeRoute = useMemo(() => {
+    const match = routeMeta.find((item) => item.path === location.pathname);
+    return match ?? routeMeta[0];
+  }, [location.pathname]);
 
-            {/* HUD Navigation */}
-            <nav className={`global-nav ${isScrolled ? 'scrolled' : ''}`}>
-                {/* Left: Logo */}
-                <Link to="/" className="nav-brand">
-                    <img
-                        src="/hollow-bits-logo.svg"
-                        alt="HOLLOW BITS"
-                        className="brand-logo"
-                        width={160}
-                        height={50}
-                    />
+  return (
+    <div className="site-shell">
+      <AnimatedBackground />
+      <div className="site-shell__grain" aria-hidden="true" />
+
+      <header className={`site-nav ${isScrolled ? 'site-nav--scrolled' : ''}`}>
+        <div className="site-nav__inner">
+          <Link className="brand-lockup" to="/">
+            <span className="brand-lockup__eyebrow">HOLLOW BITS</span>
+            <span className="brand-lockup__title">Digital studio for heavy ideas</span>
+          </Link>
+
+          <button
+            type="button"
+            className="site-nav__toggle"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          >
+            {menuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+
+          <div className={`site-nav__panel ${menuOpen ? 'site-nav__panel--open' : ''}`}>
+            <nav className="site-nav__links">
+              {routeMeta.map((item) => (
+                <Link
+                  key={item.id}
+                  to={item.path}
+                  className={`site-nav__link ${item.path === location.pathname ? 'is-active' : ''}`}
+                >
+                  <span className="site-nav__link-stamp">{item.stamp}</span>
+                  <span>{item.label}</span>
                 </Link>
-
-                {/* Center: Nav links */}
-                <div className={`nav-links ${menuOpen ? 'mobile-open' : ''}`}>
-                    {navItems.map((item, idx) => (
-                        <Link
-                            key={item.id}
-                            to={item.path}
-                            className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
-                        >
-                            <span className="nav-link-index">{String(idx + 1).padStart(2, '0')}</span>
-                            {item.label}
-                        </Link>
-                    ))}
-                </div>
-
-                {/* Right: Status indicator */}
-                <div className="nav-actions">
-                    <div className="nav-status">
-                        <span className="status-dot"></span>
-                        <span className="status-text">DAW v0.9 ALPHA</span>
-                    </div>
-                    <button
-                        className="mobile-menu-toggle"
-                        onClick={() => setMenuOpen(!menuOpen)}
-                    >
-                        {menuOpen ? <X size={18} /> : <Menu size={18} />}
-                    </button>
-                </div>
+              ))}
             </nav>
 
-            {/* Main Content Area */}
-            <main>
-                <Outlet />
-            </main>
-
-            {/* Global Footer — HUD bottom bar */}
-            <footer className="global-footer">
-                <span>HOLLOW BITS — ALLYX × ETHEREAL SOUNDS</span>
-                <span className="footer-mid">AUDIO ENGINE ARCHITECTURE</span>
-                <span>© 2025 — ALL RIGHTS RESERVED</span>
-            </footer>
+            <div className="site-nav__status">
+              <span className="site-nav__status-dot" />
+              <div>
+                <span className="site-nav__status-label">{activeRoute.kicker}</span>
+                <strong>{activeRoute.stamp}</strong>
+              </div>
+            </div>
+          </div>
         </div>
-    );
+      </header>
+
+      <main className="site-main">
+        <div className="site-main__frame" key={location.pathname} data-route-shell>
+          <Outlet />
+        </div>
+      </main>
+
+      <footer className="site-footer">
+        <div className="site-footer__inner">
+          <div>
+            <span className="site-footer__label">Current route</span>
+            <strong>{activeRoute.summary}</strong>
+          </div>
+          <div>
+            <span className="site-footer__label">Product mood</span>
+            <strong>Silent by default. Visual by obsession.</strong>
+          </div>
+          <div>
+            <span className="site-footer__label">Origin</span>
+            <strong>ALLYX - desktop-first DAW study</strong>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
 }

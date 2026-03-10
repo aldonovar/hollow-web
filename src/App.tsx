@@ -1,19 +1,21 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 import Lenis from 'lenis';
 
 import { Layout } from './components/Layout';
-import { Home } from './pages/Home';
-import { Engine } from './pages/Engine';
-import { Ecosystem } from './pages/Ecosystem';
-import { Roadmap } from './pages/Roadmap';
 import { Contact } from './pages/Contact';
+import { Ecosystem } from './pages/Ecosystem';
+import { Engine } from './pages/Engine';
+import { Home } from './pages/Home';
+import { Roadmap } from './pages/Roadmap';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [pathname]);
 
   return null;
@@ -21,24 +23,25 @@ function ScrollToTop() {
 
 function App() {
   useEffect(() => {
+    gsap.registerPlugin(ScrollTrigger);
+
     const lenis = new Lenis({
-      duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      orientation: 'vertical',
-      gestureOrientation: 'vertical',
+      duration: 1.1,
       smoothWheel: true,
-      wheelMultiplier: 1,
-      touchMultiplier: 2,
+      wheelMultiplier: 0.95,
+      touchMultiplier: 1.4,
     });
 
-    function raf(time: number) {
-      lenis.raf(time);
-      requestAnimationFrame(raf);
-    }
+    const handleLenisFrame = (time: number) => {
+      lenis.raf(time * 1000);
+    };
 
-    requestAnimationFrame(raf);
+    lenis.on('scroll', ScrollTrigger.update);
+    gsap.ticker.add(handleLenisFrame);
+    gsap.ticker.lagSmoothing(0);
 
     return () => {
+      gsap.ticker.remove(handleLenisFrame);
       lenis.destroy();
     };
   }, []);

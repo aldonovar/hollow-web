@@ -1,105 +1,124 @@
-import { useEffect } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { engineHighlights, matrixLegend } from '../content';
+import {
+  engineGateCommands,
+  engineNarratives,
+  enginePosters,
+  engineProofMetrics,
+  engineThresholds,
+} from '../content';
+import { LinkPill, MetricCard, PosterCard, SectionIntro } from '../components/Editorial';
+import { usePageMotion } from '../components/usePageMotion';
 
 export function Engine() {
-    useEffect(() => {
-        gsap.registerPlugin(ScrollTrigger);
-        const ctx = gsap.context(() => {
-            gsap.utils.toArray<HTMLElement>('.reveal').forEach((elem) => {
-                gsap.fromTo(elem,
-                    { autoAlpha: 0, y: 60 },
-                    {
-                        autoAlpha: 1,
-                        y: 0,
-                        duration: 1.2,
-                        ease: 'power3.out',
-                        scrollTrigger: {
-                            trigger: elem,
-                            start: 'top 85%',
-                            once: true
-                        }
-                    }
-                );
-            });
+  const pageRef = usePageMotion();
 
-            gsap.utils.toArray<HTMLElement>('.stagger-group').forEach((group) => {
-                const items = group.querySelectorAll('.stagger-item');
-                gsap.fromTo(items,
-                    { autoAlpha: 0, y: 40 },
-                    {
-                        autoAlpha: 1,
-                        y: 0,
-                        duration: 1,
-                        stagger: 0.1,
-                        ease: 'power3.out',
-                        scrollTrigger: {
-                            trigger: group,
-                            start: 'top 85%',
-                            once: true
-                        }
-                    }
-                );
-            });
-
-            gsap.to('.data-stream', { strokeDashoffset: -100, duration: 2, ease: 'none', repeat: -1 });
-            gsap.to('.data-stream-2', { strokeDashoffset: 100, duration: 4, ease: 'none', repeat: -1 });
-        });
-
-        return () => ctx.revert();
-    }, []);
-
-    return (
-        <div style={{ paddingTop: '150px' }}>
-            <section className="section container">
-                <header className="section-header reveal">
-                    <span className="section-label">[ 002 ] CORE ARCHITECTURE</span>
-                    <h2 className="section-title">Precisión<br /><span style={{ color: 'var(--text-tertiary)' }}>Matemática.</span></h2>
-                    <p className="section-description">
-                        Scheduler Dual (Worklet-node nativo), buffers de latencia cero y recuperación iterativa en hilo secundario. El estándar profesional indiscutible.
-                    </p>
-                </header>
-
-                <div className="grid-2">
-                    <div className="timeline">
-                        {engineHighlights.map((hl, idx) => (
-                            <div key={hl.title} className={`timeline-item ${idx === 0 ? 'active' : ''} reveal`}>
-                                <h3 className="timeline-focus" style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{hl.title}</h3>
-                                <p className="card-text">{hl.body}</p>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="reveal" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                        <div style={{ padding: '2px', background: 'var(--border-strong)' }}>
-                            <div style={{ height: '300px', background: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
-                                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--border-strong)" strokeWidth="1" />
-                                    </pattern>
-                                    <rect width="100%" height="100%" fill="url(#grid)" />
-                                    <path className="data-stream" d="M 0 150 Q 100 50 200 150 T 400 150 T 600 150 T 800 150" fill="none" stroke="var(--accent-primary)" strokeWidth="2" strokeDasharray="10 10" />
-                                    <path className="data-stream-2" d="M 0 200 Q 150 250 300 100 T 600 200 T 900 100" fill="none" stroke="var(--text-secondary)" strokeWidth="1" strokeDasharray="5 15" />
-                                </svg>
-                                <div style={{ position: 'absolute', top: '1rem', left: '1rem', padding: '0.25rem 0.75rem', border: '1px solid var(--border-strong)', background: 'rgba(0,0,0,0.8)', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>LIVE A/B BENCHMARK - WORKLET VS INTERVAL</div>
-                            </div>
-                        </div>
-                        <div className="grid-3 stagger-group" style={{ gap: '1px', background: 'var(--border-strong)', border: '1px solid var(--border-strong)' }}>
-                            {matrixLegend.map(lg => (
-                                <div key={lg.value} className="card stagger-item" style={{ padding: '2rem 1.5rem', borderRadius: 0, border: 'none' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                        <span className="stat-label" style={{ color: lg.value === 'PASS' ? 'var(--text-primary)' : lg.value === 'WARN' ? 'var(--accent-primary)' : '#ff2a00', margin: 0 }}>{lg.value}</span>
-                                        <span style={{ fontSize: '0.6rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>[ SYS_ACTIVE ]</span>
-                                    </div>
-                                    <h4 style={{ fontSize: '1rem', marginTop: '0.5rem', marginBottom: '0.5rem', textTransform: 'uppercase' }}>{lg.label}</h4>
-                                    <p className="stat-detail" style={{ fontSize: '0.75rem' }}>{lg.detail}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </section>
+  return (
+    <div className="page-shell" ref={pageRef}>
+      <section className="page-hero page-hero--split" data-page-hero>
+        <div>
+          <span className="eyebrow-tag">Proof layer - HB-01</span>
+          <h1 className="page-hero__title">
+            Prueba tecnica
+            <br />
+            sin matar el misterio.
+          </h1>
+          <p className="page-hero__body">
+            Detras del tono editorial hay una capa dura: scheduler dual, gates de
+            release, budgets de drift y una matrix de confiabilidad pensada para decir
+            cuando el producto aun no merece salir.
+          </p>
         </div>
-    );
+
+        <div className="page-hero__aside">
+          <span className="page-hero__aside-kicker">Why it matters</span>
+          <p>
+            Un benchmark solo sirve cuando tiene poder politico dentro del producto.
+            Aqui no es adorno: puede bloquear el release.
+          </p>
+          <LinkPill to="/contact" quiet>
+            Solicitar acceso
+          </LinkPill>
+        </div>
+      </section>
+
+      <section className="editorial-section editorial-section--flush">
+        <div className="metric-strip" data-stagger>
+          {engineProofMetrics.map((item) => (
+            <div key={item.label} data-stagger-item>
+              <MetricCard item={item} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="editorial-section">
+        <div className="split-showcase">
+          <div className="split-showcase__visual" data-parallax="90">
+            <PosterCard item={enginePosters[0]} className="split-showcase__poster" />
+            <PosterCard item={enginePosters[1]} className="split-showcase__poster split-showcase__poster--offset" />
+          </div>
+
+          <div className="split-showcase__copy">
+            <SectionIntro
+              kicker="Architecture stance"
+              title={
+                <>
+                  El engine no intenta esconder
+                  <br />
+                  la dificultad. La coreografia.
+                </>
+              }
+              description="La app madre ya habla en terminos de worklet-clock, interval fallback, graph patching incremental y reportes exportables. Esta pagina traduce esa realidad a una capa visual mas deseable."
+            />
+
+            <div className="comparison-stack" data-stagger>
+              {engineNarratives.map((item) => (
+                <article className="comparison-card comparison-card--wide" key={item.title} data-stagger-item>
+                  <span className="comparison-card__eyebrow">{item.eyebrow}</span>
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
+                  <strong>{item.detail}</strong>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="editorial-section">
+        <SectionIntro
+          kicker="Gate protocol"
+          title={
+            <>
+              Release discipline
+              <br />
+              rendered as a visual contract.
+            </>
+          }
+          description="Las reglas del proyecto ya existen en la documentacion: ningun release candidate si un gate falla. Esta seccion lo vuelve legible para quien entra por primera vez."
+        />
+
+        <div className="board-grid">
+          <article className="board-card" data-reveal>
+            <span className="board-card__eyebrow">Always required</span>
+            <h3>Engineering gates</h3>
+            <ul className="board-card__list">
+              {engineGateCommands.map((command) => (
+                <li key={command}>{command}</li>
+              ))}
+            </ul>
+          </article>
+
+          <article className="board-card" data-reveal>
+            <span className="board-card__eyebrow">Perf budgets</span>
+            <h3>Benchmark thresholds</h3>
+            <ul className="board-card__list">
+              {engineThresholds.map((threshold) => (
+                <li key={threshold}>{threshold}</li>
+              ))}
+            </ul>
+          </article>
+        </div>
+      </section>
+    </div>
+  );
 }

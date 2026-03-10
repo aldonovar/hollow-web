@@ -1,71 +1,121 @@
-import { useEffect } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { accessOptions, accessReasons } from '../content';
+import { LinkPill, SectionIntro } from '../components/Editorial';
+import { usePageMotion } from '../components/usePageMotion';
 
 export function Contact() {
-    useEffect(() => {
-        gsap.registerPlugin(ScrollTrigger);
-        const ctx = gsap.context(() => {
-            gsap.utils.toArray<HTMLElement>('.reveal').forEach((elem) => {
-                gsap.fromTo(elem,
-                    { autoAlpha: 0, y: 60 },
-                    {
-                        autoAlpha: 1,
-                        y: 0,
-                        duration: 1.2,
-                        ease: 'power3.out',
-                        scrollTrigger: {
-                            trigger: elem,
-                            start: 'top 85%',
-                            once: true
-                        }
-                    }
-                );
-            });
-        });
+  const pageRef = usePageMotion();
 
-        return () => ctx.revert();
-    }, []);
-
-    return (
-        <div style={{ paddingTop: '150px' }}>
-            <section className="section container">
-                <header className="section-header reveal">
-                    <span className="section-label">Early Access B2B</span>
-                    <h2 className="section-title">Acceso de Nivel Empresarial.</h2>
-                    <p className="section-description">
-                        HOLLOW BITS no es un plugin de juguete para recintos bedroom. Filtramos la adquisición para estudios profesionales, casas productoras y veteranos del diseño sonoro.
-                    </p>
-                </header>
-
-                <div className="reveal" style={{ maxWidth: '600px', margin: '0 auto', background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)', padding: '3rem', borderRadius: 'var(--radius-lg)' }}>
-                    <form style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }} onSubmit={(e) => e.preventDefault()}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Instalación / Estudio (o Alias Pro)</label>
-                            <input type="text" style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', padding: '1rem', color: 'var(--text-primary)', borderRadius: 'var(--radius-sm)' }} placeholder="Tu organización técnica..." required />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Correo Electrónico (Solo dominios B2B o verificados)</label>
-                            <input type="email" style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', padding: '1rem', color: 'var(--text-primary)', borderRadius: 'var(--radius-sm)' }} placeholder="host@studio.com" required />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            <label style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Workflow Actual (DAW principal a reemplazar)</label>
-                            <select style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', padding: '1rem', color: 'var(--text-primary)', borderRadius: 'var(--radius-sm)' }}>
-                                <option>Ableton Live (Cargas de UI / Dropouts)</option>
-                                <option>Logic Pro (Arquitectura Estancada Core-Audio)</option>
-                                <option>Pro Tools (Lentitud de DSP)</option>
-                                <option>FL Studio / Otros</option>
-                            </select>
-                        </div>
-                        <button className="nav-button primary" style={{ marginTop: '1rem', padding: '1.25rem', justifyContent: 'center', fontSize: '1rem' }}>
-                            Solicitar Evaluación de Hardware
-                        </button>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'center', marginTop: '1rem' }}>
-                            Las solicitudes comerciales son auditadas manualmente. No aprobamos hardware incapaz de soportar cálculo matemático extremo.
-                        </p>
-                    </form>
-                </div>
-            </section>
+  return (
+    <div className="page-shell" ref={pageRef}>
+      <section className="page-hero page-hero--split" data-page-hero>
+        <div>
+          <span className="eyebrow-tag">Private circle - HB-04</span>
+          <h1 className="page-hero__title">
+            Acceso temprano
+            <br />
+            para quienes sienten el hueco.
+          </h1>
+          <p className="page-hero__body">
+            HOLLOW BITS todavia esta tomando forma. Eso es precisamente lo que vuelve
+            valioso entrar ahora: puedes probar una direccion distinta antes de que el
+            release la vuelva costumbre.
+          </p>
         </div>
-    );
+
+        <div className="page-hero__aside">
+          <span className="page-hero__aside-kicker">What we want</span>
+          <p>
+            Productores, estudios, performers y sound designers que quieran una
+            alternativa real, no otra demo bonita sin columna tecnica.
+          </p>
+          <LinkPill to="/engine" quiet>
+            Revisar la capa tecnica
+          </LinkPill>
+        </div>
+      </section>
+
+      <section className="editorial-section">
+        <div className="contact-grid">
+          <div className="contact-grid__info">
+            <SectionIntro
+              kicker="Who this is for"
+              title={
+                <>
+                  Early access no significa
+                  <br />
+                  pedir fe ciega.
+                </>
+              }
+              description="Significa abrir una conversacion con personas que reconocen el problema y saben por que vale la pena empujar otra clase de estudio digital."
+            />
+
+            <div className="reason-stack" data-stagger>
+              {accessReasons.map((reason) => (
+                <article className="reason-card" key={reason.title} data-stagger-item>
+                  <span className="reason-card__tag">{reason.tag}</span>
+                  <h3>{reason.title}</h3>
+                  <p>{reason.body}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="contact-grid__form" data-reveal>
+            <form
+              className="contact-form"
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <div className="contact-form__intro">
+                <span className="contact-form__eyebrow">Application note</span>
+                <h2>Enter the room before the walls dry.</h2>
+                <p>
+                  Dejanos tu estudio, tu contexto y la razon por la que tu DAW actual ya
+                  no alcanza.
+                </p>
+              </div>
+
+              <label className="field">
+                <span>Nombre o alias</span>
+                <input type="text" name="name" placeholder="Tu firma creativa" required />
+              </label>
+
+              <label className="field">
+                <span>Correo</span>
+                <input type="email" name="email" placeholder="you@studio.com" required />
+              </label>
+
+              <label className="field">
+                <span>DAW actual</span>
+                <select name="workflow" defaultValue={accessOptions[0]}>
+                  {accessOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Que parte de tu flujo ya no soportas?</span>
+                <textarea
+                  name="pain"
+                  rows={5}
+                  placeholder="Latencia, menus, fragilidad en vivo, export dudoso, saturacion visual..."
+                />
+              </label>
+
+              <button className="contact-form__submit" type="submit">
+                Solicitar private access
+              </button>
+
+              <p className="contact-form__note">
+                La experiencia web es silenciosa por defecto. El producto no. Nos interesa
+                hablar con gente que pueda tensionar la herramienta en contexto real.
+              </p>
+            </form>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 }

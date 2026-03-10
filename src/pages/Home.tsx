@@ -1,169 +1,150 @@
-import { useEffect } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Link } from 'react-router-dom';
-import { capabilities, heroStats } from '../content';
 
-function HollowBitsAnimatedLogo() {
-    return (
-        <div className="hero-visual" aria-hidden="true" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src="/hollow-bits-logo.svg" alt="Hollow Bits Logo" style={{ width: '100%', height: 'auto', maxWidth: '600px', transform: 'scale(1.1) translateX(-5%)', filter: 'drop-shadow(0 0 40px rgba(168, 85, 247, 0.4))' }} />
-        </div>
-    );
-}
+import {
+  homeComparisons,
+  homeHeroMetrics,
+  homePosters,
+  manifestoMetrics,
+  routePreviewPosters,
+} from '../content';
+import { LinkPill, MetricCard, PosterCard, SectionIntro } from '../components/Editorial';
+import { usePageMotion } from '../components/usePageMotion';
 
 export function Home() {
-    useEffect(() => {
-        gsap.registerPlugin(ScrollTrigger);
-        const ctx = gsap.context(() => {
-            const tl = gsap.timeline({ defaults: { ease: 'power4.out' } });
+  const pageRef = usePageMotion();
 
-            tl.fromTo('.hero-subtitle',
-                { autoAlpha: 0, x: -20 },
-                { autoAlpha: 1, x: 0, duration: 1 },
-                0.3
-            )
-                .fromTo('.hero-line',
-                    { yPercent: 110, autoAlpha: 0 },
-                    { yPercent: 0, autoAlpha: 1, stagger: 0.08, duration: 1.4 },
-                    '-=0.6'
-                )
-                .fromTo('.hero-description',
-                    { autoAlpha: 0, y: 20 },
-                    { autoAlpha: 1, y: 0, duration: 1 },
-                    '-=0.8'
-                )
-                .fromTo('.hero-meta',
-                    { autoAlpha: 0, y: 20 },
-                    { autoAlpha: 1, y: 0, duration: 0.8 },
-                    '-=0.6'
-                )
-                .fromTo('.hero-visual',
-                    { autoAlpha: 0, scale: 0.95 },
-                    { autoAlpha: 1, scale: 1, duration: 2.5, ease: 'power2.out' },
-                    0.8
-                );
+  return (
+    <div className="page-shell page-shell--home" ref={pageRef}>
+      <section className="hero-landing" data-page-hero>
+        <div className="hero-landing__copy">
+          <span className="eyebrow-tag">DAW manifesto - Windows x64 - private build</span>
+          <h1 className="hero-landing__title">
+            El estudio no deberia sentirse
+            <br />
+            mas pequeno que tu idea.
+          </h1>
+          <p className="hero-landing__body">
+            HOLLOW BITS mezcla impulso performativo, profundidad tecnica y un lenguaje
+            visual mas cinematografico para quienes ya no quieren elegir entre velocidad
+            y control.
+          </p>
+          <div className="hero-landing__actions">
+            <LinkPill to="/engine">Ver capa de prueba</LinkPill>
+            <LinkPill to="/contact" quiet>
+              Entrar al early circle
+            </LinkPill>
+          </div>
+        </div>
 
-            gsap.utils.toArray<HTMLElement>('.reveal').forEach((elem) => {
-                gsap.fromTo(elem,
-                    { autoAlpha: 0, y: 50 },
-                    {
-                        autoAlpha: 1,
-                        y: 0,
-                        duration: 1.2,
-                        ease: 'power3.out',
-                        scrollTrigger: {
-                            trigger: elem,
-                            start: 'top 85%',
-                            once: true
-                        }
-                    }
-                );
-            });
+        <div className="hero-landing__collage" data-parallax="120">
+          <PosterCard item={homePosters[0]} className="hero-poster hero-poster--primary" />
+          <PosterCard item={homePosters[1]} className="hero-poster hero-poster--secondary" />
+          <PosterCard item={homePosters[2]} className="hero-poster hero-poster--tertiary" />
+        </div>
+      </section>
 
-            gsap.utils.toArray<HTMLElement>('.stagger-group').forEach((group) => {
-                const items = group.querySelectorAll('.stagger-item');
-                gsap.fromTo(items,
-                    { autoAlpha: 0, y: 30 },
-                    {
-                        autoAlpha: 1,
-                        y: 0,
-                        duration: 1,
-                        stagger: 0.08,
-                        ease: 'power3.out',
-                        scrollTrigger: {
-                            trigger: group,
-                            start: 'top 85%',
-                            once: true
-                        }
-                    }
-                );
-            });
-
-            ScrollTrigger.refresh();
-        });
-
-        return () => ctx.revert();
-    }, []);
-
-    return (
-        <>
-            {/* HERO — Giant Editorial */}
-            <section className="hero container">
-                <div className="hero-content">
-                    <span className="hero-subtitle">// CREA SIN CORTES — V0.9 ALPHA</span>
-                    <h1 className="hero-title">
-                        <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>COMPÓN</span></span>
-                        <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block', color: 'var(--text-tertiary)' }}>SIN</span></span>
-                        <span className="line-wrap"><span className="hero-line" style={{ display: 'inline-block' }}>LÍMITES.</span></span>
-                    </h1>
-                    <p className="hero-description">
-                        HOLLOW BITS es el DAW diseñado para que la inspiración fluya sin barreras técnicas.
-                        Un motor nativo inquebrantable construido para músicos y sound designers que exigen latencia cero y libertad creativa pura.
-                    </p>
-
-                    <div className="hero-meta stagger-group">
-                        {heroStats.slice(0, 4).map(stat => (
-                            <div key={stat.label} className="hero-meta-item stagger-item">
-                                <strong>{stat.value}</strong>
-                                {stat.label}
-                            </div>
-                        ))}
-                        <div className="hero-meta-item stagger-item" style={{ marginLeft: 'auto' }}>
-                            <Link to="/engine" className="hud-link">
-                                EXPLORAR EL MOTOR →
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Giant SVG Logo replaces generic visual */}
-                <HollowBitsAnimatedLogo />
-            </section>
-
-            {/* Stats strip */}
-            <div className="container" style={{ marginTop: '2rem' }}>
-                <div className="stats-grid stagger-group" style={{ position: 'relative' }}>
-                    <div style={{ position: 'absolute', top: '-20px', left: '2rem', background: 'var(--bg-primary)', padding: '0 10px', fontSize: '0.65rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-primary)', letterSpacing: '0.2em' }}>
-                        SYS_METRICS_V0.9
-                    </div>
-                    {heroStats.map(stat => (
-                        <div key={stat.label} className="stat-item stagger-item">
-                            <span style={{ fontSize: '0.6rem', color: '#10b981', fontFamily: 'var(--font-mono)', marginBottom: '1rem' }}>[ ONLINE ]</span>
-                            <span className="stat-value">{stat.value}</span>
-                            <span className="stat-label">{stat.label}</span>
-                            <span className="stat-detail">{stat.detail}</span>
-                        </div>
-                    ))}
-                </div>
+      <section className="editorial-section editorial-section--flush">
+        <div className="metric-strip" data-stagger>
+          {homeHeroMetrics.map((item) => (
+            <div key={item.label} data-stagger-item>
+              <MetricCard item={item} />
             </div>
+          ))}
+        </div>
+      </section>
 
-            {/* Capabilities section */}
-            <section className="section container">
-                <header className="section-header reveal">
-                    <span className="section-label">[ 001 ] EL DAW DEFINITIVO // CAPABILITIES</span>
-                    <h2 className="section-title">Workflow diseñado<br /><span style={{ color: 'var(--text-tertiary)' }}>para tu inspiración.</span></h2>
-                    <p className="section-description">
-                        Combina la inmediatez de la vista de sesión con la profundidad de un arreglo tradicional.
-                        HOLLOW BITS funde ambos mundos en un entorno creativo fluido e inquebrantable.
-                    </p>
-                </header>
+      <section className="editorial-section">
+        <SectionIntro
+          kicker="Why this exists"
+          title={
+            <>
+              Ableton nos dio velocidad.
+              <br />
+              Logic nos dio pulido.
+              <br />
+              HOLLOW BITS quiere el espacio despues de ambos.
+            </>
+          }
+          description="No se trata de insultar a los DAWs que formaron una generacion. Se trata de aceptar que todavia hay un territorio nuevo entre performance, precision y presencia visual."
+        />
 
-                <div className="card-grid stagger-group">
-                    {capabilities.map((cap, idx) => (
-                        <article key={cap.title} className="card stagger-item">
-                            <div className="card-index">{String(idx + 1).padStart(2, '0')}</div>
-                            <h3 className="card-title">{cap.title}</h3>
-                            <p className="card-text">{cap.body}</p>
-                            <ul className="card-list">
-                                {cap.bullets.map((bullet, bi) => (
-                                    <li key={bi} className="card-list-item">{bullet}</li>
-                                ))}
-                            </ul>
-                        </article>
-                    ))}
-                </div>
-            </section>
-        </>
-    );
+        <div className="comparison-grid" data-stagger>
+          {homeComparisons.map((item) => (
+            <article className="comparison-card" key={item.title} data-stagger-item>
+              <span className="comparison-card__eyebrow">{item.eyebrow}</span>
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
+              <strong>{item.detail}</strong>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="editorial-section editorial-section--quote">
+        <div className="quote-panel" data-reveal>
+          <span className="quote-panel__kicker">Core feeling</span>
+          <p className="quote-panel__text">
+            This is not a prettier dashboard for old habits.
+            <br />
+            It is a studio language built around pulse, scale and intent.
+          </p>
+          <span className="quote-panel__caption">
+            Silent by default. Visceral by design.
+          </span>
+        </div>
+      </section>
+
+      <section className="editorial-section">
+        <SectionIntro
+          kicker="Product evidence"
+          title={
+            <>
+              El manifiesto no flota solo.
+              <br />
+              Ya tiene columna tecnica debajo.
+            </>
+          }
+          description="Estos bloques salen de la app madre y de su documentacion: reliability matrix, benchmark export, virtualizacion de sesiones y una disciplina de release que impide vender humo."
+        />
+
+        <div className="metric-grid metric-grid--three" data-stagger>
+          {manifestoMetrics.map((item) => (
+            <div key={item.label} data-stagger-item>
+              <MetricCard item={item} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="editorial-section">
+        <SectionIntro
+          kicker="Continue the trip"
+          title={
+            <>
+              Explora el proyecto como una serie
+              <br />
+              de capitulos, no como tabs sueltas.
+            </>
+          }
+          description="Cada pagina empuja una parte distinta del relato: prueba, flujo, futuro y acceso."
+        />
+
+        <div className="route-preview-grid" data-stagger>
+          {routePreviewPosters.map((poster, index) => {
+            const routes = ['/engine', '/ecosystem', '/contact'];
+            return (
+              <Link
+                className="route-preview-link"
+                key={poster.title}
+                to={routes[index]}
+                data-stagger-item
+              >
+                <PosterCard item={poster} />
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
 }
