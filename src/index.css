@@ -42,11 +42,8 @@ input,select,textarea{font:inherit;color:inherit}
   display:flex;align-items:center;justify-content:space-between;gap:.75rem;
   border:1px solid var(--border);background:var(--glass);backdrop-filter:blur(20px) saturate(1.4);
   border-radius:var(--r);transition:all .3s var(--ease)}
-.brand-lockup{display:flex;align-items:center;gap:.6rem}
-.brand-lockup__icon{width:26px;height:26px;border-radius:var(--r);background:var(--grad);display:grid;place-items:center;
-  box-shadow:0 0 16px rgba(168,85,247,.3)}
-.brand-lockup__icon span{font-family:var(--fm);font-size:.6rem;font-weight:700;color:#fff}
-.brand-lockup__text{font-family:var(--fm);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-2)}
+.brand-lockup{display:flex;align-items:center}
+.brand-lockup__logo{height:28px;width:auto}
 
 .site-nav__toggle{display:none;width:2.2rem;height:2.2rem;border:1px solid var(--border);
   background:var(--glass);border-radius:var(--r);color:var(--text-2);align-items:center;justify-content:center}
@@ -81,8 +78,7 @@ input,select,textarea{font:inherit;color:inherit}
 .hero__badge{display:inline-flex;align-items:center;gap:.5rem;padding:.4rem .85rem;border-radius:var(--r);
   border:1px solid var(--border);background:var(--bg-elevated);font-family:var(--fm);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text-2);margin-bottom:2rem}
 .hero__badge-dot{width:5px;height:5px;border-radius:50%;background:var(--purple);box-shadow:0 0 10px var(--purple);animation:pulse 2s ease infinite}
-.hero__title{font-family:var(--fd);font-size:clamp(3rem,7.5vw,6rem);font-weight:800;line-height:.9;letter-spacing:-.04em;max-width:880px;
-  background:linear-gradient(180deg,#fff 20%,rgba(255,255,255,.45));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero__title{font-family:var(--fd);font-size:clamp(3rem,7.5vw,6rem);font-weight:800;line-height:.9;letter-spacing:-.04em;max-width:880px;color:#fff}
 .hero__subtitle{margin-top:1.5rem;font-size:clamp(1rem,1.6vw,1.15rem);line-height:1.75;color:var(--text-2);max-width:560px}
 .hero__actions{display:flex;gap:.75rem;margin-top:2.5rem;flex-wrap:wrap;justify-content:center}
 .hero__glow{position:absolute;width:500px;height:500px;border-radius:50%;filter:blur(100px);opacity:.12;pointer-events:none;z-index:-1}
@@ -153,9 +149,8 @@ input,select,textarea{font:inherit;color:inherit}
   padding:.3rem .85rem;border-radius:var(--r);background:var(--grad);font-family:var(--fm);
   font-size:.6rem;letter-spacing:.12em;color:#fff;font-weight:700}
 .pricing-card__name{font-family:var(--fm);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-3)}
-.pricing-card__price{font-family:var(--fd);font-size:3.2rem;font-weight:800;margin:.6rem 0 .2rem;
-  background:linear-gradient(180deg,#fff,rgba(255,255,255,.55));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.pricing-card__price span{font-size:.9rem;font-weight:400;-webkit-text-fill-color:var(--text-3)}
+.pricing-card__price{font-family:var(--fd);font-size:3.2rem;font-weight:800;margin:.6rem 0 .2rem;color:#fff}
+.pricing-card__price span{font-size:.9rem;font-weight:400;color:var(--text-3)}
 .pricing-card__desc{color:var(--text-2);font-size:.85rem;margin-bottom:1.75rem}
 .pricing-card__features{list-style:none;text-align:left;display:grid;gap:.5rem;margin-bottom:1.75rem}
 .pricing-card__features li{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--text-2)}
