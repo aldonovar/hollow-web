@@ -1,4 +1,4 @@
-import { Btn, SectionHeader } from '../components/Editorial';
+import { SectionHeader } from '../components/Editorial';
 import { usePageMotion } from '../components/usePageMotion';
 
 const reasons = [
