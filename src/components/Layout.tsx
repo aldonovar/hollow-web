@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, User } from 'lucide-react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { AnimatedBackground } from '../AnimatedBackground';
 import { routeMeta } from '../content';
@@ -49,7 +49,13 @@ export function Layout() {
                 </Link>
               ))}
             </nav>
-            <Link className="site-nav__cta" to="/console">Abrir Console</Link>
+            <div className="site-nav__auth">
+              <Link className="site-nav__login" to="/login">Log In</Link>
+              <Link className="site-nav__cta" to="/signup">
+                Sign Up
+                <User className="site-nav__icon" size={16} />
+              </Link>
+            </div>
           </div>
         </div>
       </header>

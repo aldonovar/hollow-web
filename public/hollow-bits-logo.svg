@@ -37,7 +37,7 @@
   </defs>
 
   <!-- Deep Cosmos Background -->
-  <rect width="800" height="250" fill="#090a10" rx="4" />
+  <rect width="800" height="250" fill="transparent" rx="4" />
   
   <!-- Subtle Stars -->
   <g fill="#ffffff" opacity="0.4">
