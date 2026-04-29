@@ -1,5 +1,5 @@
-import { roadmapPhases, roadmapPrinciples } from '../content';
-import { LinkPill, SectionIntro } from '../components/Editorial';
+import { roadmapPhases } from '../content';
+import { Btn, SectionHeader } from '../components/Editorial';
 import { usePageMotion } from '../components/usePageMotion';
 
 export function Roadmap() {
@@ -7,96 +7,45 @@ export function Roadmap() {
 
   return (
     <div className="page-shell" ref={pageRef}>
-      <section className="page-hero page-hero--split" data-page-hero>
-        <div>
-          <span className="eyebrow-tag">Future states - HB-03</span>
-          <h1 className="page-hero__title">
-            Un roadmap sirve
-            <br />
-            cuando tambien sabe decir no.
-          </h1>
-          <p className="page-hero__body">
-            La evolucion de HOLLOW BITS no es una lluvia de features. Es una secuencia
-            de capas: primero determinismo, luego profundidad, despues performance y al
-            final una diferencia que no pueda confundirse con maquillaje.
-          </p>
-        </div>
-
-        <div className="page-hero__aside">
-          <span className="page-hero__aside-kicker">North star</span>
-          <p>
-            Construir un DAW desktop-first que compita con Ableton y Logic en casos
-            clave y los supere cuando la estabilidad, el workflow y la inteligencia ya
-            no pueden ir separados.
-          </p>
-          <LinkPill to="/contact" quiet>
-            Sumarse al acceso temprano
-          </LinkPill>
-        </div>
+      <section className="hero" style={{ minHeight: 'auto', paddingBottom: '2rem' }} data-page-hero>
+        <div className="hero__badge"><span className="hero__badge-dot" /> Roadmap</div>
+        <h1 className="hero__title" style={{ fontSize: 'clamp(2.8rem,6vw,5rem)' }}>
+          Un roadmap que<br />también sabe decir no.
+        </h1>
+        <p className="hero__subtitle">
+          Foundation → Depth → Web Console → Differentiation.
+          Cada fase tiene criterios de salida reales, no promesas vagas.
+        </p>
       </section>
 
-      <section className="editorial-section">
-        <SectionIntro
-          kicker="Sequence"
-          title={
-            <>
-              Foundation.
-              <br />
-              Parity.
-              <br />
-              Differentiation.
-            </>
-          }
-          description="El roadmap maestro ya esta escrito en la app madre. Esta pagina lo traduce a una secuencia mas deseable y menos burocratica."
+      <section className="section">
+        <SectionHeader
+          kicker="Evolución"
+          title={<>Cuatro fases hacia<br />un estudio sin compromisos.</>}
         />
-
-        <div className="timeline-grid" data-stagger>
-          {roadmapPhases.map((phase) => (
-            <article className="timeline-card" key={phase.phase} data-stagger-item>
-              <span className="timeline-card__phase">{phase.phase}</span>
-              <h3>{phase.horizon}</h3>
-              <p>{phase.body}</p>
-              <ul className="timeline-card__list">
-                {phase.deliverables.map((deliverable) => (
-                  <li key={deliverable}>{deliverable}</li>
-                ))}
+        <div className="timeline" data-stagger>
+          {roadmapPhases.map(phase => (
+            <article className="timeline__item" key={phase.phase} data-stagger-item>
+              <div className="timeline__dot" />
+              <span className="timeline__phase">{phase.phase}</span>
+              <h3 className="timeline__title">{phase.horizon}</h3>
+              <p className="timeline__body">{phase.body}</p>
+              <ul className="timeline__deliverables">
+                {phase.deliverables.map(d => <li key={d}>{d}</li>)}
               </ul>
-              <strong>{phase.note}</strong>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="editorial-section editorial-section--quote">
-        <div className="quote-panel" data-reveal>
-          <span className="quote-panel__kicker">Governance</span>
-          <p className="quote-panel__text">
-            No feature deserves a glossy reveal if the transport still cannot hold its
-            nerve.
+      <section className="cta-section">
+        <div className="cta-section__inner" data-reveal>
+          <h2 className="cta-section__title">¿Quieres influir en la dirección?</h2>
+          <p className="cta-section__desc">
+            Los usuarios de la beta privada tienen voz directa en el roadmap.
+            Entra antes de que las paredes sequen.
           </p>
-        </div>
-      </section>
-
-      <section className="editorial-section">
-        <SectionIntro
-          kicker="Operating principles"
-          title={
-            <>
-              La direccion del producto se protege
-              <br />
-              con reglas simples y duras.
-            </>
-          }
-          description="Estas reglas vienen del roadmap y de los release gates del proyecto. Son parte del producto, no notas internas."
-        />
-
-        <div className="principle-list" data-stagger>
-          {roadmapPrinciples.map((principle) => (
-            <article className="principle-card" key={principle} data-stagger-item>
-              <span className="principle-card__index">/</span>
-              <p>{principle}</p>
-            </article>
-          ))}
+          <Btn to="/contact">Solicitar acceso</Btn>
         </div>
       </section>
     </div>
