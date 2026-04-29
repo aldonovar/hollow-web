@@ -7,116 +7,132 @@ export function AnimatedBackground() {
     const canvas = canvasRef.current;
     if (!canvas || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
-    let particles: Particle[] = [];
-    const numParticles = Math.floor(window.innerWidth / 15);
-    const mouse = { x: -1000, y: -1000, radius: 150 };
-
-    class Particle {
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      size: number;
-      color: string;
-      baseX: number;
-      baseY: number;
-
-      constructor() {
-        this.x = Math.random() * canvas!.width;
-        this.y = Math.random() * canvas!.height;
-        this.baseX = this.x;
-        this.baseY = this.y;
-        this.vx = (Math.random() - 0.5) * 0.5;
-        this.vy = (Math.random() - 0.5) * 0.5;
-        this.size = Math.random() * 2 + 0.5;
-        
-        const rand = Math.random();
-        if (rand > 0.95) this.color = '#f43f5e';
-        else if (rand > 0.9) this.color = '#a855f7';
-        else this.color = 'rgba(255, 255, 255, 0.4)';
-      }
-
-      update() {
-        this.x += this.vx;
-        this.y += this.vy;
-
-        if (this.x < 0 || this.x > canvas!.width) this.vx *= -1;
-        if (this.y < 0 || this.y > canvas!.height) this.vy *= -1;
-
-        const dx = mouse.x - this.x;
-        const dy = mouse.y - this.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < mouse.radius) {
-          const forceDirectionX = dx / distance;
-          const forceDirectionY = dy / distance;
-          const force = (mouse.radius - distance) / mouse.radius;
-          const directionX = forceDirectionX * force * 2;
-          const directionY = forceDirectionY * force * 2;
-          this.x -= directionX;
-          this.y -= directionY;
-        }
-      }
-
-      draw() {
-        ctx!.beginPath();
-        ctx!.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx!.fillStyle = this.color;
-        ctx!.fill();
-      }
-    }
+    let cols = 0;
+    let rows = 0;
+    const spacing = 60;
+    let grid: { x: number; y: number; ox: number; oy: number; angle: number; speed: number }[][] = [];
+    const mouse = { x: -1000, y: -1000, radius: 250 };
 
     const init = () => {
-      canvas!.width = window.innerWidth;
-      canvas!.height = window.innerHeight;
-      particles = [];
-      for (let i = 0; i < numParticles; i++) {
-        particles.push(new Particle());
-      }
-    };
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      cols = Math.floor(canvas.width / spacing) + 2;
+      rows = Math.floor(canvas.height / spacing) + 2;
+      grid = [];
 
-    const connect = () => {
-      for (let a = 0; a < particles.length; a++) {
-        for (let b = a; b < particles.length; b++) {
-          const dx = particles[a].x - particles[b].x;
-          const dy = particles[a].y - particles[b].y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance < 120) {
-            const opacity = 1 - distance / 120;
-            ctx!.strokeStyle = `rgba(255, 255, 255, ${opacity * 0.15})`;
-            ctx!.lineWidth = 1;
-            ctx!.beginPath();
-            ctx!.moveTo(particles[a].x, particles[a].y);
-            ctx!.lineTo(particles[b].x, particles[b].y);
-            ctx!.stroke();
-          }
+      for (let i = 0; i < cols; i++) {
+        grid[i] = [];
+        for (let j = 0; j < rows; j++) {
+          grid[i][j] = {
+            ox: i * spacing - spacing / 2,
+            oy: j * spacing - spacing / 2,
+            x: 0,
+            y: 0,
+            angle: (i * 0.5) + (j * 0.5),
+            speed: 0.015 + Math.random() * 0.01
+          };
         }
       }
     };
 
     let animationFrameId: number;
     const animate = () => {
-      ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
-      
-      ctx!.fillStyle = 'rgba(255,255,255,0.01)';
-      for(let i=0; i<canvas!.width; i+=40) ctx!.fillRect(i, 0, 1, canvas!.height);
-      for(let i=0; i<canvas!.height; i+=40) ctx!.fillRect(0, i, canvas!.width, 1);
+      // Dark brutalist background
+      ctx.fillStyle = '#060608';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      for (let i = 0; i < particles.length; i++) {
-        particles[i].update();
-        particles[i].draw();
+      const time = Date.now() * 0.001;
+
+      // Update points
+      for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows; j++) {
+          const p = grid[i][j];
+          p.angle += p.speed;
+          
+          // Base undulation
+          let targetX = p.ox + Math.cos(p.angle) * 20;
+          let targetY = p.oy + Math.sin(p.angle) * 20;
+
+          // Mouse interaction (repulsion)
+          const dx = mouse.x - targetX;
+          const dy = mouse.y - targetY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < mouse.radius) {
+            const force = (mouse.radius - dist) / mouse.radius;
+            // Easing curve for a "magnetic" feel
+            const push = Math.pow(force, 2) * 80;
+            targetX -= (dx / dist) * push;
+            targetY -= (dy / dist) * push;
+          }
+
+          p.x = targetX;
+          p.y = targetY;
+        }
       }
-      connect();
+
+      // Draw wireframe mesh
+      ctx.lineWidth = 1;
+      
+      for (let i = 0; i < cols - 1; i++) {
+        for (let j = 0; j < rows - 1; j++) {
+          const p1 = grid[i][j];
+          const p2 = grid[i + 1][j];
+          const p3 = grid[i][j + 1];
+          const p4 = grid[i + 1][j + 1];
+
+          // Determine opacity based on distance to mouse for a "spotlight" effect
+          const cx = (p1.x + p4.x) / 2;
+          const cy = (p1.y + p4.y) / 2;
+          const dx = mouse.x - cx;
+          const dy = mouse.y - cy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          let lineOpacity = 0.08; // Base visibility (increased from previous)
+          if (dist < 400) {
+            lineOpacity += (1 - dist / 400) * 0.3; // Glows when mouse is near
+          }
+
+          ctx.strokeStyle = `rgba(255, 255, 255, ${lineOpacity})`;
+          
+          // Draw triangle 1
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.lineTo(p3.x, p3.y);
+          ctx.closePath();
+          ctx.stroke();
+
+          // Draw triangle 2
+          ctx.beginPath();
+          ctx.moveTo(p2.x, p2.y);
+          ctx.lineTo(p4.x, p4.y);
+          ctx.lineTo(p3.x, p3.y);
+          ctx.closePath();
+          ctx.stroke();
+
+          // Random tech-glitch fills
+          const fillRand = Math.sin(i * 12.9898 + j * 78.233 + time);
+          if (fillRand > 0.98) {
+            ctx.fillStyle = `rgba(168, 85, 247, ${lineOpacity * 0.8})`; // Purple
+            ctx.fill();
+          } else if (fillRand < -0.98) {
+            ctx.fillStyle = `rgba(244, 63, 94, ${lineOpacity * 0.8})`; // Rose
+            ctx.fill();
+          } else if (fillRand > 0.95 && fillRand <= 0.98) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${lineOpacity * 0.5})`; // White flash
+            ctx.fill();
+          }
+        }
+      }
+
       animationFrameId = requestAnimationFrame(animate);
     };
 
     const handleResize = () => {
-      canvas!.width = window.innerWidth;
-      canvas!.height = window.innerHeight;
       init();
     };
 
@@ -156,7 +172,6 @@ export function AnimatedBackground() {
         height: '100vh',
         pointerEvents: 'none',
         zIndex: -1,
-        background: 'transparent',
       }}
     />
   );
