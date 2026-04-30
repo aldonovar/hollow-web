@@ -10,6 +10,7 @@ interface AuthState {
   session: Session | null;
   profile: Profile | null;
   isLoading: boolean;
+  requiresMfa: boolean;
 }
 
 interface AuthActions {
@@ -19,6 +20,8 @@ interface AuthActions {
   signOut: () => Promise<void>;
   /** Re-fetch the profile from the database (after edits) */
   refreshProfile: () => Promise<void>;
+  /** Re-check MFA status after successful verification */
+  checkMfa: () => Promise<void>;
 }
 
 type AuthStore = AuthState & AuthActions;
@@ -47,20 +50,24 @@ export const useAuthStore = create<AuthStore>((set) => ({
   session: null,
   profile: null,
   isLoading: true,
+  requiresMfa: false,
 
   // --- actions ---
   initialize: () => {
     // 1. Hydrate from existing session (page refresh)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
+        const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        const needsMfa = aalData?.currentLevel === 'aal1' && aalData?.nextLevel === 'aal2';
+        
         const profile = await fetchProfile(session.user.id);
-        set({ user: session.user, session, profile, isLoading: false });
+        set({ user: session.user, session, profile, requiresMfa: needsMfa, isLoading: false });
       } else {
-        set({ user: null, session: null, profile: null, isLoading: false });
+        set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
       }
     }).catch((err) => {
       console.error('[authStore] Failed to get session:', err);
-      set({ user: null, session: null, profile: null, isLoading: false });
+      set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
     });
 
     // 2. Subscribe to auth state changes (login, logout, token refresh)
@@ -68,15 +75,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
-        // Skip token refresh events — they can cause momentary state glitches
-        // during MFA flows and don't need profile re-fetching
+        // Skip token refresh events to avoid flicker, EXCEPT if we need to check MFA
         if (event === 'TOKEN_REFRESHED') return;
 
         if (session?.user) {
+          const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          const needsMfa = aalData?.currentLevel === 'aal1' && aalData?.nextLevel === 'aal2';
+          
           const profile = await fetchProfile(session.user.id);
-          set({ user: session.user, session, profile, isLoading: false });
+          set({ user: session.user, session, profile, requiresMfa: needsMfa, isLoading: false });
         } else {
-          set({ user: null, session: null, profile: null, isLoading: false });
+          set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
         }
       }
     );
@@ -89,7 +98,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
     set({ isLoading: true });
     const { error } = await supabase.auth.signOut();
     if (error) console.error('[authStore] Sign-out error:', error.message);
-    set({ user: null, session: null, profile: null, isLoading: false });
+    set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
   },
 
   refreshProfile: async () => {
@@ -98,5 +107,11 @@ export const useAuthStore = create<AuthStore>((set) => ({
       const profile = await fetchProfile(session.user.id);
       set({ profile });
     }
+  },
+
+  checkMfa: async () => {
+    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const needsMfa = aalData?.currentLevel === 'aal1' && aalData?.nextLevel === 'aal2';
+    set({ requiresMfa: needsMfa });
   },
 }));

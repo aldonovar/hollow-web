@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   User, AtSign, Mail, Lock, Shield, Camera, Save, AlertCircle, CheckCircle,
-  LogOut, KeyRound, Eye, EyeOff, Loader2, ChevronRight
+  LogOut, KeyRound, Eye, EyeOff, Loader2, ChevronRight, Copy, X
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
@@ -25,8 +25,10 @@ export function Settings() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   /* ─── Password state ────────────────────────────────────────── */
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [pwStatus, setPwStatus] = useState<FeedbackStatus>('idle');
@@ -40,6 +42,7 @@ export function Settings() {
   const [mfaVerifyCode, setMfaVerifyCode] = useState('');
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [mfaMsg, setMfaMsg] = useState('');
+  const [copied, setCopied] = useState(false);
 
   /* ─── Computed ──────────────────────────────────────────────── */
   const authProvider = user?.app_metadata?.provider || 'email';
@@ -152,21 +155,41 @@ export function Settings() {
   const handlePasswordChange = async () => {
     setPwMsg('');
 
+    if (!isOAuthUser && !currentPassword) {
+      setPwStatus('error');
+      setPwMsg('Debes ingresar tu contraseña actual.');
+      return;
+    }
+
     if (newPassword.length < 6) {
       setPwStatus('error');
-      setPwMsg('La contraseña debe tener al menos 6 caracteres.');
+      setPwMsg('La nueva contraseña debe tener al menos 6 caracteres.');
       return;
     }
 
     if (newPassword !== confirmPassword) {
       setPwStatus('error');
-      setPwMsg('Las contraseñas no coinciden.');
+      setPwMsg('Las contraseñas nuevas no coinciden.');
       return;
     }
 
     setPwStatus('saving');
 
     try {
+      // Si el usuario es de email, verificamos la contraseña actual primero
+      if (!isOAuthUser && emailAddress) {
+        const { error: verifyError } = await supabase.auth.signInWithPassword({
+          email: emailAddress,
+          password: currentPassword,
+        });
+
+        if (verifyError) {
+          setPwStatus('error');
+          setPwMsg('La contraseña actual es incorrecta.');
+          return;
+        }
+      }
+
       const { error } = await supabase.auth.updateUser({ password: newPassword });
 
       if (error) {
@@ -177,6 +200,7 @@ export function Settings() {
         setPwMsg(isOAuthUser
           ? '¡Contraseña establecida! Ahora puedes iniciar sesión con correo y contraseña.'
           : 'Contraseña actualizada correctamente.');
+        setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
         setTimeout(() => setPwStatus('idle'), 4000);
@@ -194,6 +218,16 @@ export function Settings() {
     setMfaMsg('');
 
     try {
+      // Limpiar factores no verificados previamente para evitar conflictos
+      const { data: factorsData } = await supabase.auth.mfa.listFactors();
+      if (factorsData?.totp) {
+        for (const factor of factorsData.totp) {
+          if (factor.status === 'unverified') {
+            await supabase.auth.mfa.unenroll({ factorId: factor.id });
+          }
+        }
+      }
+
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
         friendlyName: 'HollowBits Auth',
@@ -222,27 +256,19 @@ export function Settings() {
     setMfaMsg('');
 
     try {
-      const challenge = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
-      if (challenge.error) {
-        setMfaMsg(challenge.error.message);
-        setMfaLoading(false);
-        return;
-      }
-
-      const verify = await supabase.auth.mfa.verify({
+      const challengeAndVerify = await supabase.auth.mfa.challengeAndVerify({
         factorId: mfaFactorId,
-        challengeId: challenge.data.id,
-        code: mfaVerifyCode,
+        code: mfaVerifyCode.trim(),
       });
 
-      if (verify.error) {
+      if (challengeAndVerify.error) {
         setMfaMsg('Código inválido. Intenta de nuevo.');
       } else {
         setMfaEnabled(true);
         setMfaQr(null);
         setMfaSecret(null);
         setMfaVerifyCode('');
-        setMfaMsg('¡Autenticación de dos factores activada!');
+        setMfaMsg('¡Autenticación de dos factores activada correctamente!');
       }
     } catch (err: any) {
       console.error('[Settings] MFA verify error:', err);
@@ -270,6 +296,26 @@ export function Settings() {
       setMfaMsg(err?.message || 'Error inesperado.');
     } finally {
       setMfaLoading(false);
+    }
+  };
+
+  const handleCancelMfa = async () => {
+    if (mfaFactorId) {
+      // Intentamos limpiarlo en background para no bloquear la UI
+      supabase.auth.mfa.unenroll({ factorId: mfaFactorId }).catch(() => {});
+    }
+    setMfaQr(null);
+    setMfaSecret(null);
+    setMfaFactorId(null);
+    setMfaVerifyCode('');
+    setMfaMsg('');
+  };
+
+  const handleCopySecret = () => {
+    if (mfaSecret) {
+      navigator.clipboard.writeText(mfaSecret);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -428,6 +474,29 @@ export function Settings() {
             </p>
 
             <div className="settings__fields settings__fields--security">
+              {/* Current Password (only for email users) */}
+              {!isOAuthUser && (
+                <div className="settings__field">
+                  <label>Contraseña Actual</label>
+                  <div className="settings__input-wrapper">
+                    <Lock size={16} className="settings__input-icon" />
+                    <input
+                      type={showCurrentPw ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={e => setCurrentPassword(e.target.value)}
+                      placeholder="Tu contraseña actual"
+                    />
+                    <button
+                      type="button"
+                      className="settings__pw-toggle"
+                      onClick={() => setShowCurrentPw(!showCurrentPw)}
+                    >
+                      {showCurrentPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="settings__field">
                 <label>Nueva Contraseña</label>
                 <div className="settings__input-wrapper">
@@ -518,18 +587,35 @@ export function Settings() {
               </div>
             ) : mfaQr ? (
               <div className="settings__mfa-enroll">
-                <p className="settings__mfa-instruction">
-                  Escanea este código QR con tu aplicación de autenticación:
-                </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <p className="settings__mfa-instruction">
+                    Escanea este código QR con tu aplicación de autenticación:
+                  </p>
+                  <button 
+                    className="settings__cancel-btn" 
+                    onClick={handleCancelMfa}
+                    title="Cancelar configuración"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
                 <div className="settings__mfa-qr">
                   <img src={mfaQr} alt="MFA QR Code" />
                 </div>
                 {mfaSecret && (
-                  <p className="settings__mfa-secret">
-                    Clave manual: <code>{mfaSecret}</code>
-                  </p>
+                  <div className="settings__mfa-secret-box">
+                    <span className="settings__mfa-secret-label">Clave manual:</span>
+                    <code className="settings__mfa-secret-code">{mfaSecret}</code>
+                    <button className="settings__copy-btn" onClick={handleCopySecret} title="Copiar clave">
+                      {copied ? <CheckCircle size={14} color="#a855f7" /> : <Copy size={14} />}
+                    </button>
+                  </div>
                 )}
-                <div className="settings__field" style={{ marginTop: '1rem' }}>
+                <div className="settings__mfa-hint">
+                  <AlertCircle size={12} />
+                  <span>El código en tu app se renueva automáticamente cada 30 segundos.</span>
+                </div>
+                <div className="settings__field" style={{ marginTop: '1.5rem' }}>
                   <label>Código de Verificación</label>
                   <div className="settings__input-wrapper">
                     <Shield size={16} className="settings__input-icon" />

@@ -15,6 +15,7 @@ import { Contact } from './pages/Contact';
 import { Auth } from './pages/Auth';
 import { Settings } from './pages/Settings';
 import { Engine } from './pages/Engine';
+import { MfaChallenge } from './pages/MfaChallenge';
 import { useAuthStore } from './stores/authStore';
 
 function ScrollToTop() {
@@ -57,6 +58,8 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   const initialize = useAuthStore((s) => s.initialize);
+  const requiresMfa = useAuthStore((s) => s.requiresMfa);
+  const isLoading = useAuthStore((s) => s.isLoading);
 
   useEffect(() => {
     // Initialize the auth store — hydrate session & subscribe to changes
@@ -73,6 +76,11 @@ function App() {
     gsap.ticker.lagSmoothing(0);
     return () => { gsap.ticker.remove(onFrame); lenis.destroy(); };
   }, []);
+
+  // Intercepción Global para 2FA
+  if (requiresMfa && !isLoading) {
+    return <MfaChallenge />;
+  }
 
   return (
     <Router>
