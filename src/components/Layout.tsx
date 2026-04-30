@@ -1,31 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Menu, X, User, LogOut } from 'lucide-react';
+import { Menu, X, User, LogOut, Settings } from 'lucide-react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatedBackground } from '../AnimatedBackground';
 import { routeMeta } from '../content';
-import { supabase } from '../lib/supabase';
-import type { Session } from '@supabase/supabase-js';
+import { useAuthStore } from '../stores/authStore';
 
 export function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [session, setSession] = useState<Session | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  // Use the shared auth store instead of a duplicate local listener
+  const session = useAuthStore((s) => s.session);
+  const profile = useAuthStore((s) => s.profile);
+  const user = useAuthStore((s) => s.user);
+  const signOut = useAuthStore((s) => s.signOut);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -36,9 +26,27 @@ export function Layout() {
   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+    try {
+      await signOut();
+      navigate('/');
+    } catch (err) {
+      console.error('[Layout] Logout error:', err);
+      // Force navigate even if signOut fails
+      navigate('/');
+    }
   };
+
+  // Friendly display name for the navbar
+  const displayName = profile?.full_name
+    || profile?.username
+    || user?.user_metadata?.full_name
+    || user?.email?.split('@')[0]
+    || '';
+
+  // Avatar URL
+  const avatarUrl = profile?.avatar_url
+    || user?.user_metadata?.avatar_url
+    || null;
 
   return (
     <div className="site-shell">
@@ -80,12 +88,31 @@ export function Layout() {
               {session ? (
                 <>
                   <Link className="site-nav__cta" to="/console">
-                    Console
-                    <User className="site-nav__icon" size={16} />
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt=""
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          marginRight: 6,
+                        }}
+                      />
+                    ) : (
+                      <User className="site-nav__icon" size={16} style={{ marginRight: 6 }} />
+                    )}
+                    {displayName || 'Mi Cuenta'}
                   </Link>
-                  <button onClick={handleLogout} className="site-nav__login" style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                  <button
+                    onClick={handleLogout}
+                    className="site-nav__login"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
+                    title="Cerrar sesión"
+                  >
                     <LogOut size={16} style={{ display: 'inline', marginRight: '6px' }} />
-                    Log Out
+                    Salir
                   </button>
                 </>
               ) : (

@@ -64,7 +64,11 @@ export const useAuthStore = create<AuthStore>((set) => ({
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (_event: AuthChangeEvent, session: Session | null) => {
+      async (event: AuthChangeEvent, session: Session | null) => {
+        // Skip token refresh events — they can cause momentary state glitches
+        // during MFA flows and don't need profile re-fetching
+        if (event === 'TOKEN_REFRESHED') return;
+
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
           set({ user: session.user, session, profile, isLoading: false });
