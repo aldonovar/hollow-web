@@ -90,8 +90,7 @@ export function AnimatedBackground() {
 
     let animationFrameId: number;
     const animate = () => {
-      ctx.fillStyle = '#060608';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       mouse.clickPulse = Math.max(0, mouse.clickPulse - 0.05);
 
