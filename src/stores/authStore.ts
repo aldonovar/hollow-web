@@ -58,6 +58,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
       } else {
         set({ user: null, session: null, profile: null, isLoading: false });
       }
+    }).catch((err) => {
+      console.error('[authStore] Failed to get session:', err);
+      set({ user: null, session: null, profile: null, isLoading: false });
     });
 
     // 2. Subscribe to auth state changes (login, logout, token refresh)

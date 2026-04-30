@@ -31,7 +31,26 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
   const session = useAuthStore((s) => s.session);
   const isLoading = useAuthStore((s) => s.isLoading);
 
-  if (isLoading) return null;
+  // While loading, show a minimal centered spinner instead of blank page
+  if (isLoading) {
+    return (
+      <div
+        className="page-shell"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '60vh',
+          color: 'var(--text-2)',
+          fontFamily: 'Inter, sans-serif',
+          fontSize: '0.9rem',
+        }}
+      >
+        Verificando sesión...
+      </div>
+    );
+  }
+
   if (session) return <Navigate to="/console" replace />;
   return <>{children}</>;
 }
