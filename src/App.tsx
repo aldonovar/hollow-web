@@ -13,6 +13,7 @@ import { Console } from './pages/Console';
 import { Roadmap } from './pages/Roadmap';
 import { Contact } from './pages/Contact';
 import { Auth } from './pages/Auth';
+import { Settings } from './pages/Settings';
 import { Engine } from './pages/Engine';
 import { useAuthStore } from './stores/authStore';
 
@@ -71,6 +72,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Console />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             }
           />

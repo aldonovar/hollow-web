@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 
 
 import { usePageMotion } from '../components/usePageMotion';
-import { Plus, FolderOpen, LogOut } from 'lucide-react';
+import { Plus, FolderOpen, LogOut, Settings } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
@@ -118,6 +118,23 @@ export function Console() {
               }}
             >
               <Plus size={18} /> Nuevo Proyecto
+            </button>
+            <button
+              onClick={() => navigate('/settings')}
+              title="Configuración de la cuenta"
+              style={{
+                background: 'var(--glass)',
+                color: 'var(--text-2)',
+                border: '1px solid var(--border)',
+                padding: '12px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <Settings size={18} />
             </button>
             <button
               onClick={handleSignOut}

@@ -13,10 +13,12 @@ interface AuthState {
 }
 
 interface AuthActions {
-  /** Bootstrap: call once in App root to hydrate session + subscribe to changes */
+  /** Bootstrap: call once in App root to hydrate session & subscribe to changes */
   initialize: () => () => void;
   /** Sign out and clear all state */
   signOut: () => Promise<void>;
+  /** Re-fetch the profile from the database (after edits) */
+  refreshProfile: () => Promise<void>;
 }
 
 type AuthStore = AuthState & AuthActions;
@@ -81,5 +83,13 @@ export const useAuthStore = create<AuthStore>((set) => ({
     const { error } = await supabase.auth.signOut();
     if (error) console.error('[authStore] Sign-out error:', error.message);
     set({ user: null, session: null, profile: null, isLoading: false });
+  },
+
+  refreshProfile: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const profile = await fetchProfile(session.user.id);
+      set({ profile });
+    }
   },
 }));
