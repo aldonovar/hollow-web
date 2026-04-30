@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, ArrowRight, AlertCircle, Lock, User, MapPin, AtSign } from 'lucide-react';
+import { Mail, ArrowRight, AlertCircle, Lock, User, AtSign } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import './Auth.css';
 
@@ -12,7 +12,6 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
   // Campos extra para signup
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
-  const [address, setAddress] = useState('');
   
   const [status, setStatus] = useState<AuthStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -37,8 +36,7 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
         options: {
           data: {
             full_name: fullName,
-            username: username,
-            address: address
+            username: username
           },
           emailRedirectTo: `${window.location.origin}/console`,
         }
@@ -179,21 +177,6 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
-                    disabled={status === 'loading'}
-                  />
-                </div>
-              </div>
-              
-              <div className="auth-form__group">
-                <label htmlFor="address">País / Región</label>
-                <div className="auth-form__input-wrapper">
-                  <MapPin size={18} className="auth-form__icon" />
-                  <input
-                    id="address"
-                    type="text"
-                    placeholder="Tu ubicación"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
                     disabled={status === 'loading'}
                   />
                 </div>
