@@ -29,22 +29,37 @@ type AuthStore = AuthState & AuthActions;
 /* ─── Helpers ────────────────────────────────────────────────────── */
 
 async function fetchProfile(userId: string): Promise<Profile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
 
-  if (error) {
-    console.error('[authStore] Failed to fetch profile:', error.message);
+    if (error) {
+      console.warn('[authStore] Profile fetch failed (non-blocking):', error.message);
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.warn('[authStore] Profile fetch exception (non-blocking):', err);
     return null;
   }
-  return data;
+}
+
+/** Safely check MFA — returns false on any error instead of hanging */
+async function safeMfaCheck(): Promise<boolean> {
+  try {
+    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    return aalData?.currentLevel === 'aal1' && aalData?.nextLevel === 'aal2';
+  } catch {
+    return false;
+  }
 }
 
 /* ─── Store ──────────────────────────────────────────────────────── */
 
-export const useAuthStore = create<AuthStore>((set) => ({
+export const useAuthStore = create<AuthStore>((set, get) => ({
   // --- initial state ---
   user: null,
   session: null,
@@ -54,20 +69,41 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   // --- actions ---
   initialize: () => {
+    let resolved = false;
+
+    const resolveLoading = () => {
+      if (!resolved) {
+        resolved = true;
+        const state = get();
+        if (state.isLoading) {
+          set({ isLoading: false });
+        }
+      }
+    };
+
+    // SAFETY NET: Always resolve loading within 5 seconds no matter what.
+    // This prevents the "Cargando sesión..." infinite loop.
+    const safetyTimeout = setTimeout(() => {
+      console.warn('[authStore] Safety timeout — forcing isLoading=false');
+      resolveLoading();
+    }, 5000);
+
     // 1. Hydrate from existing session (page refresh)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        const needsMfa = aalData?.currentLevel === 'aal1' && aalData?.nextLevel === 'aal2';
-        
+        const needsMfa = await safeMfaCheck();
         const profile = await fetchProfile(session.user.id);
         set({ user: session.user, session, profile, requiresMfa: needsMfa, isLoading: false });
       } else {
         set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
       }
+      resolved = true;
+      clearTimeout(safetyTimeout);
     }).catch((err) => {
       console.error('[authStore] Failed to get session:', err);
       set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
+      resolved = true;
+      clearTimeout(safetyTimeout);
     });
 
     // 2. Subscribe to auth state changes (login, logout, token refresh)
@@ -75,13 +111,11 @@ export const useAuthStore = create<AuthStore>((set) => ({
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
-        // Skip token refresh events to avoid flicker, EXCEPT if we need to check MFA
+        // Skip token refresh events to avoid flicker
         if (event === 'TOKEN_REFRESHED') return;
 
         if (session?.user) {
-          const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-          const needsMfa = aalData?.currentLevel === 'aal1' && aalData?.nextLevel === 'aal2';
-          
+          const needsMfa = await safeMfaCheck();
           const profile = await fetchProfile(session.user.id);
           set({ user: session.user, session, profile, requiresMfa: needsMfa, isLoading: false });
         } else {
@@ -91,13 +125,20 @@ export const useAuthStore = create<AuthStore>((set) => ({
     );
 
     // Return unsubscribe handle for cleanup
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimeout);
+      subscription.unsubscribe();
+    };
   },
 
   signOut: async () => {
     set({ isLoading: true });
-    const { error } = await supabase.auth.signOut();
-    if (error) console.error('[authStore] Sign-out error:', error.message);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) console.error('[authStore] Sign-out error:', error.message);
+    } catch (err) {
+      console.error('[authStore] Sign-out exception:', err);
+    }
     set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
   },
 
@@ -110,8 +151,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   checkMfa: async () => {
-    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    const needsMfa = aalData?.currentLevel === 'aal1' && aalData?.nextLevel === 'aal2';
+    const needsMfa = await safeMfaCheck();
     set({ requiresMfa: needsMfa });
   },
 }));

@@ -29,12 +29,28 @@ export function Console() {
   const fetchProjects = async () => {
     setLoading(true);
     try {
+      // First, get workspace IDs the user belongs to
+      const { data: memberships, error: memberErr } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user!.id);
+
+      if (memberErr || !memberships || memberships.length === 0) {
+        console.warn('[Console] No workspaces found or error:', memberErr?.message);
+        setProjects([]);
+        return;
+      }
+
+      const workspaceIds = memberships.map(m => m.workspace_id);
+
       const { data, error } = await supabase
         .from('projects')
         .select('*')
+        .in('workspace_id', workspaceIds)
         .order('created_at', { ascending: false });
 
       if (!error && data) setProjects(data);
+      else if (error) console.error('[Console] Error fetching projects:', error.message);
     } catch (err) {
       console.error('[Console] Error fetching projects:', err);
     } finally {
