@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, X, User, LogOut, Settings } from 'lucide-react';
+import { Menu, X, User, LogOut } from 'lucide-react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatedBackground } from '../AnimatedBackground';
 import { routeMeta } from '../content';
