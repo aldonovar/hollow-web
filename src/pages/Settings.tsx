@@ -63,13 +63,17 @@ export function Settings() {
   /* ─── Check MFA status on mount ─────────────────────────────── */
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.auth.mfa.listFactors();
-      if (data?.totp && data.totp.length > 0) {
-        const verified = data.totp.find(f => f.status === 'verified');
-        if (verified) {
-          setMfaEnabled(true);
-          setMfaFactorId(verified.id);
+      try {
+        const { data } = await supabase.auth.mfa.listFactors();
+        if (data?.totp && data.totp.length > 0) {
+          const verified = data.totp.find(f => f.status === 'verified');
+          if (verified) {
+            setMfaEnabled(true);
+            setMfaFactorId(verified.id);
+          }
         }
+      } catch (err) {
+        console.error('[Settings] Error checking MFA status:', err);
       }
     })();
   }, []);
@@ -80,28 +84,34 @@ export function Settings() {
     setProfileStatus('saving');
     setProfileMsg('');
 
-    const trimmedUsername = username.trim().toLowerCase().replace(/\s+/g, '_');
+    try {
+      const trimmedUsername = username.trim().toLowerCase().replace(/\s+/g, '_');
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        full_name: fullName.trim(),
-        username: trimmedUsername,
-        avatar_url: avatarUrl,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id);
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName.trim(),
+          username: trimmedUsername,
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
 
-    if (error) {
+      if (error) {
+        setProfileStatus('error');
+        setProfileMsg(error.message.includes('duplicate')
+          ? 'Ese nombre de usuario ya está en uso.'
+          : error.message);
+      } else {
+        setProfileStatus('success');
+        setProfileMsg('Perfil actualizado correctamente.');
+        refreshProfile();
+        setTimeout(() => setProfileStatus('idle'), 3000);
+      }
+    } catch (err: any) {
+      console.error('[Settings] Profile save error:', err);
       setProfileStatus('error');
-      setProfileMsg(error.message.includes('duplicate')
-        ? 'Ese nombre de usuario ya está en uso.'
-        : error.message);
-    } else {
-      setProfileStatus('success');
-      setProfileMsg('Perfil actualizado correctamente.');
-      refreshProfile();
-      setTimeout(() => setProfileStatus('idle'), 3000);
+      setProfileMsg(err?.message || 'Error inesperado al guardar el perfil.');
     }
   };
 
@@ -110,31 +120,36 @@ export function Settings() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    const fileExt = file.name.split('.').pop();
-    const filePath = `${user.id}/avatar.${fileExt}`;
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/avatar.${fileExt}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file, { upsert: true });
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
 
-    if (uploadError) {
-      setProfileMsg('Error al subir la imagen: ' + uploadError.message);
+      if (uploadError) {
+        setProfileMsg('Error al subir la imagen: ' + uploadError.message);
+        setProfileStatus('error');
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      setAvatarUrl(urlData.publicUrl);
+      setProfileMsg('Imagen cargada. Guarda los cambios para aplicar.');
+      setProfileStatus('idle');
+    } catch (err: any) {
+      console.error('[Settings] Avatar upload error:', err);
+      setProfileMsg('Error inesperado al subir la imagen.');
       setProfileStatus('error');
-      return;
     }
-
-    const { data: urlData } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath);
-
-    setAvatarUrl(urlData.publicUrl);
-    setProfileMsg('Imagen cargada. Guarda los cambios para aplicar.');
-    setProfileStatus('idle');
   };
 
   /* ─── Change/Set Password ───────────────────────────────────── */
   const handlePasswordChange = async () => {
-    setPwStatus('saving');
     setPwMsg('');
 
     if (newPassword.length < 6) {
@@ -149,19 +164,27 @@ export function Settings() {
       return;
     }
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setPwStatus('saving');
 
-    if (error) {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        setPwStatus('error');
+        setPwMsg(error.message);
+      } else {
+        setPwStatus('success');
+        setPwMsg(isOAuthUser
+          ? '¡Contraseña establecida! Ahora puedes iniciar sesión con correo y contraseña.'
+          : 'Contraseña actualizada correctamente.');
+        setNewPassword('');
+        setConfirmPassword('');
+        setTimeout(() => setPwStatus('idle'), 4000);
+      }
+    } catch (err: any) {
+      console.error('[Settings] Password change error:', err);
       setPwStatus('error');
-      setPwMsg(error.message);
-    } else {
-      setPwStatus('success');
-      setPwMsg(isOAuthUser
-        ? '¡Contraseña establecida! Ahora puedes iniciar sesión con correo y contraseña.'
-        : 'Contraseña actualizada correctamente.');
-      setNewPassword('');
-      setConfirmPassword('');
-      setTimeout(() => setPwStatus('idle'), 4000);
+      setPwMsg(err?.message || 'Error inesperado al cambiar la contraseña.');
     }
   };
 
@@ -169,18 +192,28 @@ export function Settings() {
   const handleEnrollMfa = async () => {
     setMfaLoading(true);
     setMfaMsg('');
-    const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'HollowBits Auth' });
 
-    if (error || !data) {
-      setMfaMsg(error?.message || 'Error al activar 2FA.');
+    try {
+      const { data, error } = await supabase.auth.mfa.enroll({
+        factorType: 'totp',
+        friendlyName: 'HollowBits Auth',
+      });
+
+      if (error || !data) {
+        setMfaMsg(error?.message || 'Error al activar 2FA.');
+        setMfaLoading(false);
+        return;
+      }
+
+      setMfaQr(data.totp.qr_code);
+      setMfaSecret(data.totp.secret);
+      setMfaFactorId(data.id);
+    } catch (err: any) {
+      console.error('[Settings] MFA enroll error:', err);
+      setMfaMsg(err?.message || 'Error inesperado al configurar 2FA.');
+    } finally {
       setMfaLoading(false);
-      return;
     }
-
-    setMfaQr(data.totp.qr_code);
-    setMfaSecret(data.totp.secret);
-    setMfaFactorId(data.id);
-    setMfaLoading(false);
   };
 
   const handleVerifyMfa = async () => {
@@ -188,42 +221,56 @@ export function Settings() {
     setMfaLoading(true);
     setMfaMsg('');
 
-    const challenge = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
-    if (challenge.error) {
-      setMfaMsg(challenge.error.message);
+    try {
+      const challenge = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
+      if (challenge.error) {
+        setMfaMsg(challenge.error.message);
+        setMfaLoading(false);
+        return;
+      }
+
+      const verify = await supabase.auth.mfa.verify({
+        factorId: mfaFactorId,
+        challengeId: challenge.data.id,
+        code: mfaVerifyCode,
+      });
+
+      if (verify.error) {
+        setMfaMsg('Código inválido. Intenta de nuevo.');
+      } else {
+        setMfaEnabled(true);
+        setMfaQr(null);
+        setMfaSecret(null);
+        setMfaVerifyCode('');
+        setMfaMsg('¡Autenticación de dos factores activada!');
+      }
+    } catch (err: any) {
+      console.error('[Settings] MFA verify error:', err);
+      setMfaMsg(err?.message || 'Error inesperado al verificar el código.');
+    } finally {
       setMfaLoading(false);
-      return;
     }
-
-    const verify = await supabase.auth.mfa.verify({
-      factorId: mfaFactorId,
-      challengeId: challenge.data.id,
-      code: mfaVerifyCode,
-    });
-
-    if (verify.error) {
-      setMfaMsg('Código inválido. Intenta de nuevo.');
-    } else {
-      setMfaEnabled(true);
-      setMfaQr(null);
-      setMfaSecret(null);
-      setMfaMsg('¡Autenticación de dos factores activada!');
-    }
-    setMfaLoading(false);
   };
 
   const handleUnenrollMfa = async () => {
     if (!mfaFactorId) return;
     setMfaLoading(true);
-    const { error } = await supabase.auth.mfa.unenroll({ factorId: mfaFactorId });
-    if (error) {
-      setMfaMsg(error.message);
-    } else {
-      setMfaEnabled(false);
-      setMfaFactorId(null);
-      setMfaMsg('Autenticación de dos factores desactivada.');
+
+    try {
+      const { error } = await supabase.auth.mfa.unenroll({ factorId: mfaFactorId });
+      if (error) {
+        setMfaMsg(error.message);
+      } else {
+        setMfaEnabled(false);
+        setMfaFactorId(null);
+        setMfaMsg('Autenticación de dos factores desactivada.');
+      }
+    } catch (err: any) {
+      console.error('[Settings] MFA unenroll error:', err);
+      setMfaMsg(err?.message || 'Error inesperado.');
+    } finally {
+      setMfaLoading(false);
     }
-    setMfaLoading(false);
   };
 
   /* ─── Sign Out ──────────────────────────────────────────────── */

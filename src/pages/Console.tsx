@@ -18,18 +18,28 @@ export function Console() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) fetchProjects();
+    if (user) {
+      fetchProjects();
+    } else {
+      // If there's no user (e.g. session expired), stop loading
+      setLoading(false);
+    }
   }, [user]);
 
   const fetchProjects = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (!error && data) setProjects(data);
-    setLoading(false);
+      if (!error && data) setProjects(data);
+    } catch (err) {
+      console.error('[Console] Error fetching projects:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const createProject = async () => {
