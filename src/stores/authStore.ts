@@ -39,7 +39,7 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
 
 /* ─── Store ──────────────────────────────────────────────────────── */
 
-export const useAuthStore = create<AuthStore>((set, get) => ({
+export const useAuthStore = create<AuthStore>((set) => ({
   // --- initial state ---
   user: null,
   session: null,

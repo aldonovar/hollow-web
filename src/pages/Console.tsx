@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { consoleFeatures } from '../content';
-import { Btn, SectionHeader } from '../components/Editorial';
+
+
 import { usePageMotion } from '../components/usePageMotion';
-import { Globe, Link as LinkIcon, Cloud, Shield, Monitor, Plus, FolderOpen, LogOut } from 'lucide-react';
+import { Plus, FolderOpen, LogOut } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 import type { Project } from '../types/supabase';
 
-const iconMap: Record<string, React.ElementType> = { Globe, Link: LinkIcon, Cloud, Shield };
+
 
 export function Console() {
   const pageRef = usePageMotion();
