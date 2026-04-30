@@ -222,7 +222,7 @@ export function Settings() {
       const { data: factorsData } = await supabase.auth.mfa.listFactors();
       if (factorsData?.totp) {
         for (const factor of factorsData.totp) {
-          if (factor.status === 'unverified') {
+          if ((factor as any).status === 'unverified') {
             await supabase.auth.mfa.unenroll({ factorId: factor.id });
           }
         }
