@@ -11,6 +11,8 @@ import { Pricing } from './pages/Pricing';
 import { Console } from './pages/Console';
 import { Roadmap } from './pages/Roadmap';
 import { Contact } from './pages/Contact';
+import { Auth } from './pages/Auth';
+import { Engine } from './pages/Engine';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -40,7 +42,11 @@ function App() {
           <Route path="console" element={<Console />} />
           <Route path="roadmap" element={<Roadmap />} />
           <Route path="contact" element={<Contact />} />
+          <Route path="login" element={<Auth type="login" />} />
+          <Route path="signup" element={<Auth type="signup" />} />
         </Route>
+        {/* Engine without the Layout shell because it's full screen */}
+        <Route path="/engine" element={<Engine />} />
       </Routes>
     </Router>
   );

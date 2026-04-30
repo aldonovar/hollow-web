@@ -10,112 +10,125 @@ export function AnimatedBackground() {
     const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
-    let cols = 0;
-    let rows = 0;
-    const spacing = 80; // Larger spacing for brutalist feel
-    let grid: { ox: number; oy: number; x: number; y: number; baseOffset: number; isGlitch: boolean }[][] = [];
-    const mouse = { x: -1000, y: -1000, radius: 350, clickPulse: 0 };
+    let particles: Particle[] = [];
+    const particleCount = Math.min(window.innerWidth / 12, 150); // Responsive count
+    const connectionDistance = 150;
+    const mouse = { x: -1000, y: -1000, radius: 250, clickPulse: 0 };
+
+    class Particle {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      baseX: number;
+      baseY: number;
+      size: number;
+      color: string;
+      isGlitch: boolean;
+
+      constructor() {
+        this.x = Math.random() * canvas!.width;
+        this.y = Math.random() * canvas!.height;
+        this.baseX = this.x;
+        this.baseY = this.y;
+        this.vx = (Math.random() - 0.5) * 0.8;
+        this.vy = (Math.random() - 0.5) * 0.8;
+        this.size = Math.random() * 2 + 1;
+        this.isGlitch = Math.random() > 0.95;
+        this.color = this.isGlitch ? '#f43f5e' : (Math.random() > 0.8 ? '#a855f7' : '#ffffff');
+      }
+
+      update() {
+        // Natural movement
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Bounce off edges smoothly
+        if (this.x < 0 || this.x > canvas!.width) this.vx *= -1;
+        if (this.y < 0 || this.y > canvas!.height) this.vy *= -1;
+
+        // Mouse interaction
+        const dx = mouse.x - this.x;
+        const dy = mouse.y - this.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < mouse.radius) {
+          const forceDirectionX = dx / distance;
+          const forceDirectionY = dy / distance;
+          
+          // Repel force
+          const force = (mouse.radius - distance) / mouse.radius;
+          const push = force * (2 + mouse.clickPulse * 15);
+          
+          this.x -= forceDirectionX * push;
+          this.y -= forceDirectionY * push;
+        }
+
+        // Return to natural bounds slowly if pushed out
+        if (this.x < -50) this.x = canvas!.width + 50;
+        if (this.x > canvas!.width + 50) this.x = -50;
+        if (this.y < -50) this.y = canvas!.height + 50;
+        if (this.y > canvas!.height + 50) this.y = -50;
+      }
+
+      draw() {
+        ctx!.fillStyle = this.color;
+        ctx!.beginPath();
+        ctx!.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx!.fill();
+      }
+    }
 
     const init = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      cols = Math.floor(canvas.width / spacing) + 3;
-      rows = Math.floor(canvas.height / spacing) + 3;
-      grid = [];
-
-      for (let i = 0; i < cols; i++) {
-        grid[i] = [];
-        for (let j = 0; j < rows; j++) {
-          grid[i][j] = {
-            ox: (i - 1) * spacing,
-            oy: (j - 1) * spacing,
-            x: 0,
-            y: 0,
-            baseOffset: Math.random() * Math.PI * 2,
-            isGlitch: Math.random() > 0.95
-          };
-        }
+      particles = [];
+      for (let i = 0; i < particleCount; i++) {
+        particles.push(new Particle());
       }
     };
 
     let animationFrameId: number;
     const animate = () => {
-      ctx.fillStyle = '#050505'; // Stark black
+      ctx.fillStyle = '#060608';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      const time = Date.now() * 0.0005;
       mouse.clickPulse = Math.max(0, mouse.clickPulse - 0.05);
 
-      // Calculate positions
-      for (let i = 0; i < cols; i++) {
-        for (let j = 0; j < rows; j++) {
-          const p = grid[i][j];
-          
-          // Angular, jagged movement instead of smooth sine
-          const wave = Math.sin(p.baseOffset + time + (i * 0.1) - (j * 0.1));
-          let targetX = p.ox + (Math.abs(wave) * 20 * Math.sign(Math.cos(time + p.baseOffset)));
-          let targetY = p.oy + (wave * 20);
+      for (let i = 0; i < particles.length; i++) {
+        particles[i].update();
+        particles[i].draw();
 
-          if (p.isGlitch && Math.random() > 0.9) {
-            targetX += (Math.random() - 0.5) * 40;
-            targetY += (Math.random() - 0.5) * 40;
-          }
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
 
-          const dx = mouse.x - p.ox;
-          const dy = mouse.y - p.oy;
-          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (distance < connectionDistance) {
+            const opacity = 1 - (distance / connectionDistance);
+            
+            // Mouse proximity highlights connections
+            const distToMouse = Math.sqrt(
+              Math.pow(mouse.x - (particles[i].x + particles[j].x)/2, 2) + 
+              Math.pow(mouse.y - (particles[i].y + particles[j].y)/2, 2)
+            );
+            
+            let strokeOpacity = opacity * 0.2;
+            if (distToMouse < mouse.radius) {
+              strokeOpacity += (1 - distToMouse / mouse.radius) * 0.5;
+            }
 
-          // Brutalist magnetic distortion
-          if (dist < mouse.radius) {
-            const force = Math.pow((mouse.radius - dist) / mouse.radius, 2);
-            targetX -= (dx / dist) * force * (100 + mouse.clickPulse * 200);
-            targetY -= (dy / dist) * force * (100 + mouse.clickPulse * 200);
-          }
-
-          p.x += (targetX - p.x) * 0.1;
-          p.y += (targetY - p.y) * 0.1;
-        }
-      }
-
-      ctx.lineWidth = 1;
-
-      // Draw horizontal and vertical lines (Grid mode)
-      for (let i = 0; i < cols - 1; i++) {
-        for (let j = 0; j < rows - 1; j++) {
-          const p = grid[i][j];
-          const right = grid[i + 1][j];
-          const bottom = grid[i][j + 1];
-
-          const distToMouse = Math.sqrt(Math.pow(mouse.x - p.x, 2) + Math.pow(mouse.y - p.y, 2));
-          const visibility = Math.max(0.05, 1 - (distToMouse / 600));
-
-          ctx.strokeStyle = p.isGlitch ? `rgba(244, 63, 94, ${visibility + 0.2})` : `rgba(255, 255, 255, ${visibility * 0.4})`;
-
-          // Draw Right
-          ctx.beginPath();
-          ctx.moveTo(p.x, p.y);
-          ctx.lineTo(right.x, right.y);
-          ctx.stroke();
-
-          // Draw Bottom
-          ctx.beginPath();
-          ctx.moveTo(p.x, p.y);
-          ctx.lineTo(bottom.x, bottom.y);
-          ctx.stroke();
-
-          // Intersecting Diagonals for certain areas
-          if ((i + j) % 3 === 0) {
-            const br = grid[i + 1][j + 1];
+            // Determine line color based on particle colors
+            const isSpecial = particles[i].isGlitch || particles[j].isGlitch;
+            ctx.strokeStyle = isSpecial 
+              ? `rgba(244, 63, 94, ${strokeOpacity})` 
+              : `rgba(255, 255, 255, ${strokeOpacity})`;
+            
+            ctx.lineWidth = isSpecial ? 1.5 : 1;
             ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(br.x, br.y);
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
             ctx.stroke();
-          }
-
-          // Draw glitch nodes
-          if (p.isGlitch || distToMouse < 80) {
-            ctx.fillStyle = p.isGlitch ? '#f43f5e' : '#fff';
-            ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
           }
         }
       }

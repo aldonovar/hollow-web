@@ -1,13 +1,31 @@
 import { useEffect, useState } from 'react';
-import { Menu, X, User } from 'lucide-react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Menu, X, User, LogOut } from 'lucide-react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatedBackground } from '../AnimatedBackground';
 import { routeMeta } from '../content';
+import { supabase } from '../lib/supabase';
+import type { Session } from '@supabase/supabase-js';
 
 export function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -16,6 +34,11 @@ export function Layout() {
   }, []);
 
   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
 
   return (
     <div className="site-shell">
@@ -54,11 +77,26 @@ export function Layout() {
               ))}
             </nav>
             <div className="site-nav__auth">
-              <Link className="site-nav__login" to="/login">Log In</Link>
-              <Link className="site-nav__cta" to="/signup">
-                Sign Up
-                <User className="site-nav__icon" size={16} />
-              </Link>
+              {session ? (
+                <>
+                  <Link className="site-nav__cta" to="/console">
+                    Console
+                    <User className="site-nav__icon" size={16} />
+                  </Link>
+                  <button onClick={handleLogout} className="site-nav__login" style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                    <LogOut size={16} style={{ display: 'inline', marginRight: '6px' }} />
+                    Log Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link className="site-nav__login" to="/login">Log In</Link>
+                  <Link className="site-nav__cta" to="/signup">
+                    Sign Up
+                    <User className="site-nav__icon" size={16} />
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
