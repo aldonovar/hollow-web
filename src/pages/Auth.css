@@ -52,6 +52,8 @@
   margin: 0;
 }
 
+/* ─── Form ───────────────────────────────────────────────────── */
+
 .auth-form {
   display: flex;
   flex-direction: column;
@@ -108,6 +110,13 @@
   color: var(--text-3);
 }
 
+.auth-form__input-wrapper input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Submit Button ──────────────────────────────────────────── */
+
 .auth-form__submit {
   background: var(--text);
   color: var(--bg);
@@ -137,6 +146,42 @@
   cursor: not-allowed;
 }
 
+.auth-form__submit--ghost {
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  margin-top: 0;
+}
+
+.auth-form__submit--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  border-color: var(--purple);
+}
+
+/* ─── Loading Spinner ────────────────────────────────────────── */
+
+.auth-form__loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-form__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: var(--bg);
+  border-radius: 50%;
+  animation: auth-spin 0.6s linear infinite;
+}
+
+@keyframes auth-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Error Message ──────────────────────────────────────────── */
+
 .auth-form__error {
   background: rgba(244, 63, 94, 0.1);
   border: 1px solid rgba(244, 63, 94, 0.2);
@@ -146,7 +191,54 @@
   font-family: 'Inter', sans-serif;
   font-size: 13px;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
+
+/* ─── Success State ──────────────────────────────────────────── */
+
+.auth-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  text-align: center;
+}
+
+.auth-success__icon {
+  color: var(--green, #22c55e);
+  animation: auth-success-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes auth-success-pop {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.auth-success__title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.auth-success__desc {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: var(--text-2);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.auth-success__desc strong {
+  color: var(--text);
+}
+
+/* ─── Footer ─────────────────────────────────────────────────── */
 
 .auth-card__footer {
   text-align: center;
