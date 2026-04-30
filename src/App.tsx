@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
@@ -14,9 +14,10 @@ import { Roadmap } from './pages/Roadmap';
 import { Contact } from './pages/Contact';
 import { Auth } from './pages/Auth';
 import { Settings } from './pages/Settings';
-import { Engine } from './pages/Engine';
 import { MfaChallenge } from './pages/MfaChallenge';
 import { useAuthStore } from './stores/authStore';
+
+const DawApp = lazy(() => import('./daw/App'));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -56,6 +57,8 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+const isPlayApp = window.location.hostname.startsWith('play.') || window.location.hostname.startsWith('console.');
+
 function App() {
   const initialize = useAuthStore((s) => s.initialize);
   const requiresMfa = useAuthStore((s) => s.requiresMfa);
@@ -86,40 +89,89 @@ function App() {
     <Router>
       <ScrollToTop />
       <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
-          <Route path="features" element={<Features />} />
-          <Route path="pricing" element={<Pricing />} />
-          <Route path="roadmap" element={<Roadmap />} />
-          <Route path="contact" element={<Contact />} />
-          <Route path="login" element={<GuestRoute><Auth type="login" /></GuestRoute>} />
-          <Route path="signup" element={<GuestRoute><Auth type="signup" /></GuestRoute>} />
-          <Route
-            path="console"
-            element={
-              <ProtectedRoute>
-                <Console />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="settings"
-            element={
-              <ProtectedRoute>
-                <Settings />
-              </ProtectedRoute>
-            }
-          />
-        </Route>
-        {/* Engine without the Layout shell because it's full screen */}
-        <Route
-          path="/engine"
-          element={
-            <ProtectedRoute>
-              <Engine />
-            </ProtectedRoute>
-          }
-        />
+        {isPlayApp ? (
+          /* =========================================
+             RUTAS DE LA APLICACIÓN DAW (play. / console.)
+             ========================================= */
+          <>
+            {/* Si entran a la raíz de play.hollowbits.com, van directo a la consola */}
+            <Route path="/" element={<Navigate to="/console" replace />} />
+            <Route path="/login" element={<GuestRoute><Auth type="login" /></GuestRoute>} />
+            <Route path="/signup" element={<GuestRoute><Auth type="signup" /></GuestRoute>} />
+            
+            <Route
+              path="/console"
+              element={
+                <ProtectedRoute>
+                  <Console />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/engine"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<div className="min-h-screen bg-[#06080a] flex items-center justify-center text-white font-mono text-sm">CARGANDO MOTOR AUDIO...</div>}>
+                    <DawApp />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<Navigate to="/console" replace />} />
+          </>
+        ) : (
+          /* =========================================
+             RUTAS DE MARKETING (hollowbits.com)
+             ========================================= */
+          <>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Home />} />
+              <Route path="features" element={<Features />} />
+              <Route path="pricing" element={<Pricing />} />
+              <Route path="roadmap" element={<Roadmap />} />
+              <Route path="contact" element={<Contact />} />
+              <Route path="login" element={<GuestRoute><Auth type="login" /></GuestRoute>} />
+              <Route path="signup" element={<GuestRoute><Auth type="signup" /></GuestRoute>} />
+              
+              {/* Se mantienen estas rutas temporalmente para entorno de desarrollo local si no usan play.localhost */}
+              <Route
+                path="console"
+                element={
+                  <ProtectedRoute>
+                    <Console />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="settings"
+                element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                }
+              />
+            </Route>
+            
+            <Route
+              path="/engine"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<div className="min-h-screen bg-[#06080a] flex items-center justify-center text-white font-mono text-sm">CARGANDO MOTOR AUDIO...</div>}>
+                    <DawApp />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+          </>
+        )}
       </Routes>
     </Router>
   );

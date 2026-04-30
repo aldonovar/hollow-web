@@ -1,0 +1,1017 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Clock3, Play, Square } from 'lucide-react';
+import { Clip, Track, TrackType } from '../types';
+import { engineAdapter } from '../services/engineAdapter';
+import type { SessionLaunchTelemetryEvent } from '../services/engineAdapter';
+import { BrowserDragPayload, readBrowserDragPayload } from '../services/browserDragService';
+import {
+    buildSessionLaunchReport,
+    buildSessionTrackWindow,
+    summarizeSessionLaunchTelemetry,
+    type SessionOverloadDecision,
+    type SessionLaunchReport,
+    type SessionLaunchTelemetrySample
+} from '../services/sessionPerformanceService';
+import {
+    appendSceneRecordingEvent,
+    buildSceneRecordingIndex,
+    buildSceneReplayPlan,
+    createSceneRecordingEvent,
+    deserializeSceneRecordingEvents,
+    serializeSceneRecordingEvents,
+    summarizeSceneReplayPlan,
+    summarizeSceneRecordingEvents,
+    type SceneRecordingEvent,
+    type SceneTrackClipRef
+} from '../services/sessionSceneRecordingService';
+
+interface SessionViewProps {
+    tracks: Track[];
+    bpm: number;
+    overloadDecision: SessionOverloadDecision;
+    onExternalDrop?: (trackId: string, sceneIndex: number, payload: BrowserDragPayload) => void;
+    onClipSelect?: (trackId: string, clipId: string) => void;
+}
+
+interface TrackLaunchState {
+    playingClipId?: string;
+    queuedClipId?: string;
+}
+
+interface SceneSlot {
+    clip: Clip | null;
+}
+
+interface VisibleTrackColumn {
+    track: Track;
+    index: number;
+    rightGapPx: number;
+}
+
+const SCENES = 8;
+const SCENE_COLUMN_WIDTH_PX = 76;
+const TRACK_COLUMN_WIDTH_PX = 144;
+const TRACK_COLUMN_GAP_PX = 8;
+const TRACK_WINDOW_OVERSCAN = 3;
+const SESSION_SCENE_RECORDING_STORAGE_KEY = 'hollowbits.session.scene-recording.v1';
+const SESSION_LAUNCH_TELEMETRY_STORAGE_KEY = 'hollowbits.session-launch.telemetry.v1';
+const SESSION_LIVE_WORKFLOW_STORAGE_KEY = 'hollowbits.session.live-workflow.v1';
+
+const QUANTIZE_OPTIONS = [
+    { value: 0.25, label: '1/4 Bar' },
+    { value: 0.5, label: '1/2 Bar' },
+    { value: 1, label: '1 Bar' },
+    { value: 2, label: '2 Bars' }
+];
+
+const sanitizeSceneRecordingEvents = (candidate: unknown): SceneRecordingEvent[] => {
+    return deserializeSceneRecordingEvents(candidate);
+};
+
+const sanitizeLaunchTelemetrySamples = (candidate: unknown): SessionLaunchTelemetrySample[] => {
+    if (!Array.isArray(candidate)) return [];
+
+    const mappedSamples: Array<SessionLaunchTelemetrySample | null> = candidate
+        .map((sample) => {
+            if (!sample || typeof sample !== 'object') return null;
+            const value = sample as Partial<SessionLaunchTelemetrySample>;
+            if (typeof value.trackId !== 'string' || typeof value.clipId !== 'string') {
+                return null;
+            }
+
+            return {
+                trackId: value.trackId,
+                clipId: value.clipId,
+                sceneIndex: typeof value.sceneIndex === 'number' ? value.sceneIndex : undefined,
+                requestedLaunchTimeSec: Number.isFinite(value.requestedLaunchTimeSec) ? Number(value.requestedLaunchTimeSec) : 0,
+                effectiveLaunchTimeSec: Number.isFinite(value.effectiveLaunchTimeSec) ? Number(value.effectiveLaunchTimeSec) : 0,
+                launchErrorMs: Number.isFinite(value.launchErrorMs) ? Number(value.launchErrorMs) : 0,
+                quantized: Boolean(value.quantized),
+                wasLate: Boolean(value.wasLate),
+                capturedAtMs: Number.isFinite(value.capturedAtMs) ? Number(value.capturedAtMs) : Date.now()
+            };
+        });
+
+    return mappedSamples
+        .filter((sample): sample is SessionLaunchTelemetrySample => sample !== null)
+        .slice(-1200);
+};
+
+const sanitizeLaunchQuantizeBars = (candidate: unknown): number => {
+    const value = Number(candidate);
+    const allowed = new Set(QUANTIZE_OPTIONS.map((option) => option.value));
+    if (!Number.isFinite(value) || !allowed.has(value)) {
+        return 1;
+    }
+    return value;
+};
+
+const SessionView: React.FC<SessionViewProps> = ({
+    tracks,
+    bpm,
+    overloadDecision,
+    onExternalDrop,
+    onClipSelect
+}) => {
+    const [trackLaunchState, setTrackLaunchState] = useState<Record<string, TrackLaunchState>>({});
+    const [launchQuantizeBars, setLaunchQuantizeBars] = useState<number>(1);
+    const [trackViewport, setTrackViewport] = useState({ left: 0, width: 1280 });
+    const [isSceneRecording, setIsSceneRecording] = useState(false);
+    const [sceneRecordingEvents, setSceneRecordingEvents] = useState<SceneRecordingEvent[]>([]);
+    const [isSceneReplayRunning, setIsSceneReplayRunning] = useState(false);
+    const [launchTelemetrySamples, setLaunchTelemetrySamples] = useState<SessionLaunchTelemetrySample[]>([]);
+
+    const pendingTimersRef = useRef<number[]>([]);
+    const replayTimersRef = useRef<number[]>([]);
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+    const sessionTracks = useMemo(
+        () => tracks.filter((track) => track.type === TrackType.AUDIO || track.type === TrackType.MIDI),
+        [tracks]
+    );
+
+    useEffect(() => {
+        try {
+            const rawSessionWorkflow = localStorage.getItem(SESSION_LIVE_WORKFLOW_STORAGE_KEY);
+            if (rawSessionWorkflow) {
+                const parsed = JSON.parse(rawSessionWorkflow) as { launchQuantizeBars?: unknown };
+                setLaunchQuantizeBars(sanitizeLaunchQuantizeBars(parsed?.launchQuantizeBars));
+            }
+        } catch {
+            // Non-blocking restore path.
+        }
+
+        try {
+            const rawSceneRecording = localStorage.getItem(SESSION_SCENE_RECORDING_STORAGE_KEY);
+            if (rawSceneRecording) {
+                const parsed = JSON.parse(rawSceneRecording) as { events?: unknown };
+                const sanitizedEvents = sanitizeSceneRecordingEvents(parsed);
+                if (sanitizedEvents.length > 0) {
+                    setSceneRecordingEvents(sanitizedEvents);
+                }
+            }
+        } catch {
+            // Non-blocking restore path.
+        }
+
+        try {
+            const rawTelemetry = localStorage.getItem(SESSION_LAUNCH_TELEMETRY_STORAGE_KEY);
+            if (rawTelemetry) {
+                const parsed = JSON.parse(rawTelemetry) as { samples?: unknown };
+                const sanitizedSamples = sanitizeLaunchTelemetrySamples(parsed?.samples);
+                if (sanitizedSamples.length > 0) {
+                    setLaunchTelemetrySamples(sanitizedSamples);
+                }
+            }
+        } catch {
+            // Non-blocking restore path.
+        }
+    }, []);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(SESSION_LIVE_WORKFLOW_STORAGE_KEY, JSON.stringify({
+                launchQuantizeBars
+            }));
+        } catch {
+            // Non-blocking persistence path.
+        }
+    }, [launchQuantizeBars]);
+
+    useEffect(() => {
+        return () => {
+            pendingTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+            pendingTimersRef.current = [];
+            replayTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+            replayTimersRef.current = [];
+        };
+    }, []);
+
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        let rafId = 0;
+        let pending = false;
+
+        const commitViewport = () => {
+            pending = false;
+            const left = Math.max(0, container.scrollLeft - SCENE_COLUMN_WIDTH_PX - TRACK_COLUMN_GAP_PX);
+            const width = Math.max(1, container.clientWidth - SCENE_COLUMN_WIDTH_PX - TRACK_COLUMN_GAP_PX);
+
+            setTrackViewport((prev) => {
+                if (prev.left === left && prev.width === width) {
+                    return prev;
+                }
+                return { left, width };
+            });
+        };
+
+        const scheduleViewportCommit = () => {
+            if (pending) return;
+            pending = true;
+            rafId = requestAnimationFrame(commitViewport);
+        };
+
+        scheduleViewportCommit();
+        container.addEventListener('scroll', scheduleViewportCommit, { passive: true });
+        window.addEventListener('resize', scheduleViewportCommit);
+
+        return () => {
+            if (rafId) cancelAnimationFrame(rafId);
+            container.removeEventListener('scroll', scheduleViewportCommit);
+            window.removeEventListener('resize', scheduleViewportCommit);
+        };
+    }, []);
+
+    useEffect(() => {
+        const validTrackIds = new Set(sessionTracks.map((track) => track.id));
+        setTrackLaunchState((prev) => {
+            const next: Record<string, TrackLaunchState> = {};
+            let changed = false;
+
+            Object.entries(prev).forEach(([trackId, state]) => {
+                if (validTrackIds.has(trackId)) {
+                    next[trackId] = state;
+                    return;
+                }
+                changed = true;
+            });
+
+            return changed ? next : prev;
+        });
+    }, [sessionTracks]);
+
+    const scheduleUiUpdate = useCallback((callback: () => void, delayMs: number) => {
+        const effectiveDelayMs = Math.max(delayMs, overloadDecision.uiUpdateDebounceMs);
+
+        if (effectiveDelayMs <= 1) {
+            callback();
+            return;
+        }
+
+        const timerId = window.setTimeout(callback, effectiveDelayMs);
+        pendingTimersRef.current.push(timerId);
+    }, [overloadDecision.uiUpdateDebounceMs]);
+
+    const pushLaunchTelemetrySamples = useCallback((samples: SessionLaunchTelemetrySample[]) => {
+        if (samples.length === 0) return;
+
+        setLaunchTelemetrySamples((prev) => {
+            const merged = [...prev, ...samples];
+            if (merged.length <= 1200) {
+                return merged;
+            }
+            return merged.slice(merged.length - 1200);
+        });
+    }, []);
+
+    const toLaunchTelemetrySample = useCallback((
+        event: SessionLaunchTelemetryEvent,
+        sceneIndex?: number | null
+    ): SessionLaunchTelemetrySample => {
+        return {
+            trackId: event.trackId,
+            clipId: event.clipId,
+            sceneIndex: typeof sceneIndex === 'number' ? sceneIndex : null,
+            requestedLaunchTimeSec: event.requestedLaunchTimeSec,
+            effectiveLaunchTimeSec: event.effectiveLaunchTimeSec,
+            launchErrorMs: event.launchErrorMs,
+            quantized: event.quantized,
+            wasLate: event.wasLate,
+            capturedAtMs: event.capturedAtMs
+        };
+    }, []);
+
+    const launchTelemetrySummary = useMemo(() => {
+        return summarizeSessionLaunchTelemetry(launchTelemetrySamples, 2);
+    }, [launchTelemetrySamples]);
+
+    const launchTelemetryReport = useMemo<SessionLaunchReport>(() => {
+        return buildSessionLaunchReport(
+            launchTelemetrySamples,
+            {
+                name: 'session-launch-live-capture',
+                tracks: sessionTracks.length,
+                scenes: SCENES,
+                quantizeBars: launchQuantizeBars,
+                source: 'live-capture'
+            },
+            2
+        );
+    }, [launchQuantizeBars, launchTelemetrySamples, sessionTracks.length]);
+
+    useEffect(() => {
+        if (launchTelemetrySummary.sampleCount === 0) return;
+
+        try {
+            localStorage.setItem(SESSION_LAUNCH_TELEMETRY_STORAGE_KEY, JSON.stringify({
+                capturedAt: Date.now(),
+                summary: launchTelemetrySummary,
+                samples: launchTelemetrySamples.slice(-200)
+            }));
+            localStorage.setItem('hollowbits.session-launch.latest-report.v1', JSON.stringify(launchTelemetryReport));
+        } catch {
+            // Non-blocking persistence path.
+        }
+    }, [launchTelemetryReport, launchTelemetrySamples, launchTelemetrySummary]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(SESSION_SCENE_RECORDING_STORAGE_KEY, JSON.stringify(
+                serializeSceneRecordingEvents(sceneRecordingEvents)
+            ));
+        } catch {
+            // Non-blocking persistence path.
+        }
+    }, [sceneRecordingEvents]);
+
+    const computeLaunchAt = useCallback(() => {
+        return engineAdapter.getSessionLaunchTime(launchQuantizeBars);
+    }, [launchQuantizeBars]);
+
+    const queueClipLaunch = useCallback((track: Track, clip: Clip, launchAt: number, sceneIndex?: number) => {
+        if (track.type !== TrackType.AUDIO || !clip.buffer) return;
+
+        const now = engineAdapter.getContext().currentTime;
+        const delayMs = Math.max(0, Math.round((launchAt - now) * 1000));
+
+        setTrackLaunchState((prev) => ({
+            ...prev,
+            [track.id]: {
+                ...(prev[track.id] || {}),
+                queuedClipId: clip.id
+            }
+        }));
+
+        const telemetryEvent = engineAdapter.launchClip(track, clip, launchAt);
+        if (telemetryEvent) {
+            pushLaunchTelemetrySamples([toLaunchTelemetrySample(telemetryEvent, sceneIndex)]);
+        }
+
+        scheduleUiUpdate(() => {
+            setTrackLaunchState((prev) => ({
+                ...prev,
+                [track.id]: {
+                    playingClipId: clip.id,
+                    queuedClipId: undefined
+                }
+            }));
+        }, delayMs + 24);
+    }, [pushLaunchTelemetrySamples, scheduleUiUpdate, toLaunchTelemetrySample]);
+
+    const queueSceneLaunchBatch = useCallback((
+        entries: Array<{ track: Track; clip: Clip }>,
+        launchAt: number,
+        sceneIndex?: number
+    ) => {
+        if (entries.length === 0) return;
+
+        const now = engineAdapter.getContext().currentTime;
+        const delayMs = Math.max(0, Math.round((launchAt - now) * 1000));
+
+        setTrackLaunchState((prev) => {
+            const next = { ...prev };
+            entries.forEach(({ track, clip }) => {
+                next[track.id] = {
+                    ...(next[track.id] || {}),
+                    queuedClipId: clip.id
+                };
+            });
+            return next;
+        });
+
+        const telemetrySamples: SessionLaunchTelemetrySample[] = [];
+        entries.forEach(({ track, clip }) => {
+            const telemetryEvent = engineAdapter.launchClip(track, clip, launchAt);
+            if (telemetryEvent) {
+                telemetrySamples.push(toLaunchTelemetrySample(telemetryEvent, sceneIndex));
+            }
+        });
+        pushLaunchTelemetrySamples(telemetrySamples);
+
+        scheduleUiUpdate(() => {
+            setTrackLaunchState((prev) => {
+                const next = { ...prev };
+                entries.forEach(({ track, clip }) => {
+                    next[track.id] = {
+                        playingClipId: clip.id,
+                        queuedClipId: undefined
+                    };
+                });
+                return next;
+            });
+        }, delayMs + 24);
+    }, [pushLaunchTelemetrySamples, scheduleUiUpdate, toLaunchTelemetrySample]);
+
+    const stopTrackLaunch = useCallback((trackId: string, launchAt: number) => {
+        const now = engineAdapter.getContext().currentTime;
+        const delayMs = Math.max(0, Math.round((launchAt - now) * 1000));
+
+        engineAdapter.stopTrackClips(trackId, launchAt);
+
+        scheduleUiUpdate(() => {
+            setTrackLaunchState((prev) => ({
+                ...prev,
+                [trackId]: {
+                    playingClipId: undefined,
+                    queuedClipId: undefined
+                }
+            }));
+        }, delayMs + 24);
+    }, [scheduleUiUpdate]);
+
+    const getSceneSlotsForTrack = useCallback((track: Track): SceneSlot[] => {
+        const slots: SceneSlot[] = Array.from({ length: SCENES }, () => ({ clip: null }));
+
+        track.sessionClips.forEach((sessionSlot, index) => {
+            if (index >= SCENES || !sessionSlot.clip) return;
+            slots[index] = { clip: sessionSlot.clip };
+        });
+
+        if (slots.some((slot) => slot.clip)) {
+            return slots;
+        }
+
+        const clipsByStart = [...track.clips].sort((a, b) => a.start - b.start);
+        clipsByStart.forEach((clip) => {
+            const sceneIndex = Math.floor(Math.max(0, clip.start - 1));
+            if (sceneIndex >= SCENES) return;
+            if (!slots[sceneIndex].clip) {
+                slots[sceneIndex] = { clip };
+            }
+        });
+
+        return slots;
+    }, []);
+
+    const sessionSlotsByTrack = useMemo(() => {
+        return sessionTracks.reduce<Record<string, SceneSlot[]>>((acc, track) => {
+            acc[track.id] = getSceneSlotsForTrack(track);
+            return acc;
+        }, {});
+    }, [getSceneSlotsForTrack, sessionTracks]);
+
+    const trackWindow = useMemo(() => {
+        const baseWindow = buildSessionTrackWindow({
+            totalTracks: sessionTracks.length,
+            trackColumnWidthPx: TRACK_COLUMN_WIDTH_PX,
+            trackGapPx: TRACK_COLUMN_GAP_PX,
+            viewportLeftPx: trackViewport.left,
+            viewportWidthPx: trackViewport.width,
+            overscanTracks: TRACK_WINDOW_OVERSCAN
+        });
+
+        if (!overloadDecision.virtualizeTracks || sessionTracks.length === 0) {
+            return {
+                ...baseWindow,
+                startIndex: 0,
+                endIndex: sessionTracks.length - 1,
+                leftSpacerPx: 0,
+                rightSpacerPx: 0
+            };
+        }
+
+        const maxVisible = overloadDecision.maxVisibleTrackColumns;
+        if (!maxVisible || baseWindow.endIndex < baseWindow.startIndex) {
+            return baseWindow;
+        }
+
+        const currentVisibleCount = (baseWindow.endIndex - baseWindow.startIndex) + 1;
+        if (currentVisibleCount <= maxVisible) {
+            return baseWindow;
+        }
+
+        const center = baseWindow.startIndex + Math.floor(currentVisibleCount / 2);
+        let startIndex = Math.max(0, center - Math.floor(maxVisible / 2));
+        let endIndex = Math.min(sessionTracks.length - 1, startIndex + maxVisible - 1);
+        startIndex = Math.max(0, endIndex - maxVisible + 1);
+
+        const stride = TRACK_COLUMN_WIDTH_PX + TRACK_COLUMN_GAP_PX;
+        const leftSpacerPx = startIndex * stride;
+        const visibleCount = (endIndex - startIndex) + 1;
+        const visibleWidthPx = (visibleCount * TRACK_COLUMN_WIDTH_PX) + (Math.max(0, visibleCount - 1) * TRACK_COLUMN_GAP_PX);
+        const rightSpacerPx = Math.max(0, baseWindow.totalWidthPx - leftSpacerPx - visibleWidthPx);
+
+        return {
+            ...baseWindow,
+            startIndex,
+            endIndex,
+            leftSpacerPx,
+            rightSpacerPx
+        };
+    }, [
+        overloadDecision.maxVisibleTrackColumns,
+        overloadDecision.virtualizeTracks,
+        sessionTracks.length,
+        trackViewport.left,
+        trackViewport.width
+    ]);
+
+    const visibleTrackColumns = useMemo<VisibleTrackColumn[]>(() => {
+        if (trackWindow.endIndex < trackWindow.startIndex || sessionTracks.length === 0) {
+            return [];
+        }
+
+        const slice = sessionTracks.slice(trackWindow.startIndex, trackWindow.endIndex + 1);
+        return slice.map((track, offset) => {
+            const index = trackWindow.startIndex + offset;
+            return {
+                track,
+                index,
+                rightGapPx: index < sessionTracks.length - 1 ? TRACK_COLUMN_GAP_PX : 0
+            };
+        });
+    }, [sessionTracks, trackWindow.endIndex, trackWindow.startIndex]);
+
+    const clearReplayTimers = useCallback(() => {
+        replayTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+        replayTimersRef.current = [];
+    }, []);
+
+    const runSceneReplayPlan = useCallback((replayPlan: ReturnType<typeof buildSceneReplayPlan>) => {
+        if (replayPlan.length === 0 || isSceneReplayRunning) return;
+
+        clearReplayTimers();
+        const now = engineAdapter.getContext().currentTime;
+        setIsSceneReplayRunning(true);
+
+        replayPlan.forEach((event, index) => {
+            const delayMs = Math.max(0, Math.round((event.replayLaunchAtSec - now) * 1000));
+            const timerId = window.setTimeout(() => {
+                const entries = event.entries.flatMap((entry) => {
+                    const track = sessionTracks.find((candidate) => candidate.id === entry.trackId);
+                    if (!track || track.type !== TrackType.AUDIO) return [];
+
+                    const slotClip = sessionSlotsByTrack[track.id]?.[event.sceneIndex]?.clip || null;
+                    const clip = slotClip?.id === entry.clipId
+                        ? slotClip
+                        : track.clips.find((candidate) => candidate.id === entry.clipId);
+
+                    if (!clip || !clip.buffer) return [];
+                    return [{ track, clip }];
+                });
+
+                queueSceneLaunchBatch(entries, event.replayLaunchAtSec, event.sceneIndex);
+
+                if (index === replayPlan.length - 1) {
+                    const settleTimer = window.setTimeout(() => {
+                        setIsSceneReplayRunning(false);
+                    }, 160);
+                    replayTimersRef.current.push(settleTimer);
+                }
+            }, delayMs);
+
+            replayTimersRef.current.push(timerId);
+        });
+    }, [
+        clearReplayTimers,
+        isSceneReplayRunning,
+        queueSceneLaunchBatch,
+        sessionSlotsByTrack,
+        sessionTracks
+    ]);
+
+    const buildSceneTrackClipRefs = useCallback((entries: Array<{ track: Track; clip: Clip }>): SceneTrackClipRef[] => {
+        return entries.map(({ track, clip }) => ({
+            trackId: track.id,
+            clipId: clip.id
+        }));
+    }, []);
+
+    const handleLaunch = useCallback((track: Track, clip: Clip, sceneIndex: number) => {
+        if (track.type !== TrackType.AUDIO || !clip.buffer) return;
+
+        const launchAt = computeLaunchAt();
+        const trackState = trackLaunchState[track.id];
+        const isSameClipPlaying = trackState?.playingClipId === clip.id && !trackState?.queuedClipId;
+
+        if (isSameClipPlaying) {
+            stopTrackLaunch(track.id, launchAt);
+            return;
+        }
+
+        queueClipLaunch(track, clip, launchAt, sceneIndex);
+    }, [computeLaunchAt, queueClipLaunch, stopTrackLaunch, trackLaunchState]);
+
+    const handleSceneLaunch = useCallback((sceneIndex: number) => {
+        const launchAt = computeLaunchAt();
+
+        const entries = sessionTracks.flatMap((track) => {
+            const slotClip = sessionSlotsByTrack[track.id]?.[sceneIndex]?.clip;
+            if (!slotClip || !slotClip.buffer || track.type !== TrackType.AUDIO) {
+                return [];
+            }
+            return [{ track, clip: slotClip }];
+        });
+
+        if (entries.length === 0) return;
+
+        if (isSceneRecording) {
+            const nextEvent = createSceneRecordingEvent(
+                sceneIndex,
+                launchAt,
+                launchQuantizeBars,
+                buildSceneTrackClipRefs(entries)
+            );
+            setSceneRecordingEvents((prev) => appendSceneRecordingEvent(prev, nextEvent, 1024));
+        }
+
+        queueSceneLaunchBatch(entries, launchAt, sceneIndex);
+    }, [
+        buildSceneTrackClipRefs,
+        computeLaunchAt,
+        isSceneRecording,
+        launchQuantizeBars,
+        queueSceneLaunchBatch,
+        sessionSlotsByTrack,
+        sessionTracks
+    ]);
+
+    const clearSceneRecording = useCallback(() => {
+        clearReplayTimers();
+        setIsSceneReplayRunning(false);
+        setSceneRecordingEvents([]);
+    }, [clearReplayTimers]);
+
+    const undoLastSceneRecordingEvent = useCallback(() => {
+        setSceneRecordingEvents((prev) => {
+            if (prev.length === 0) return prev;
+            return prev.slice(0, prev.length - 1);
+        });
+    }, []);
+
+    const resetLaunchTelemetry = useCallback(() => {
+        setLaunchTelemetrySamples([]);
+    }, []);
+
+    const exportLaunchTelemetryReport = useCallback(async () => {
+        if (launchTelemetryReport.summary.sampleCount === 0) return;
+
+        const payload = JSON.stringify(launchTelemetryReport, null, 2);
+        const fileName = 'session-launch-report.json';
+
+        try {
+            if (window.nativeWindows?.saveProject) {
+                await window.nativeWindows.saveProject(payload, fileName);
+                return;
+            }
+
+            if (window.electron?.saveProject) {
+                await window.electron.saveProject(payload, fileName);
+                return;
+            }
+        } catch {
+            // Fallback to browser download.
+        }
+
+        const blob = new Blob([payload], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(url);
+    }, [launchTelemetryReport]);
+
+    const handleReplaySceneRecording = useCallback(() => {
+        if (sceneRecordingEvents.length === 0 || isSceneReplayRunning) return;
+        const replayStartLaunchAtSec = computeLaunchAt();
+        const replayPlan = buildSceneReplayPlan(sceneRecordingEvents, replayStartLaunchAtSec);
+        runSceneReplayPlan(replayPlan);
+    }, [
+        computeLaunchAt,
+        isSceneReplayRunning,
+        sceneRecordingEvents,
+        runSceneReplayPlan
+    ]);
+
+    const handleReplayLastScene = useCallback(() => {
+        if (sceneRecordingEvents.length === 0 || isSceneReplayRunning) return;
+
+        const latestEvent = sceneRecordingEvents[sceneRecordingEvents.length - 1];
+        const replayPlan = buildSceneReplayPlan([latestEvent], computeLaunchAt());
+        runSceneReplayPlan(replayPlan);
+    }, [computeLaunchAt, isSceneReplayRunning, runSceneReplayPlan, sceneRecordingEvents]);
+
+    const stopAllSessionClips = useCallback(() => {
+        const launchAt = computeLaunchAt();
+        const now = engineAdapter.getContext().currentTime;
+        const delayMs = Math.max(0, Math.round((launchAt - now) * 1000));
+
+        sessionTracks.forEach((track) => {
+            engineAdapter.stopTrackClips(track.id, launchAt);
+        });
+
+        scheduleUiUpdate(() => {
+            setTrackLaunchState((prev) => {
+                const next = { ...prev };
+                sessionTracks.forEach((track) => {
+                    next[track.id] = {
+                        playingClipId: undefined,
+                        queuedClipId: undefined
+                    };
+                });
+                return next;
+            });
+        }, delayMs + 24);
+    }, [computeLaunchAt, scheduleUiUpdate, sessionTracks]);
+
+    const handleSlotDrop = useCallback((event: React.DragEvent<HTMLDivElement>, trackId: string, sceneIndex: number) => {
+        if (!onExternalDrop) return;
+
+        event.preventDefault();
+        const payload = readBrowserDragPayload(event.dataTransfer);
+        if (!payload) return;
+
+        onExternalDrop(trackId, sceneIndex, payload);
+    }, [onExternalDrop]);
+
+    const usePulseAnimation = overloadDecision.animationLevel === 'full';
+    const showSlotFooter = overloadDecision.mode !== 'critical';
+    const sceneRecordingSummary = useMemo(() => summarizeSceneRecordingEvents(sceneRecordingEvents), [sceneRecordingEvents]);
+    const sceneRecordingIndex = useMemo(() => buildSceneRecordingIndex(sceneRecordingEvents), [sceneRecordingEvents]);
+    const sceneReplaySummary = useMemo(() => {
+        if (sceneRecordingEvents.length === 0) return summarizeSceneReplayPlan([]);
+        return summarizeSceneReplayPlan(buildSceneReplayPlan(sceneRecordingEvents, 0));
+    }, [sceneRecordingEvents]);
+    const stageSafeSummary = useMemo(() => {
+        if (overloadDecision.mode === 'critical') {
+            return {
+                label: 'STAGE SAFE CRITICAL',
+                detail: 'animation minimal + virtualizacion estricta',
+                toneClass: 'border-red-400/35 bg-red-500/10 text-red-200'
+            };
+        }
+
+        if (overloadDecision.mode === 'guarded') {
+            return {
+                label: 'STAGE SAFE GUARDED',
+                detail: 'launch estable + viewport reducido',
+                toneClass: 'border-amber-400/35 bg-amber-500/10 text-amber-200'
+            };
+        }
+
+        return {
+            label: 'STAGE SAFE READY',
+            detail: 'launch cuantizado + replay listo',
+            toneClass: 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200'
+        };
+    }, [overloadDecision.mode]);
+
+    return (
+        <div ref={scrollContainerRef} className="flex-1 bg-[#111218] overflow-x-auto overflow-y-hidden relative p-4">
+            <div className="mb-2 min-h-[24px] flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <div className={`px-2.5 py-1 rounded-sm border text-[9px] uppercase tracking-wider font-bold ${stageSafeSummary.toneClass}`}>
+                        {stageSafeSummary.label}
+                    </div>
+                    <div className="px-2.5 py-1 rounded-sm border border-white/15 bg-[#101420]/88 text-[9px] uppercase tracking-wider font-bold text-gray-200 flex items-center gap-2">
+                        <span>{stageSafeSummary.detail}</span>
+                        <span className="text-gray-500">
+                            {sceneRecordingIndex.uniqueSceneCount} SCN / {sceneRecordingIndex.uniqueTrackCount} TRK
+                        </span>
+                    </div>
+                    {launchTelemetrySummary.sampleCount > 0 && (
+                        <div className="px-2.5 py-1 rounded-sm border border-white/15 bg-[#101420]/88 text-[9px] uppercase tracking-wider font-bold text-gray-200 flex items-center gap-2">
+                            <span>Launch Gate</span>
+                            <span className={launchTelemetrySummary.gatePass ? 'text-emerald-300' : 'text-red-300'}>
+                                {launchTelemetrySummary.gatePass ? 'PASS' : 'FAIL'}
+                            </span>
+                            <span className="text-gray-400">p95 {launchTelemetrySummary.p95LaunchErrorMs.toFixed(2)}ms</span>
+                            <span className="text-gray-500">n={launchTelemetrySummary.sampleCount}</span>
+                        </div>
+                    )}
+                </div>
+                <div className="flex items-center gap-2 ml-auto"></div>
+            </div>
+
+            <div className="flex gap-2 min-h-full">
+                <div className="w-[76px] shrink-0 flex flex-col gap-2 sticky left-0 z-20">
+                    <div className="h-8 rounded-sm border border-white/10 bg-[#171924] px-2 flex items-center justify-between text-[9px] uppercase tracking-wider text-gray-400">
+                        <span>Scene</span>
+                        <Play size={10} className="text-daw-violet" />
+                    </div>
+
+                    <div className="h-8 rounded-sm border border-white/10 bg-[#171924] px-2 flex items-center justify-between text-[9px] uppercase tracking-wider text-gray-400">
+                        <Clock3 size={10} className="text-daw-cyan" />
+                        <select
+                            value={String(launchQuantizeBars)}
+                            onChange={(event) => setLaunchQuantizeBars(Number(event.target.value))}
+                            className="bg-transparent text-[9px] text-gray-300 outline-none"
+                        >
+                            {QUANTIZE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value} className="bg-[#111218]">
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <button
+                        onClick={stopAllSessionClips}
+                        className="h-8 rounded-sm border border-daw-ruby/35 bg-daw-ruby/10 text-daw-ruby hover:bg-daw-ruby/20 transition-colors flex items-center justify-center"
+                        title="Detener todos los clips"
+                    >
+                        <Square size={11} />
+                    </button>
+
+                    <div className="text-[9px] text-gray-500 uppercase tracking-wider text-center">{Math.round(bpm)} BPM</div>
+
+                    <div className="grid grid-cols-2 gap-1">
+                        <button
+                            onClick={() => setIsSceneRecording((prev) => !prev)}
+                            className={`h-6 rounded-sm border text-[8px] font-bold tracking-wider ${isSceneRecording ? 'border-red-400/70 bg-red-500/20 text-red-200' : 'border-white/10 bg-[#161a29] text-gray-300 hover:text-white'}`}
+                            title="Scene Recording"
+                        >
+                            {isSceneRecording ? 'REC ON' : 'REC'}
+                        </button>
+                        <button
+                            onClick={handleReplaySceneRecording}
+                            disabled={sceneRecordingEvents.length === 0 || isSceneReplayRunning}
+                            className={`h-6 rounded-sm border text-[8px] font-bold tracking-wider ${sceneRecordingEvents.length > 0 && !isSceneReplayRunning ? 'border-daw-cyan/60 bg-daw-cyan/15 text-daw-cyan hover:bg-daw-cyan/25' : 'border-white/10 bg-[#161a29] text-gray-500 cursor-not-allowed'}`}
+                            title="Replay Scene Recording"
+                        >
+                            {isSceneReplayRunning ? 'RUN' : 'REPLAY'}
+                        </button>
+                        <button
+                            onClick={handleReplayLastScene}
+                            disabled={sceneRecordingEvents.length === 0 || isSceneReplayRunning}
+                            className={`h-6 rounded-sm border text-[8px] font-bold tracking-wider ${sceneRecordingEvents.length > 0 && !isSceneReplayRunning ? 'border-sky-400/60 bg-sky-500/12 text-sky-200 hover:bg-sky-500/20' : 'border-white/10 bg-[#161a29] text-gray-500 cursor-not-allowed'}`}
+                            title="Replay Last Recorded Scene"
+                        >
+                            LAST
+                        </button>
+                        <button
+                            onClick={clearSceneRecording}
+                            disabled={sceneRecordingEvents.length === 0 && !isSceneReplayRunning}
+                            className={`h-6 rounded-sm border text-[8px] font-bold tracking-wider ${sceneRecordingEvents.length > 0 || isSceneReplayRunning ? 'border-amber-400/60 bg-amber-500/12 text-amber-200 hover:bg-amber-500/20' : 'border-white/10 bg-[#161a29] text-gray-500 cursor-not-allowed'}`}
+                            title="Clear Scene Recording"
+                        >
+                            CLR SCN
+                        </button>
+                        <button
+                            onClick={resetLaunchTelemetry}
+                            disabled={launchTelemetrySummary.sampleCount === 0}
+                            className={`h-6 rounded-sm border text-[8px] font-bold tracking-wider ${launchTelemetrySummary.sampleCount > 0 ? 'border-daw-violet/60 bg-daw-violet/15 text-daw-violet hover:bg-daw-violet/25' : 'border-white/10 bg-[#161a29] text-gray-500 cursor-not-allowed'}`}
+                            title="Reset Launch Telemetry"
+                        >
+                            CLR GATE
+                        </button>
+                        <button
+                            onClick={undoLastSceneRecordingEvent}
+                            disabled={sceneRecordingEvents.length === 0}
+                            className={`h-6 rounded-sm border text-[8px] font-bold tracking-wider ${sceneRecordingEvents.length > 0 ? 'border-fuchsia-400/60 bg-fuchsia-500/12 text-fuchsia-200 hover:bg-fuchsia-500/20' : 'border-white/10 bg-[#161a29] text-gray-500 cursor-not-allowed'}`}
+                            title="Undo Last Scene Recording Event"
+                        >
+                            UNDO SCN
+                        </button>
+                        <button
+                            onClick={() => { void exportLaunchTelemetryReport(); }}
+                            disabled={launchTelemetrySummary.sampleCount === 0}
+                            className={`h-6 rounded-sm border text-[8px] font-bold tracking-wider ${launchTelemetrySummary.sampleCount > 0 ? 'border-emerald-400/60 bg-emerald-500/12 text-emerald-200 hover:bg-emerald-500/20' : 'border-white/10 bg-[#161a29] text-gray-500 cursor-not-allowed'}`}
+                            title="Export Launch Report JSON"
+                        >
+                            EXP JSON
+                        </button>
+                    </div>
+
+                    <div className="text-[8px] text-gray-500 uppercase tracking-wider text-center">
+                        Scenes REC: {sceneRecordingSummary.eventCount}
+                    </div>
+                    <div className="text-[8px] text-gray-600 uppercase tracking-wider text-center">
+                        {sceneRecordingSummary.uniqueSceneCount} SCN | {sceneRecordingSummary.uniqueTrackCount} TRK | {sceneRecordingSummary.durationSec.toFixed(2)}s
+                    </div>
+                    <div className="text-[8px] text-gray-600 uppercase tracking-wider text-center">
+                        Replay {sceneReplaySummary.eventCount} EVT | {sceneReplaySummary.uniqueSceneCount} SCN | {sceneReplaySummary.durationSec.toFixed(2)}s
+                    </div>
+
+                    <div className="pt-[6px] flex flex-col gap-2">
+                        {Array.from({ length: SCENES }).map((_, index) => (
+                            <div key={`scene-launch-${index}`} className="h-24 flex flex-col items-center justify-center gap-1">
+                                <button
+                                    onClick={() => handleSceneLaunch(index)}
+                                    className="w-7 h-7 rounded-full bg-[#1e2130] border border-white/10 hover:border-daw-violet/40 hover:bg-daw-violet/15 transition-colors flex items-center justify-center"
+                                    title={`Lanzar escena ${index + 1}`}
+                                >
+                                    <Play size={10} className="text-gray-300 ml-[1px]" fill="currentColor" />
+                                </button>
+                                <span className={`text-[8px] font-mono uppercase tracking-wider ${sceneRecordingIndex.perSceneEventCount[index] ? 'text-daw-cyan' : 'text-gray-600'}`}>
+                                    {sceneRecordingIndex.perSceneEventCount[index] ? `${sceneRecordingIndex.perSceneEventCount[index]} rec` : '---'}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="shrink-0 flex" style={{ width: `${trackWindow.totalWidthPx}px` }}>
+                    {trackWindow.leftSpacerPx > 0 && (
+                        <div className="shrink-0" style={{ width: `${trackWindow.leftSpacerPx}px` }} />
+                    )}
+
+                    {visibleTrackColumns.map((column) => {
+                        const { track, rightGapPx } = column;
+                        const slots = sessionSlotsByTrack[track.id] || [];
+                        const state = trackLaunchState[track.id] || {};
+
+                        return (
+                            <div
+                                key={track.id}
+                                className="bg-[#171924] flex flex-col rounded-sm border border-daw-border shrink-0"
+                                style={{
+                                    width: `${TRACK_COLUMN_WIDTH_PX}px`,
+                                    marginRight: `${rightGapPx}px`
+                                }}
+                            >
+                                <div className="h-8 bg-[#202332] border-b border-daw-border flex items-center justify-between px-2">
+                                    <span className="text-[10px] font-bold truncate text-gray-200 w-24 uppercase">{track.name}</span>
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: track.color }}></div>
+                                </div>
+
+                                <div className="flex-1 flex flex-col p-1 gap-2 bg-[#131622]">
+                                    {Array.from({ length: SCENES }).map((_, sceneIndex) => {
+                                        const slotClip = slots[sceneIndex]?.clip || null;
+                                        const canPlay = Boolean(slotClip?.buffer) && track.type === TrackType.AUDIO;
+                                        const isPlaying = slotClip ? state.playingClipId === slotClip.id : false;
+                                        const isQueued = slotClip ? state.queuedClipId === slotClip.id : false;
+
+                                        return (
+                                            <div
+                                                key={`scene-${sceneIndex}`}
+                                                className={`h-24 rounded-[2px] border transition-all relative group ${slotClip
+                                                    ? 'bg-[#25283a] border-[#373b51]'
+                                                    : 'bg-[#151826] border-transparent opacity-60'}
+                                                ${canPlay ? 'hover:bg-[#2d3148] cursor-pointer' : ''}`}
+                                                onDragOver={(event) => {
+                                                    if (!onExternalDrop) return;
+                                                    event.preventDefault();
+                                                    event.dataTransfer.dropEffect = 'copy';
+                                                }}
+                                                onDrop={(event) => handleSlotDrop(event, track.id, sceneIndex)}
+                                            >
+                                                {slotClip ? (
+                                                    <div
+                                                        className="w-full h-full p-2 flex flex-col justify-between"
+                                                        onClick={() => {
+                                                            onClipSelect?.(track.id, slotClip.id);
+                                                            if (canPlay) {
+                                                                handleLaunch(track, slotClip, sceneIndex);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <div className="flex justify-between items-start gap-2">
+                                                            <span className="text-[9px] font-bold text-white truncate px-1 bg-black/40 rounded-sm">{slotClip.name}</span>
+                                                            {!canPlay && (
+                                                                <span className="text-[8px] uppercase tracking-wider text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-sm px-1">
+                                                                    MIDI
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="flex items-center justify-center">
+                                                            {isPlaying ? (
+                                                                <div className={`w-8 h-8 rounded-full bg-green-500/90 flex items-center justify-center ${usePulseAnimation ? 'animate-pulse shadow-[0_0_12px_rgba(34,197,94,0.55)]' : ''}`}>
+                                                                    <Play size={13} fill="white" className="text-white ml-[1px]" />
+                                                                </div>
+                                                            ) : isQueued ? (
+                                                                <div className="w-8 h-8 rounded-full border border-daw-violet/65 bg-daw-violet/20 flex items-center justify-center shadow-[0_0_10px_rgba(168,85,247,0.35)]">
+                                                                    <Clock3 size={12} className="text-daw-violet" />
+                                                                </div>
+                                                            ) : (
+                                                                <div className="w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all group-hover:scale-110" style={{ borderColor: track.color }}>
+                                                                    <Play size={10} fill={track.color} className="ml-[1px]" style={{ color: track.color }} />
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {showSlotFooter && (
+                                                            <div className="text-[8px] text-gray-500 font-mono text-center uppercase">
+                                                                {slotClip.length.toFixed(2)} BAR
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-[9px] text-gray-600 uppercase tracking-wider">
+                                                        Vacio
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })}
+
+                    {trackWindow.rightSpacerPx > 0 && (
+                        <div className="shrink-0" style={{ width: `${trackWindow.rightSpacerPx}px` }} />
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default SessionView;

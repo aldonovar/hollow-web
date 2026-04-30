@@ -9,11 +9,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@google/genai": "^1.51.0",
+    "@spotify/basic-pitch": "^1.0.1",
     "@studio-freight/lenis": "^1.0.42",
     "@supabase/auth-ui-react": "^0.4.7",
     "@supabase/auth-ui-shared": "^0.1.8",
     "@supabase/supabase-js": "^2.105.1",
+    "@tauri-apps/api": "^2.11.0",
     "gsap": "^3.14.2",
+    "jszip": "^3.10.1",
     "lenis": "^1.3.17",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",

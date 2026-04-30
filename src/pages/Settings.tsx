@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   User, AtSign, Mail, Lock, Shield, Camera, Save, AlertCircle, CheckCircle,
-  LogOut, KeyRound, Eye, EyeOff, Loader2, ChevronRight, Copy, X
+  LogOut, KeyRound, Eye, EyeOff, Loader2, ChevronRight, Copy, X, Clock
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
@@ -43,6 +43,21 @@ export function Settings() {
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [mfaMsg, setMfaMsg] = useState('');
   const [copied, setCopied] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(30);
+
+  // Timer simulation (TOTP rotates every 30s based on epoch)
+  useEffect(() => {
+    const epoch = Math.floor(Date.now() / 1000);
+    const currentSeconds = epoch % 30;
+    setTimeLeft(30 - currentSeconds);
+
+    const interval = setInterval(() => {
+      const e = Math.floor(Date.now() / 1000);
+      setTimeLeft(30 - (e % 30));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   /* ─── Computed ──────────────────────────────────────────────── */
   const authProvider = user?.app_metadata?.provider || 'email';
@@ -586,11 +601,14 @@ export function Settings() {
                 </button>
               </div>
             ) : mfaQr ? (
-              <div className="settings__mfa-enroll">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <p className="settings__mfa-instruction">
-                    Escanea este código QR con tu aplicación de autenticación:
-                  </p>
+              <div className="settings__mfa-enroll" style={{ border: '1px solid rgba(168, 85, 247, 0.2)', padding: '24px', borderRadius: '4px', background: 'rgba(10,10,10,0.6)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+                  <div>
+                    <h4 style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '14px', color: '#a855f7', margin: '0 0 8px 0', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Sincronización TOTP</h4>
+                    <p className="settings__mfa-instruction" style={{ margin: 0, fontSize: '13px' }}>
+                      Escanea este código QR con tu aplicación de autenticación:
+                    </p>
+                  </div>
                   <button 
                     className="settings__cancel-btn" 
                     onClick={handleCancelMfa}
@@ -599,44 +617,64 @@ export function Settings() {
                     <X size={16} />
                   </button>
                 </div>
-                <div className="settings__mfa-qr">
-                  <img src={mfaQr} alt="MFA QR Code" />
+                
+                <div className="settings__mfa-qr" style={{ padding: '16px', background: '#fff', display: 'inline-block', borderRadius: '8px', marginBottom: '16px' }}>
+                  <img src={mfaQr} alt="MFA QR Code" style={{ display: 'block' }} />
                 </div>
+                
                 {mfaSecret && (
-                  <div className="settings__mfa-secret-box">
-                    <span className="settings__mfa-secret-label">Clave manual:</span>
-                    <code className="settings__mfa-secret-code">{mfaSecret}</code>
-                    <button className="settings__copy-btn" onClick={handleCopySecret} title="Copiar clave">
-                      {copied ? <CheckCircle size={14} color="#a855f7" /> : <Copy size={14} />}
+                  <div className="settings__mfa-secret-box" style={{ background: 'rgba(0,0,0,0.4)', padding: '12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                    <span className="settings__mfa-secret-label" style={{ fontSize: '12px', color: 'var(--text-2)' }}>Clave manual:</span>
+                    <code className="settings__mfa-secret-code" style={{ fontFamily: '"JetBrains Mono", monospace', color: '#a855f7', fontSize: '14px', letterSpacing: '0.1em' }}>{mfaSecret}</code>
+                    <button className="settings__copy-btn" onClick={handleCopySecret} title="Copiar clave" style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer' }}>
+                      {copied ? <CheckCircle size={16} color="#a855f7" /> : <Copy size={16} />}
                     </button>
                   </div>
                 )}
-                <div className="settings__mfa-hint">
-                  <AlertCircle size={12} />
-                  <span>El código en tu app se renueva automáticamente cada 30 segundos.</span>
+                
+                <div className="mfa-timer" style={{ marginBottom: '24px' }}>
+                  <div className="mfa-timer__header">
+                    <span className={`mfa-timer__text ${timeLeft <= 5 ? 'mfa-timer__text--urgent' : ''}`}>
+                      <Clock size={12} /> {timeLeft}s para rotación de código
+                    </span>
+                  </div>
+                  <div className="mfa-timer__track">
+                    <div 
+                      className={`mfa-timer__bar ${timeLeft <= 5 ? 'mfa-timer__bar--urgent' : ''}`}
+                      style={{ width: `${(timeLeft / 30) * 100}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="settings__field" style={{ marginTop: '1.5rem' }}>
-                  <label>Código de Verificación</label>
-                  <div className="settings__input-wrapper">
-                    <Shield size={16} className="settings__input-icon" />
+
+                <div className="settings__field">
+                  <div className="mfa-input-container">
                     <input
                       type="text"
+                      className="mfa-input"
+                      style={{ padding: '16px', fontSize: '24px', letterSpacing: '0.4em' }}
                       value={mfaVerifyCode}
-                      onChange={e => setMfaVerifyCode(e.target.value)}
-                      placeholder="Ingresa el código de 6 dígitos"
+                      onChange={e => setMfaVerifyCode(e.target.value.replace(/\D/g, ''))}
+                      placeholder="0 0 0 0 0 0"
                       maxLength={6}
                     />
                   </div>
                 </div>
+                
                 <button
-                  className="settings__save-btn"
+                  className={`mfa-submit-btn ${mfaVerifyCode.length === 6 ? 'mfa-submit-btn--ready' : ''}`}
+                  style={{ width: '100%', marginTop: '24px' }}
                   onClick={handleVerifyMfa}
                   disabled={mfaLoading || mfaVerifyCode.length < 6}
                 >
+                  <div className="mfa-submit-btn__bg"></div>
                   {mfaLoading ? (
-                    <><Loader2 size={16} className="settings__spinner" /> Verificando...</>
+                    <span className="mfa-submit-btn__content">
+                      <Loader2 size={16} className="settings__spinner" /> VERIFICANDO...
+                    </span>
                   ) : (
-                    <><Shield size={16} /> Verificar y Activar</>
+                    <span className="mfa-submit-btn__content">
+                      VERIFICAR Y ACTIVAR 2FA <Shield size={16} />
+                    </span>
                   )}
                 </button>
               </div>
