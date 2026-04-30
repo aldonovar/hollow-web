@@ -2,42 +2,20 @@ import { Btn } from '../components/Editorial';
 import { usePageMotion } from '../components/usePageMotion';
 
 function DAWPreview() {
-  const tracks = [
-    { name: 'BOMBO', color: '#e11d48', clipW: '70%' },
-    { name: 'SUB', color: '#a855f7', clipW: '55%' },
-    { name: 'ATMO', color: '#c084fc', clipW: '85%' },
-    { name: 'LEAD', color: '#f43f5e', clipW: '45%' },
-    { name: 'PAD', color: '#ec4899', clipW: '65%' },
-  ];
-
   return (
     <div className="daw-preview" data-reveal>
-      <div className="daw-preview__bar">
-        <span className="daw-preview__dot" />
-        <span className="daw-preview__dot" />
-        <span className="daw-preview__dot" />
-      </div>
-      <div className="daw-preview__body">
-        <div className="daw-preview__sidebar">
-          {[0,1,2,3,4,5].map(i => (
-            <div key={i} className={`daw-preview__sidebar-item ${i === 1 ? 'daw-preview__sidebar-item--active' : ''}`} />
-          ))}
-        </div>
-        <div className="daw-preview__tracks">
-          {tracks.map(t => (
-            <div key={t.name} className="daw-preview__track" style={{ background: 'rgba(255,255,255,0.02)' }}>
-              <div className="daw-preview__track-color" style={{ background: t.color }} />
-              <div className="daw-preview__track-clip" style={{ width: t.clipW, background: `${t.color}33` }} />
-            </div>
-          ))}
-        </div>
-        <div className="daw-preview__mixer">
-          {[75, 60, 85, 45, 55].map((h, i) => (
-            <div key={i} className="daw-preview__meter">
-              <div className="daw-preview__meter-fill" style={{ height: `${h}%` }} />
-            </div>
-          ))}
-        </div>
+      <div className="daw-preview__image-wrapper">
+        <img 
+          src="/daw-screenshot-real.png" 
+          alt="Hollow Bits DAW Interface" 
+          className="daw-preview__image"
+          onError={(e) => {
+            // Fallback for when the real image isn't uploaded yet
+            e.currentTarget.src = 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&q=80&w=2000';
+            e.currentTarget.style.opacity = '0.5';
+            e.currentTarget.style.filter = 'grayscale(100%) contrast(1.2)';
+          }}
+        />
       </div>
       <div className="daw-preview__shimmer" />
     </div>

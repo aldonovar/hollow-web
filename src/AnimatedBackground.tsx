@@ -12,27 +12,27 @@ export function AnimatedBackground() {
 
     let cols = 0;
     let rows = 0;
-    const spacing = 60;
-    let grid: { x: number; y: number; ox: number; oy: number; angle: number; speed: number }[][] = [];
-    const mouse = { x: -1000, y: -1000, radius: 250 };
+    const spacing = 80; // Larger spacing for brutalist feel
+    let grid: { ox: number; oy: number; x: number; y: number; baseOffset: number; isGlitch: boolean }[][] = [];
+    const mouse = { x: -1000, y: -1000, radius: 350, clickPulse: 0 };
 
     const init = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      cols = Math.floor(canvas.width / spacing) + 2;
-      rows = Math.floor(canvas.height / spacing) + 2;
+      cols = Math.floor(canvas.width / spacing) + 3;
+      rows = Math.floor(canvas.height / spacing) + 3;
       grid = [];
 
       for (let i = 0; i < cols; i++) {
         grid[i] = [];
         for (let j = 0; j < rows; j++) {
           grid[i][j] = {
-            ox: i * spacing - spacing / 2,
-            oy: j * spacing - spacing / 2,
+            ox: (i - 1) * spacing,
+            oy: (j - 1) * spacing,
             x: 0,
             y: 0,
-            angle: (i * 0.5) + (j * 0.5),
-            speed: 0.015 + Math.random() * 0.01
+            baseOffset: Math.random() * Math.PI * 2,
+            isGlitch: Math.random() > 0.95
           };
         }
       }
@@ -40,91 +40,82 @@ export function AnimatedBackground() {
 
     let animationFrameId: number;
     const animate = () => {
-      // Dark brutalist background
-      ctx.fillStyle = '#060608';
+      ctx.fillStyle = '#050505'; // Stark black
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      const time = Date.now() * 0.001;
+      const time = Date.now() * 0.0005;
+      mouse.clickPulse = Math.max(0, mouse.clickPulse - 0.05);
 
-      // Update points
+      // Calculate positions
       for (let i = 0; i < cols; i++) {
         for (let j = 0; j < rows; j++) {
           const p = grid[i][j];
-          p.angle += p.speed;
           
-          // Base undulation
-          let targetX = p.ox + Math.cos(p.angle) * 20;
-          let targetY = p.oy + Math.sin(p.angle) * 20;
+          // Angular, jagged movement instead of smooth sine
+          const wave = Math.sin(p.baseOffset + time + (i * 0.1) - (j * 0.1));
+          let targetX = p.ox + (Math.abs(wave) * 20 * Math.sign(Math.cos(time + p.baseOffset)));
+          let targetY = p.oy + (wave * 20);
 
-          // Mouse interaction (repulsion)
-          const dx = mouse.x - targetX;
-          const dy = mouse.y - targetY;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-
-          if (dist < mouse.radius) {
-            const force = (mouse.radius - dist) / mouse.radius;
-            // Easing curve for a "magnetic" feel
-            const push = Math.pow(force, 2) * 80;
-            targetX -= (dx / dist) * push;
-            targetY -= (dy / dist) * push;
+          if (p.isGlitch && Math.random() > 0.9) {
+            targetX += (Math.random() - 0.5) * 40;
+            targetY += (Math.random() - 0.5) * 40;
           }
 
-          p.x = targetX;
-          p.y = targetY;
+          const dx = mouse.x - p.ox;
+          const dy = mouse.y - p.oy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          // Brutalist magnetic distortion
+          if (dist < mouse.radius) {
+            const force = Math.pow((mouse.radius - dist) / mouse.radius, 2);
+            targetX -= (dx / dist) * force * (100 + mouse.clickPulse * 200);
+            targetY -= (dy / dist) * force * (100 + mouse.clickPulse * 200);
+          }
+
+          p.x += (targetX - p.x) * 0.1;
+          p.y += (targetY - p.y) * 0.1;
         }
       }
 
-      // Draw wireframe mesh
       ctx.lineWidth = 1;
-      
+
+      // Draw horizontal and vertical lines (Grid mode)
       for (let i = 0; i < cols - 1; i++) {
         for (let j = 0; j < rows - 1; j++) {
-          const p1 = grid[i][j];
-          const p2 = grid[i + 1][j];
-          const p3 = grid[i][j + 1];
-          const p4 = grid[i + 1][j + 1];
+          const p = grid[i][j];
+          const right = grid[i + 1][j];
+          const bottom = grid[i][j + 1];
 
-          // Determine opacity based on distance to mouse for a "spotlight" effect
-          const cx = (p1.x + p4.x) / 2;
-          const cy = (p1.y + p4.y) / 2;
-          const dx = mouse.x - cx;
-          const dy = mouse.y - cy;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          let lineOpacity = 0.08; // Base visibility (increased from previous)
-          if (dist < 400) {
-            lineOpacity += (1 - dist / 400) * 0.3; // Glows when mouse is near
+          const distToMouse = Math.sqrt(Math.pow(mouse.x - p.x, 2) + Math.pow(mouse.y - p.y, 2));
+          const visibility = Math.max(0.05, 1 - (distToMouse / 600));
+
+          ctx.strokeStyle = p.isGlitch ? `rgba(244, 63, 94, ${visibility + 0.2})` : `rgba(255, 255, 255, ${visibility * 0.4})`;
+
+          // Draw Right
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(right.x, right.y);
+          ctx.stroke();
+
+          // Draw Bottom
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(bottom.x, bottom.y);
+          ctx.stroke();
+
+          // Intersecting Diagonals for certain areas
+          if ((i + j) % 3 === 0) {
+            const br = grid[i + 1][j + 1];
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(br.x, br.y);
+            ctx.stroke();
           }
 
-          ctx.strokeStyle = `rgba(255, 255, 255, ${lineOpacity})`;
-          
-          // Draw triangle 1
-          ctx.beginPath();
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p2.x, p2.y);
-          ctx.lineTo(p3.x, p3.y);
-          ctx.closePath();
-          ctx.stroke();
-
-          // Draw triangle 2
-          ctx.beginPath();
-          ctx.moveTo(p2.x, p2.y);
-          ctx.lineTo(p4.x, p4.y);
-          ctx.lineTo(p3.x, p3.y);
-          ctx.closePath();
-          ctx.stroke();
-
-          // Random tech-glitch fills
-          const fillRand = Math.sin(i * 12.9898 + j * 78.233 + time);
-          if (fillRand > 0.98) {
-            ctx.fillStyle = `rgba(168, 85, 247, ${lineOpacity * 0.8})`; // Purple
-            ctx.fill();
-          } else if (fillRand < -0.98) {
-            ctx.fillStyle = `rgba(244, 63, 94, ${lineOpacity * 0.8})`; // Rose
-            ctx.fill();
-          } else if (fillRand > 0.95 && fillRand <= 0.98) {
-            ctx.fillStyle = `rgba(255, 255, 255, ${lineOpacity * 0.5})`; // White flash
-            ctx.fill();
+          // Draw glitch nodes
+          if (p.isGlitch || distToMouse < 80) {
+            ctx.fillStyle = p.isGlitch ? '#f43f5e' : '#fff';
+            ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
           }
         }
       }
@@ -132,15 +123,12 @@ export function AnimatedBackground() {
       animationFrameId = requestAnimationFrame(animate);
     };
 
-    const handleResize = () => {
-      init();
-    };
-
+    const handleResize = () => init();
     const handleMouseMove = (e: MouseEvent) => {
       mouse.x = e.clientX;
       mouse.y = e.clientY;
     };
-
+    const handleMouseClick = () => { mouse.clickPulse = 1; };
     const handleMouseLeave = () => {
       mouse.x = -1000;
       mouse.y = -1000;
@@ -148,6 +136,7 @@ export function AnimatedBackground() {
 
     window.addEventListener('resize', handleResize);
     window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousedown', handleMouseClick);
     window.addEventListener('mouseleave', handleMouseLeave);
 
     init();
@@ -156,6 +145,7 @@ export function AnimatedBackground() {
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousedown', handleMouseClick);
       window.removeEventListener('mouseleave', handleMouseLeave);
       cancelAnimationFrame(animationFrameId);
     };

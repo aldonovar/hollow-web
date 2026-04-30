@@ -25,7 +25,11 @@ export function Layout() {
       <header className={`site-nav ${scrolled ? 'site-nav--scrolled' : ''}`}>
         <div className="site-nav__inner">
           <Link className="brand-lockup" to="/">
-            <img src="/hollow-bits-logo.svg" alt="HOLLOW bits" className="brand-lockup__logo" />
+            <img src="/logo-sphere.svg" alt="HOLLOW bits" className="brand-lockup__icon" />
+            <div className="brand-lockup__text">
+              <span className="brand-lockup__hollow">HOLLOW</span>
+              <span className="brand-lockup__bits">bits</span>
+            </div>
           </Link>
 
           <button
@@ -69,8 +73,12 @@ export function Layout() {
       <footer className="site-footer">
         <div className="site-footer__inner">
           <div className="site-footer__brand">
-            <Link className="brand-lockup" to="/">
-              <img src="/hollow-bits-logo.svg" alt="HOLLOW bits" className="brand-lockup__logo" />
+            <Link className="brand-lockup brand-lockup--footer" to="/">
+              <img src="/logo-sphere.svg" alt="HOLLOW bits" className="brand-lockup__icon" />
+              <div className="brand-lockup__text">
+                <span className="brand-lockup__hollow">HOLLOW</span>
+                <span className="brand-lockup__bits">bits</span>
+              </div>
             </Link>
             <p>El DAW que fusiona rendimiento nativo, colaboración en tiempo real y una estética sin precedentes.</p>
           </div>
