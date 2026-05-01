@@ -18,7 +18,15 @@ const ssoStorage = {
     if (match) return decodeURIComponent(match[2]);
     // Fallback to localStorage for migration
     if (typeof window !== 'undefined') {
-      return window.localStorage.getItem(key);
+      const localVal = window.localStorage.getItem(key);
+      if (localVal) {
+        // Sync to cookie automatically so they don't have to re-login
+        const domain = window.location.hostname.includes('hollowbits.com') 
+          ? 'domain=.hollowbits.com;' 
+          : '';
+        document.cookie = `${key}=${encodeURIComponent(localVal)}; ${domain} path=/; max-age=31536000; SameSite=Lax; Secure`;
+        return localVal;
+      }
     }
     return null;
   },
