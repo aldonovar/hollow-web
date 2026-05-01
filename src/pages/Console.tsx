@@ -58,6 +58,23 @@ export function Console() {
     }
   };
 
+  const handleOpenDaw = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    const isPlayApp = window.location.hostname.startsWith('play.') || window.location.hostname.startsWith('console.');
+    
+    if (isPlayApp) {
+      navigate('/engine');
+    } else {
+      // Inyectar tokens para asegurar persistencia en saltos de dominio cruzado strictos
+      const { data: { session } } = await supabase.auth.getSession();
+      let url = 'https://play.hollowbits.com/engine';
+      if (session) {
+        url += `#access_token=${session.access_token}&refresh_token=${session.refresh_token}&type=recovery`;
+      }
+      window.location.href = url;
+    }
+  };
+
   const createProject = async () => {
     if (!user) return;
 
@@ -129,6 +146,7 @@ export function Console() {
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <a
               href="https://play.hollowbits.com/engine"
+              onClick={handleOpenDaw}
               style={{
                 background: 'rgba(255,255,255,0.05)',
                 color: 'var(--text)',
@@ -242,7 +260,7 @@ export function Console() {
                   position: 'relative',
                   overflow: 'hidden'
                 }}
-                onClick={() => window.location.href = 'https://play.hollowbits.com/engine'}
+                onClick={handleOpenDaw}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(168,85,247,0.5)';
                   (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
