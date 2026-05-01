@@ -47,14 +47,12 @@ input,select,textarea{font:inherit;color:inherit}
 .site-nav{position:fixed;top:0;left:0;width:100%;z-index:50;border-bottom:1px solid rgba(255,255,255,.03);background:var(--glass);backdrop-filter:blur(20px) saturate(1.4);transition:all .3s var(--ease)}
 .site-nav--scrolled{background:var(--glass-hover);border-color:var(--border-hover);box-shadow:var(--shadow-sm)}
 .site-nav__inner{width:var(--w);margin:0 auto;padding:1.25rem 0;display:flex;align-items:center;justify-content:space-between;gap:2rem}
-.brand-lockup{display:flex;align-items:center;gap:0.75rem;text-decoration:none}
-.brand-lockup__icon{height:46px;width:auto;transition:transform .3s var(--ease)}
+.brand-lockup{display:flex;align-items:center;gap:.5rem;text-decoration:none}
+.brand-lockup__icon{width:32px;height:32px;transition:transform .3s var(--ease)}
 .brand-lockup:hover .brand-lockup__icon{transform:scale(1.05)}
-.brand-lockup__text{display:flex;align-items:baseline;gap:0.35rem}
-.brand-lockup__hollow{font-family:var(--fd);font-weight:900;font-size:1.8rem;letter-spacing:0.12em;color:#fff}
-.brand-lockup__bits{font-family:var(--fm);font-weight:700;font-size:1.4rem;letter-spacing:-0.05em;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;transform:translateY(0)}
-.brand-lockup--footer .brand-lockup__hollow{font-size:1.2rem}
-.brand-lockup--footer .brand-lockup__bits{font-size:1.4rem}
+.brand-lockup__text{display:flex;flex-direction:column;justify-content:center;align-items:center;line-height:1;min-width:108px}
+.brand-lockup__hollow{font-family:var(--fd);font-weight:900;font-size:12px;letter-spacing:.3em;color:#fff;text-align:center}
+.brand-lockup__bits{display:inline-block;margin-top:-1px;font-family:'Brittany','Brittany Signature',cursive;font-weight:400;font-size:19px;letter-spacing:.01em;line-height:.9;text-align:center;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;transform:scaleX(1.26);transform-origin:center center}
 
 .site-nav__toggle{display:none;width:2.2rem;height:2.2rem;border:1px solid var(--border);
   background:var(--glass);border-radius:var(--r);color:var(--text-2);align-items:center;justify-content:center}
