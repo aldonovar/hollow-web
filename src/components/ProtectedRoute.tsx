@@ -16,7 +16,12 @@ export function ProtectedRoute({ children, fallback = '/login' }: ProtectedRoute
   const session = useAuthStore((s) => s.session);
   const isLoading = useAuthStore((s) => s.isLoading);
 
-  if (isLoading) {
+  // Defense-in-depth: if the URL still has auth hash tokens, treat as loading
+  // so we never redirect before the authStore has consumed them.
+  const hashHasAuthTokens = window.location.hash.includes('access_token=');
+  const effectiveLoading = isLoading || (!session && hashHasAuthTokens);
+
+  if (effectiveLoading) {
     return (
       <div
         className="page-shell"
