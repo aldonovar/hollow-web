@@ -63,6 +63,16 @@ function App() {
   const initialize = useAuthStore((s) => s.initialize);
   const requiresMfa = useAuthStore((s) => s.requiresMfa);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const session = useAuthStore((s) => s.session);
+
+  useEffect(() => {
+    // Si estamos autenticados en el sitio de marketing (hollowbits.com) y estamos en el home,
+    // redirigimos automáticamente a la consola inyectando los tokens de sesión.
+    // Esto resuelve el problema del redireccionamiento por defecto de OAuth de Supabase.
+    if (session && !isPlayApp && window.location.pathname === '/') {
+      window.location.href = `https://play.hollowbits.com/console#access_token=${session.access_token}&refresh_token=${session.refresh_token}&type=recovery`;
+    }
+  }, [session]);
 
   useEffect(() => {
     // Initialize the auth store — hydrate session & subscribe to changes
