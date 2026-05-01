@@ -69,7 +69,8 @@ export function Console() {
       const { data: { session } } = await supabase.auth.getSession();
       let url = 'https://play.hollowbits.com/engine';
       if (session) {
-        url += `#access_token=${session.access_token}&refresh_token=${session.refresh_token}&type=recovery`;
+        const expiresIn = session.expires_at ? Math.max(0, Math.floor(session.expires_at - Date.now() / 1000)) : 3600;
+        url += `#access_token=${session.access_token}&refresh_token=${session.refresh_token}&expires_in=${expiresIn}&token_type=${session.token_type || 'bearer'}&type=magiclink`;
       }
       window.location.href = url;
     }
