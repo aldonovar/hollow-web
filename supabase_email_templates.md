@@ -1,6 +1,6 @@
-# Plantillas de Correo para Supabase (Hollow Bits)
+# Nuevas Plantillas de Correo Brutalistas (Hollow Bits)
 
-Estas plantillas han sido diseñadas con código HTML seguro para clientes de correo (Gmail, Outlook, Apple Mail) respetando el branding "Tech Brutalism" oscuro y premium de Hollow Bits.
+A continuación tienes el nuevo diseño "Tech Brutalism" 100% puro: esquinas cuadradas, máximo contraste (blanco sobre negro puro), fuente monoespaciada o serif sólida, sin gradientes, asegurando legibilidad total incluso en bandejas de SPAM.
 
 **Instrucciones de Instalación:**
 1. Ve a **Supabase Dashboard -> Authentication -> Email Templates**.
@@ -16,26 +16,24 @@ Estas plantillas han sido diseñadas con código HTML seguro para clientes de co
 <head>
   <meta charset="UTF-8">
   <style>
-    body { margin: 0; padding: 0; background-color: #06080a; color: #ffffff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
-    .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; text-align: center; }
-    .logo { width: 120px; margin-bottom: 30px; }
-    .card { background-color: #0d1117; border: 1px solid #1a1f26; border-radius: 12px; padding: 40px; box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
-    .title { font-size: 24px; font-weight: 700; margin-bottom: 15px; letter-spacing: -0.5px; }
-    .text { font-size: 16px; line-height: 1.5; color: #a1a1aa; margin-bottom: 30px; }
-    .button { display: inline-block; background: linear-gradient(135deg, #FF3366 0%, #7C3AED 100%); color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 16px; letter-spacing: 0.5px; }
-    .footer { margin-top: 40px; font-size: 12px; color: #52525b; }
+    body { margin: 0; padding: 0; background-color: #000000; color: #ffffff; font-family: 'Courier New', Courier, monospace; }
+    .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; text-align: left; }
+    .card { background-color: #000000; border: 2px solid #ffffff; border-radius: 0; padding: 40px; }
+    .title { font-size: 28px; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+    .text { font-size: 16px; line-height: 1.6; color: #cccccc; margin-bottom: 30px; }
+    .button { display: inline-block; background-color: #ffffff; color: #000000; text-decoration: none; padding: 16px 32px; font-weight: bold; font-size: 16px; border-radius: 0; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; border: 2px solid #ffffff; }
+    .footer { margin-top: 40px; font-size: 12px; color: #666666; text-transform: uppercase; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="card">
-      <h1 class="title">Bienvenido a HOLLOW bits</h1>
-      <p class="text">Has iniciado el proceso para unirte a nuestro ecosistema DAW. Confirma tu identidad para acceder a tu consola y comenzar a crear.</p>
-      <a href="{{ .ConfirmationURL }}" class="button">Verificar mi Cuenta</a>
+      <h1 class="title">HOLLOW BITS<br>VERIFICACIÓN</h1>
+      <p class="text">ACCESO REQUERIDO. CONFIRMA TU IDENTIDAD PARA ENTRAR A LA CONSOLA DEL SISTEMA Y ACTIVAR TU CUENTA DAW.</p>
+      <a href="{{ .ConfirmationURL }}" class="button">VERIFICAR CUENTA</a>
     </div>
     <div class="footer">
-      <p>Si no solicitaste esta cuenta, puedes ignorar este correo de forma segura.</p>
-      <p>&copy; 2026 Hollow Bits. Studio Without Limits.</p>
+      <p>SISTEMA CENTRAL HOLLOW BITS &copy; 2026</p>
     </div>
   </div>
 </body>
@@ -52,24 +50,24 @@ Estas plantillas han sido diseñadas con código HTML seguro para clientes de co
 <head>
   <meta charset="UTF-8">
   <style>
-    body { margin: 0; padding: 0; background-color: #06080a; color: #ffffff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
-    .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; text-align: center; }
-    .card { background-color: #0d1117; border: 1px solid #1a1f26; border-radius: 12px; padding: 40px; }
-    .title { font-size: 24px; font-weight: 700; margin-bottom: 15px; letter-spacing: -0.5px; }
-    .text { font-size: 16px; line-height: 1.5; color: #a1a1aa; margin-bottom: 30px; }
-    .button { display: inline-block; background-color: #ffffff; color: #000000; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 16px; }
-    .footer { margin-top: 40px; font-size: 12px; color: #52525b; }
+    body { margin: 0; padding: 0; background-color: #000000; color: #ffffff; font-family: 'Courier New', Courier, monospace; }
+    .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; text-align: left; }
+    .card { background-color: #000000; border: 2px solid #ffffff; border-radius: 0; padding: 40px; }
+    .title { font-size: 28px; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+    .text { font-size: 16px; line-height: 1.6; color: #cccccc; margin-bottom: 30px; }
+    .button { display: inline-block; background-color: #ffffff; color: #000000; text-decoration: none; padding: 16px 32px; font-weight: bold; font-size: 16px; border-radius: 0; text-transform: uppercase; letter-spacing: 1px; border: 2px solid #ffffff; }
+    .footer { margin-top: 40px; font-size: 12px; color: #666666; text-transform: uppercase; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="card">
-      <h1 class="title">Recuperación de Acceso</h1>
-      <p class="text">Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en la red de HOLLOW bits.</p>
-      <a href="{{ .ConfirmationURL }}" class="button">Restablecer Contraseña</a>
+      <h1 class="title">RECUPERACIÓN<br>DE CLAVE</h1>
+      <p class="text">SE HA SOLICITADO UN REINICIO DE CREDENCIALES PARA ESTE NODO. INGRESA AL ENLACE PARA ASIGNAR UNA NUEVA CONTRASEÑA.</p>
+      <a href="{{ .ConfirmationURL }}" class="button">REINICIAR CLAVE</a>
     </div>
     <div class="footer">
-      <p>Este enlace expirará pronto. Si no solicitaste este cambio, no es necesario realizar ninguna acción.</p>
+      <p>ENLACE VÁLIDO POR TIEMPO LIMITADO.</p>
     </div>
   </div>
 </body>
@@ -86,24 +84,24 @@ Estas plantillas han sido diseñadas con código HTML seguro para clientes de co
 <head>
   <meta charset="UTF-8">
   <style>
-    body { margin: 0; padding: 0; background-color: #06080a; color: #ffffff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
-    .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; text-align: center; }
-    .card { background-color: #0d1117; border: 1px solid #1a1f26; border-radius: 12px; padding: 40px; border-top: 4px solid #7C3AED; }
-    .title { font-size: 24px; font-weight: 700; margin-bottom: 15px; }
-    .text { font-size: 16px; line-height: 1.5; color: #a1a1aa; margin-bottom: 30px; }
-    .button { display: inline-block; background-color: #7C3AED; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 16px; }
-    .footer { margin-top: 40px; font-size: 12px; color: #52525b; }
+    body { margin: 0; padding: 0; background-color: #000000; color: #ffffff; font-family: 'Courier New', Courier, monospace; }
+    .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; text-align: left; }
+    .card { background-color: #000000; border: 2px solid #ffffff; border-radius: 0; padding: 40px; }
+    .title { font-size: 28px; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+    .text { font-size: 16px; line-height: 1.6; color: #cccccc; margin-bottom: 30px; }
+    .button { display: inline-block; background-color: #ffffff; color: #000000; text-decoration: none; padding: 16px 32px; font-weight: bold; font-size: 16px; border-radius: 0; text-transform: uppercase; letter-spacing: 1px; border: 2px solid #ffffff; }
+    .footer { margin-top: 40px; font-size: 12px; color: #666666; text-transform: uppercase; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="card">
-      <h1 class="title">Tu Acceso Seguro</h1>
-      <p class="text">Utiliza el siguiente botón para iniciar sesión directamente en tu consola de forma segura, sin necesidad de contraseña.</p>
-      <a href="{{ .ConfirmationURL }}" class="button">Entrar a la Consola</a>
+      <h1 class="title">ENLACE<br>MÁGICO</h1>
+      <p class="text">AUTORIZACIÓN DIRECTA. HAZ CLIC ABAJO PARA ENTRAR AL SISTEMA SIN REQUERIR CONTRASEÑA.</p>
+      <a href="{{ .ConfirmationURL }}" class="button">ENTRAR AL SISTEMA</a>
     </div>
     <div class="footer">
-      <p>Este enlace mágico es de un solo uso y expirará pronto.</p>
+      <p>ESTE ENLACE ES DE UN SOLO USO.</p>
     </div>
   </div>
 </body>
