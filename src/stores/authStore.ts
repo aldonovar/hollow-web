@@ -104,6 +104,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const queryParams = new URLSearchParams(window.location.search);
     const authCode = queryParams.get('code');
 
+    const hash = window.location.hash;
+    const hashHasTokens =
+      hash.length > 50 &&
+      hash.includes('access_token=') &&
+      hash.includes('refresh_token=');
+
     if (authCode) {
       // Clean the code from the URL immediately
       window.history.replaceState(null, '', window.location.pathname);
@@ -119,18 +125,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         .catch(() => {
           supabase.auth.getSession().then(({ data: { session } }) => commitSession(session));
         });
-        
-      return; // Early return, handled asynchronously
-    }
-
-    // 2. Fallback for older Implicit Flow (Hash-based tokens)
-    const hash = window.location.hash;
-    const hashHasTokens =
-      hash.length > 50 &&
-      hash.includes('access_token=') &&
-      hash.includes('refresh_token=');
-
-    if (hashHasTokens) {
+    } else if (hashHasTokens) {
+      // 2. Fallback for older Implicit Flow (Hash-based tokens)
       try {
         const params = new URLSearchParams(hash.substring(1));
         const accessToken = params.get('access_token') || '';
@@ -154,17 +150,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           }).catch(() => {
             supabase.auth.getSession().then(({ data: { session } }) => commitSession(session));
           });
-
-          return; // Early return — we're handling this path asynchronously above
+        } else {
+          supabase.auth.getSession().then(({ data: { session } }) => commitSession(session)).catch(() => commitSession(null));
         }
       } catch {
-        // Hash parsing failed silently
+        supabase.auth.getSession().then(({ data: { session } }) => commitSession(session)).catch(() => commitSession(null));
       }
+    } else {
+      // 3. No tokens in URL — standard session hydration from localStorage
+      supabase.auth.getSession().then(({ data: { session } }) => commitSession(session))
+        .catch(() => commitSession(null));
     }
-    
-    // 3. No tokens in URL — standard session hydration from localStorage
-    supabase.auth.getSession().then(({ data: { session } }) => commitSession(session))
-      .catch(() => commitSession(null));
 
     // Subscribe to auth state changes (login, logout, token refresh)
     const {
