@@ -69,10 +69,9 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
         return;
       }
       
-      // Login exitoso — redirigir explícitamente a /console
-      if (data.session) {
-        navigate('/console', { replace: true });
-      }
+      // Login exitoso — GuestRoute se encargará de redirigir a /console
+      // una vez que authStore propague el estado globalmente (onAuthStateChange).
+      // Mantenemos el status en 'loading' para que el botón siga deshabilitado.
     }
   };
 
