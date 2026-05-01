@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 
 
 import { usePageMotion } from '../components/usePageMotion';
-import { Plus, FolderOpen, LogOut, Settings } from 'lucide-react';
+import { Plus, FolderOpen, Settings, Play } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
@@ -127,20 +127,53 @@ export function Console() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <button
-              onClick={createProject}
+            <a
+              href="https://play.hollowbits.com/engine"
               style={{
-                background: 'var(--purple)',
+                background: 'rgba(255,255,255,0.05)',
                 color: 'var(--text)',
-                border: 'none',
+                border: '1px solid var(--border)',
                 padding: '12px 24px',
-                borderRadius: '8px',
+                borderRadius: '2px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
                 fontWeight: 'bold',
-                fontFamily: 'Inter, sans-serif',
+                fontFamily: 'JetBrains Mono, monospace',
+                textTransform: 'uppercase',
+                fontSize: '13px',
+                letterSpacing: '0.05em',
+                textDecoration: 'none'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--purple)';
+                e.currentTarget.style.background = 'rgba(168,85,247,0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border)';
+                e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+              }}
+            >
+              <Play size={16} /> Abrir Motor DAW
+            </a>
+            <button
+              onClick={createProject}
+              style={{
+                background: 'var(--text)',
+                color: 'var(--bg)',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '2px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontWeight: 'bold',
+                fontFamily: 'JetBrains Mono, monospace',
+                textTransform: 'uppercase',
+                fontSize: '13px',
+                letterSpacing: '0.05em'
               }}
             >
               <Plus size={18} /> Nuevo Proyecto
@@ -153,7 +186,7 @@ export function Console() {
                 color: 'var(--text-2)',
                 border: '1px solid var(--border)',
                 padding: '12px',
-                borderRadius: '8px',
+                borderRadius: '2px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -161,23 +194,6 @@ export function Console() {
               }}
             >
               <Settings size={18} />
-            </button>
-            <button
-              onClick={handleSignOut}
-              title="Cerrar sesión"
-              style={{
-                background: 'var(--glass)',
-                color: 'var(--text-2)',
-                border: '1px solid var(--border)',
-                padding: '12px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <LogOut size={18} />
             </button>
           </div>
         </div>
@@ -216,21 +232,26 @@ export function Console() {
               <div
                 key={p.id}
                 style={{
-                  background: 'var(--glass)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '12px',
+                  background: 'rgba(10, 10, 10, 0.8)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '2px',
                   padding: '24px',
-                  transition: 'transform 0.2s ease, border-color 0.2s ease',
+                  transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
                   cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden'
                 }}
-                onClick={() => navigate('/engine')}
+                onClick={() => window.location.href = 'https://play.hollowbits.com/engine'}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--purple)';
+                  (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(168,85,247,0.5)';
                   (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
+                  (e.currentTarget as HTMLDivElement).style.boxShadow = '0 0 20px rgba(168,85,247,0.15)';
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)';
+                  (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255, 255, 255, 0.1)';
                   (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
+                  (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>

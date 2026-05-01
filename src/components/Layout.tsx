@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/authStore';
 
 export function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -23,7 +24,10 @@ export function Layout() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+  useEffect(() => { 
+    setMenuOpen(false); 
+    setUserMenuOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     try {
@@ -86,8 +90,17 @@ export function Layout() {
             </nav>
             <div className="site-nav__auth">
               {session ? (
-                <>
-                  <Link className="site-nav__cta" to="/console">
+                <div style={{ position: 'relative' }}>
+                  <button 
+                    className="site-nav__cta" 
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    style={{ 
+                      background: userMenuOpen ? 'var(--purple)' : '#fff', 
+                      color: userMenuOpen ? '#fff' : '#000',
+                      cursor: 'pointer',
+                      border: 'none'
+                    }}
+                  >
                     {avatarUrl ? (
                       <img
                         src={avatarUrl}
@@ -104,17 +117,50 @@ export function Layout() {
                       <User className="site-nav__icon" size={16} style={{ marginRight: 6 }} />
                     )}
                     {displayName || 'Mi Cuenta'}
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="site-nav__login"
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
-                    title="Cerrar sesión"
-                  >
-                    <LogOut size={16} style={{ display: 'inline', marginRight: '6px' }} />
-                    Salir
                   </button>
-                </>
+                  
+                  {userMenuOpen && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 8px)',
+                      right: 0,
+                      background: 'var(--glass)',
+                      backdropFilter: 'blur(12px)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      padding: '6px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px',
+                      minWidth: '180px',
+                      boxShadow: 'var(--shadow)',
+                      zIndex: 100
+                    }}>
+                      <Link 
+                        to="/console" 
+                        onClick={() => setUserMenuOpen(false)}
+                        style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--text)', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '10px', fontFamily: 'Inter, sans-serif' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <User size={15} />
+                        Mi Consola
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          handleLogout();
+                        }}
+                        style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--rose)', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '10px', textAlign: 'left', cursor: 'pointer', background: 'transparent', border: 'none', width: '100%', fontFamily: 'Inter, sans-serif' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(244,63,94,0.1)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <LogOut size={15} />
+                        Cerrar Sesión
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <>
                   <Link className="site-nav__login" to="/login">Log In</Link>

@@ -109,6 +109,7 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <div className="auth-card__glitch-bar" />
         <div className="auth-card__header">
           <img src="/logo-sphere.svg" alt="HOLLOW bits" className="auth-card__logo" />
           <h1 className="auth-card__title">
