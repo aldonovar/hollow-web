@@ -31,7 +31,7 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
         return;
       }
       
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
         password: password,
         options: {
@@ -49,8 +49,13 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
         return;
       }
       
-      // Si el registro requiere confirmación de email (comportamiento por defecto en Supabase)
-      setStatus('success');
+      // Si la confirmación de email está desactivada, el usuario se loguea instantáneamente
+      if (data.session) {
+        // AuthStore detectará el login y redirigirá a /console automáticamente
+      } else {
+        // Si la confirmación sigue activa, mostramos la pantalla de "Revisa tu correo"
+        setStatus('success');
+      }
       
     } else {
       // Login
