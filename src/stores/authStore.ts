@@ -57,34 +57,6 @@ async function safeMfaCheck(): Promise<boolean> {
   }
 }
 
-/**
- * Parse cross-domain auth tokens from the URL hash.
- * Returns the tokens only if BOTH access_token AND refresh_token are present
- * and are non-empty JWT-like strings (contain dots).
- * Returns null for all other cases to avoid false positives.
- */
-function extractCrossDomainTokens(): { accessToken: string; refreshToken: string } | null {
-  try {
-    const hash = window.location.hash;
-    // Quick bail — must start with # and contain both token keys
-    if (!hash || hash.length < 20) return null;
-    if (!hash.includes('access_token=') || !hash.includes('refresh_token=')) return null;
-
-    const params = new URLSearchParams(hash.substring(1));
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-
-    // Validate tokens look like real JWTs (contain dots for header.payload.signature)
-    if (!accessToken || !refreshToken) return null;
-    if (!accessToken.includes('.') || accessToken.length < 30) return null;
-    if (refreshToken.length < 10) return null;
-
-    return { accessToken, refreshToken };
-  } catch {
-    return null;
-  }
-}
-
 /* ─── Store ──────────────────────────────────────────────────────── */
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -105,53 +77,78 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       }
     }, 4000);
 
-    // Helper to sync session into store
-    const syncSession = async (session: Session | null) => {
-      if (session?.user) {
-        const needsMfa = await safeMfaCheck();
-        const profile = await fetchProfile(session.user.id);
-        set({ user: session.user, session, profile, requiresMfa: needsMfa, isLoading: false });
-      } else {
+    // Helper to sync a session into the store and clear the safety timeout
+    const commitSession = async (session: Session | null) => {
+      try {
+        if (session?.user) {
+          const needsMfa = await safeMfaCheck();
+          const profile = await fetchProfile(session.user.id);
+          set({ user: session.user, session, profile, requiresMfa: needsMfa, isLoading: false });
+        } else {
+          set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
+        }
+      } catch {
         set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
       }
       clearTimeout(safetyTimeout);
     };
 
-    // Step 1: Check for cross-domain auth tokens in URL hash
-    const crossDomainTokens = extractCrossDomainTokens();
+    /**
+     * Cross-domain token handler.
+     * Checks if the URL hash contains valid Supabase auth tokens
+     * (from cross-domain redirects like hollowbits.com → play.hollowbits.com).
+     * We manually parse and consume them because detectSessionInUrl is OFF
+     * to avoid the race condition that causes infinite login loops.
+     */
+    const hash = window.location.hash;
+    const hashHasTokens =
+      hash.length > 50 &&
+      hash.includes('access_token=') &&
+      hash.includes('refresh_token=');
 
-    if (crossDomainTokens) {
-      // Clean the hash from URL immediately
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (hashHasTokens) {
+      try {
+        const params = new URLSearchParams(hash.substring(1));
+        const accessToken = params.get('access_token') || '';
+        const refreshToken = params.get('refresh_token') || '';
 
-      // Consume tokens via setSession — this is the ONLY reliable way
-      // to establish a session from cross-domain token transfer
-      supabase.auth.setSession({
-        access_token: crossDomainTokens.accessToken,
-        refresh_token: crossDomainTokens.refreshToken,
-      }).then(({ data, error }) => {
-        if (data.session && !error) {
-          syncSession(data.session);
+        // Only proceed if tokens look like real JWT/tokens (not empty strings)
+        if (accessToken.length > 30 && accessToken.includes('.') && refreshToken.length > 10) {
+          // Clean the hash from URL immediately
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+
+          supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          }).then(({ data, error }) => {
+            if (data.session && !error) {
+              commitSession(data.session);
+            } else {
+              // setSession failed — fall through to normal getSession
+              supabase.auth.getSession().then(({ data: { session } }) => commitSession(session));
+            }
+          }).catch(() => {
+            supabase.auth.getSession().then(({ data: { session } }) => commitSession(session));
+          });
+
+          // Early return — we're handling this path asynchronously above
         } else {
-          console.warn('[authStore] Cross-domain setSession failed:', error?.message);
-          // Fall back to normal session check
-          supabase.auth.getSession().then(({ data: { session } }) => syncSession(session));
+          // Tokens present but invalid — ignore hash, proceed normally
+          supabase.auth.getSession().then(({ data: { session } }) => commitSession(session))
+            .catch(() => commitSession(null));
         }
-      }).catch(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => syncSession(session));
-      });
+      } catch {
+        // Hash parsing failed — proceed normally
+        supabase.auth.getSession().then(({ data: { session } }) => commitSession(session))
+          .catch(() => commitSession(null));
+      }
     } else {
-      // Step 2: Normal hydration — read existing session from storage
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        syncSession(session);
-      }).catch((err) => {
-        console.error('[authStore] Failed to get session:', err);
-        set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
-        clearTimeout(safetyTimeout);
-      });
+      // No hash tokens — standard session hydration from localStorage
+      supabase.auth.getSession().then(({ data: { session } }) => commitSession(session))
+        .catch(() => commitSession(null));
     }
 
-    // Step 3: Subscribe to auth state changes (login, logout, token refresh)
+    // Subscribe to auth state changes (login, logout, token refresh)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
