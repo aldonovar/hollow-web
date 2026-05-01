@@ -156,6 +156,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         // Skip token refresh events to avoid flicker
         if (event === 'TOKEN_REFRESHED') return;
 
+        // Inmediatamente marcamos como cargando para bloquear ProtectedRoute
+        // y evitar condiciones de carrera si Auth.tsx intenta navegar muy rápido.
+        set({ isLoading: true });
+
         if (session?.user) {
           const needsMfa = await safeMfaCheck();
           const profile = await fetchProfile(session.user.id);
