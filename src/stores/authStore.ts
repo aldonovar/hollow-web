@@ -100,6 +100,30 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
      * We manually parse and consume them because detectSessionInUrl is OFF
      * to avoid the race condition that causes infinite login loops.
      */
+    // 1. Check for PKCE Auth Code (used by newer Supabase projects for Magic Links & Email Confirmations)
+    const queryParams = new URLSearchParams(window.location.search);
+    const authCode = queryParams.get('code');
+
+    if (authCode) {
+      // Clean the code from the URL immediately
+      window.history.replaceState(null, '', window.location.pathname);
+      
+      supabase.auth.exchangeCodeForSession(authCode)
+        .then(({ data, error }) => {
+          if (data.session && !error) {
+            commitSession(data.session);
+          } else {
+            supabase.auth.getSession().then(({ data: { session } }) => commitSession(session));
+          }
+        })
+        .catch(() => {
+          supabase.auth.getSession().then(({ data: { session } }) => commitSession(session));
+        });
+        
+      return; // Early return, handled asynchronously
+    }
+
+    // 2. Fallback for older Implicit Flow (Hash-based tokens)
     const hash = window.location.hash;
     const hashHasTokens =
       hash.length > 50 &&
@@ -131,22 +155,16 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             supabase.auth.getSession().then(({ data: { session } }) => commitSession(session));
           });
 
-          // Early return — we're handling this path asynchronously above
-        } else {
-          // Tokens present but invalid — ignore hash, proceed normally
-          supabase.auth.getSession().then(({ data: { session } }) => commitSession(session))
-            .catch(() => commitSession(null));
+          return; // Early return — we're handling this path asynchronously above
         }
       } catch {
-        // Hash parsing failed — proceed normally
-        supabase.auth.getSession().then(({ data: { session } }) => commitSession(session))
-          .catch(() => commitSession(null));
+        // Hash parsing failed silently
       }
-    } else {
-      // No hash tokens — standard session hydration from localStorage
-      supabase.auth.getSession().then(({ data: { session } }) => commitSession(session))
-        .catch(() => commitSession(null));
     }
+    
+    // 3. No tokens in URL — standard session hydration from localStorage
+    supabase.auth.getSession().then(({ data: { session } }) => commitSession(session))
+      .catch(() => commitSession(null));
 
     // Subscribe to auth state changes (login, logout, token refresh)
     const {
