@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Mail, ArrowRight, AlertCircle, Lock, User, AtSign } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import './Auth.css';
@@ -7,6 +7,7 @@ import './Auth.css';
 type AuthStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export function Auth({ type }: { type: 'login' | 'signup' }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   // Campos extra para signup
@@ -53,7 +54,7 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
       
     } else {
       // Login
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: trimmedEmail,
         password: password,
       });
@@ -68,7 +69,10 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
         return;
       }
       
-      // Si el login es exitoso, la redirección a /console se maneja por el App.tsx (authStore cambia de estado)
+      // Login exitoso — redirigir explícitamente a /console
+      if (data.session) {
+        navigate('/console', { replace: true });
+      }
     }
   };
 

@@ -57,6 +57,34 @@ async function safeMfaCheck(): Promise<boolean> {
   }
 }
 
+/**
+ * Parse cross-domain auth tokens from the URL hash.
+ * Returns the tokens only if BOTH access_token AND refresh_token are present
+ * and are non-empty JWT-like strings (contain dots).
+ * Returns null for all other cases to avoid false positives.
+ */
+function extractCrossDomainTokens(): { accessToken: string; refreshToken: string } | null {
+  try {
+    const hash = window.location.hash;
+    // Quick bail — must start with # and contain both token keys
+    if (!hash || hash.length < 20) return null;
+    if (!hash.includes('access_token=') || !hash.includes('refresh_token=')) return null;
+
+    const params = new URLSearchParams(hash.substring(1));
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+
+    // Validate tokens look like real JWTs (contain dots for header.payload.signature)
+    if (!accessToken || !refreshToken) return null;
+    if (!accessToken.includes('.') || accessToken.length < 30) return null;
+    if (refreshToken.length < 10) return null;
+
+    return { accessToken, refreshToken };
+  } catch {
+    return null;
+  }
+}
+
 /* ─── Store ──────────────────────────────────────────────────────── */
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -69,99 +97,61 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   // --- actions ---
   initialize: () => {
-    let resolved = false;
-
-    const resolveLoading = () => {
-      if (!resolved) {
-        resolved = true;
-        const state = get();
-        if (state.isLoading) {
-          set({ isLoading: false });
-        }
-      }
-    };
-
-    // SAFETY NET: Always resolve loading within 8 seconds no matter what.
+    // SAFETY NET: Always resolve loading within 4 seconds no matter what.
     const safetyTimeout = setTimeout(() => {
       console.warn('[authStore] Safety timeout — forcing isLoading=false');
-      resolveLoading();
-    }, 8000);
-
-    /**
-     * Cross-domain auth hash handler.
-     * When redirecting from hollowbits.com → play.hollowbits.com, the session
-     * tokens are passed via URL hash (#access_token=...&refresh_token=...).
-     * Supabase's `detectSessionInUrl` processes these asynchronously in its
-     * internal _initialize(), which races with our getSession() call.
-     * If getSession() resolves before Supabase processes the hash, it returns
-     * null → ProtectedRoute redirects to /login → hash is lost → infinite loop.
-     *
-     * Fix: Manually parse the hash and call setSession() FIRST, then proceed.
-     */
-    const hash = window.location.hash;
-    const hasAuthHashTokens = hash.includes('access_token=') && hash.includes('refresh_token=');
-
-    const hydrateSession = async (): Promise<void> => {
-      try {
-        // Step 1: If URL contains cross-domain auth tokens, consume them explicitly
-        if (hasAuthHashTokens) {
-          const params = new URLSearchParams(hash.substring(1));
-          const accessToken = params.get('access_token');
-          const refreshToken = params.get('refresh_token');
-
-          if (accessToken && refreshToken) {
-            console.info('[authStore] Cross-domain auth tokens detected — calling setSession()');
-
-            // Clean the hash from URL immediately to prevent re-processing
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
-
-            const { data, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-
-            if (data.session?.user && !error) {
-              const needsMfa = await safeMfaCheck();
-              const profile = await fetchProfile(data.session.user.id);
-              set({
-                user: data.session.user,
-                session: data.session,
-                profile,
-                requiresMfa: needsMfa,
-                isLoading: false,
-              });
-              resolved = true;
-              clearTimeout(safetyTimeout);
-              return; // Session established — done
-            }
-
-            // setSession failed — fall through to normal getSession()
-            console.warn('[authStore] setSession from hash failed:', error?.message);
-          }
-        }
-
-        // Step 2: Normal hydration — read existing session from storage
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (session?.user) {
-          const needsMfa = await safeMfaCheck();
-          const profile = await fetchProfile(session.user.id);
-          set({ user: session.user, session, profile, requiresMfa: needsMfa, isLoading: false });
-        } else {
-          set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
-        }
-      } catch (err) {
-        console.error('[authStore] Failed to hydrate session:', err);
-        set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
-      } finally {
-        resolved = true;
-        clearTimeout(safetyTimeout);
+      if (get().isLoading) {
+        set({ isLoading: false });
       }
+    }, 4000);
+
+    // Helper to sync session into store
+    const syncSession = async (session: Session | null) => {
+      if (session?.user) {
+        const needsMfa = await safeMfaCheck();
+        const profile = await fetchProfile(session.user.id);
+        set({ user: session.user, session, profile, requiresMfa: needsMfa, isLoading: false });
+      } else {
+        set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
+      }
+      clearTimeout(safetyTimeout);
     };
 
-    hydrateSession();
+    // Step 1: Check for cross-domain auth tokens in URL hash
+    const crossDomainTokens = extractCrossDomainTokens();
 
-    // 2. Subscribe to auth state changes (login, logout, token refresh)
+    if (crossDomainTokens) {
+      // Clean the hash from URL immediately
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+
+      // Consume tokens via setSession — this is the ONLY reliable way
+      // to establish a session from cross-domain token transfer
+      supabase.auth.setSession({
+        access_token: crossDomainTokens.accessToken,
+        refresh_token: crossDomainTokens.refreshToken,
+      }).then(({ data, error }) => {
+        if (data.session && !error) {
+          syncSession(data.session);
+        } else {
+          console.warn('[authStore] Cross-domain setSession failed:', error?.message);
+          // Fall back to normal session check
+          supabase.auth.getSession().then(({ data: { session } }) => syncSession(session));
+        }
+      }).catch(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => syncSession(session));
+      });
+    } else {
+      // Step 2: Normal hydration — read existing session from storage
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        syncSession(session);
+      }).catch((err) => {
+        console.error('[authStore] Failed to get session:', err);
+        set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
+        clearTimeout(safetyTimeout);
+      });
+    }
+
+    // Step 3: Subscribe to auth state changes (login, logout, token refresh)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
