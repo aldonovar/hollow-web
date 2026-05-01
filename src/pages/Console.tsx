@@ -65,14 +65,9 @@ export function Console() {
     if (isPlayApp) {
       navigate('/engine');
     } else {
-      // Inyectar tokens para asegurar persistencia en saltos de dominio cruzado strictos
-      const { data: { session } } = await supabase.auth.getSession();
-      let url = 'https://play.hollowbits.com/engine';
-      if (session) {
-        const expiresIn = session.expires_at ? Math.max(0, Math.floor(session.expires_at - Date.now() / 1000)) : 3600;
-        url += `#access_token=${session.access_token}&refresh_token=${session.refresh_token}&expires_in=${expiresIn}&token_type=${session.token_type || 'bearer'}&type=magiclink`;
-      }
-      window.location.href = url;
+      // Usamos el sistema de Cookies SSO nativo (ssoStorage) configurado en supabase.ts
+      // Ya no necesitamos inyectar tokens frágiles en la URL
+      window.location.href = 'https://play.hollowbits.com/engine';
     }
   };
 
