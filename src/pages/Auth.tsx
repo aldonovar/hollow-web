@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, ArrowRight, AlertCircle, Lock, User, AtSign } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../stores/authStore';
 import './Auth.css';
 
 type AuthStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -73,19 +74,33 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
         }
         return;
       }
-      
-      // Login exitoso — GuestRoute se encargará de redirigir a /console
-      // una vez que authStore propague el estado globalmente (onAuthStateChange).
-      // Mantenemos el status en 'loading' para que el botón siga deshabilitado.
+
+      if (data.session) {
+        // Login exitoso: forzamos la sesión en el store ANTES de navegar
+        // para evitar la condición de carrera entre onAuthStateChange y GuestRoute.
+        useAuthStore.setState({
+          user: data.session.user,
+          session: data.session,
+          isLoading: false,
+        });
+        navigate('/console', { replace: true });
+      }
     }
   };
 
   const handleGoogleLogin = async () => {
     setStatus('loading');
+    // Redirigimos al callback de Supabase en el mismo dominio para que procese
+    // el token y luego nos lleve a /console con sesión activa.
+    const callbackUrl = `${window.location.origin}/console`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/console`
+        redirectTo: callbackUrl,
+        queryParams: {
+          // Forzamos re-selección de cuenta para evitar logins fantasma
+          prompt: 'select_account',
+        },
       }
     });
 

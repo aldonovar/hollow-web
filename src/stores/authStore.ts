@@ -94,73 +94,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     };
 
     /**
-     * Cross-domain token handler.
-     * Checks if the URL hash contains valid Supabase auth tokens
-     * (from cross-domain redirects like hollowbits.com → play.hollowbits.com).
-     * We manually parse and consume them because detectSessionInUrl is OFF
-     * to avoid the race condition that causes infinite login loops.
+     * Standard session hydration.
+     * detectSessionInUrl:true en supabase.ts maneja automáticamente:
+     * - OAuth callbacks (Google, etc.) con ?code=
+     * - Magic Link callbacks con #access_token=
+     * Solo necesitamos obtener la sesión activa del storage.
      */
-    // 1. Check for PKCE Auth Code (used by newer Supabase projects for Magic Links & Email Confirmations)
-    const queryParams = new URLSearchParams(window.location.search);
-    const authCode = queryParams.get('code');
-
-    const hash = window.location.hash;
-    const hashHasTokens =
-      hash.length > 50 &&
-      hash.includes('access_token=') &&
-      hash.includes('refresh_token=');
-
-    if (authCode) {
-      // Clean the code from the URL immediately
-      window.history.replaceState(null, '', window.location.pathname);
-      
-      supabase.auth.exchangeCodeForSession(authCode)
-        .then(({ data, error }) => {
-          if (data.session && !error) {
-            commitSession(data.session);
-          } else {
-            supabase.auth.getSession().then(({ data: { session } }) => commitSession(session));
-          }
-        })
-        .catch(() => {
-          supabase.auth.getSession().then(({ data: { session } }) => commitSession(session));
-        });
-    } else if (hashHasTokens) {
-      // 2. Fallback for older Implicit Flow (Hash-based tokens)
-      try {
-        const params = new URLSearchParams(hash.substring(1));
-        const accessToken = params.get('access_token') || '';
-        const refreshToken = params.get('refresh_token') || '';
-
-        // Only proceed if tokens look like real JWT/tokens (not empty strings)
-        if (accessToken.length > 30 && accessToken.includes('.') && refreshToken.length > 10) {
-          // Clean the hash from URL immediately
-          window.history.replaceState(null, '', window.location.pathname + window.location.search);
-
-          supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          }).then(({ data, error }) => {
-            if (data.session && !error) {
-              commitSession(data.session);
-            } else {
-              // setSession failed — fall through to normal getSession
-              supabase.auth.getSession().then(({ data: { session } }) => commitSession(session));
-            }
-          }).catch(() => {
-            supabase.auth.getSession().then(({ data: { session } }) => commitSession(session));
-          });
-        } else {
-          supabase.auth.getSession().then(({ data: { session } }) => commitSession(session)).catch(() => commitSession(null));
-        }
-      } catch {
-        supabase.auth.getSession().then(({ data: { session } }) => commitSession(session)).catch(() => commitSession(null));
-      }
-    } else {
-      // 3. No tokens in URL — standard session hydration from localStorage
-      supabase.auth.getSession().then(({ data: { session } }) => commitSession(session))
-        .catch(() => commitSession(null));
-    }
+    supabase.auth.getSession().then(({ data: { session } }) => commitSession(session))
+      .catch(() => commitSession(null));
 
     // Subscribe to auth state changes (login, logout, token refresh)
     const {
