@@ -4861,12 +4861,16 @@ const App: React.FC = () => {
                                 </button>
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center gap-1" title="Sin sesión activa — abre la consola para conectarte">
-                                <div className="w-8 h-8 rounded-full border border-white/10 bg-white/[0.03] flex items-center justify-center">
-                                    <UserCircle2 size={16} className="text-gray-600" />
+                            <button
+                                onClick={() => window.location.href = import.meta.env.PROD ? 'https://hollowbits.com/login' : '/login'}
+                                className="flex flex-col items-center gap-1 group cursor-pointer"
+                                title="Iniciar Sesión / Vincular Cuenta"
+                            >
+                                <div className="w-8 h-8 rounded-full border border-white/10 bg-white/[0.03] group-hover:bg-white/10 group-hover:border-purple-500/50 flex items-center justify-center transition-all duration-300">
+                                    <UserCircle2 size={16} className="text-gray-600 group-hover:text-purple-400 transition-colors duration-300" />
                                 </div>
-                                <span className="text-[8px] text-gray-700 uppercase tracking-wider">Guest</span>
-                            </div>
+                                <span className="text-[8px] text-gray-700 group-hover:text-gray-400 uppercase tracking-wider transition-colors duration-300">Guest</span>
+                            </button>
                         )}
                     </div>
                     {/* ─────────────────────────────────────────────────────────── */}
