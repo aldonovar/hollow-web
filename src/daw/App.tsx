@@ -16,6 +16,7 @@ import { FluidPanel } from './components/FluidPanel';
 import AsciiPerformerDock from './components/AsciiPerformerDock';
 import CollabPanel, { CollabActivityEntry } from './components/CollabPanel';
 import { CollabAuthModal } from './components/CollabAuthModal';
+import { MiniAuthPanel } from './components/MiniAuthPanel';
 import { INITIAL_TRACKS, getTrackColorByPosition } from './constants';
 import { LoopMode, Note, SessionHealthSnapshot, StudioPerformanceProfile, Track, TransportState, TrackType, AudioSettings, Clip, ProjectData, AutomationMode, ScannedFileEntry, PunchRange, TransportAuthoritySnapshot, MonitoringRouteMode, RecordingCommitResult, RecordingJournalEntry, AutomationRuntimeFrame, AudioIncidentWindow, DiagnosticsVisibilityMode, VisualPerformanceSnapshot, AudioClipEditorViewState, ScoreWorkspaceState } from './types';
 import { engineAdapter, type EngineDiagnostics } from './services/engineAdapter';
@@ -373,6 +374,7 @@ const App: React.FC = () => {
     const [lastAutosaveAt, setLastAutosaveAt] = useState<number | null>(null);
     const [lastAutosaveReason, setLastAutosaveReason] = useState<string>('initial-snapshot');
     const [showSessionPopover, setShowSessionPopover] = useState(false);
+    const [sessionPopoverView, setSessionPopoverView] = useState<'main' | 'login'>('main');
     const [projectIntegrityReport, setProjectIntegrityReport] = useState<ProjectIntegrityReport | null>(null);
     const [recordingJournalEntries, setRecordingJournalEntries] = useState<RecordingJournalEntry[]>(() => loadRecordingJournalEntries());
     const [recordingRecoveryAcknowledgedAt, setRecordingRecoveryAcknowledgedAt] = useState<number>(() => loadRecordingJournalRecoveryAcknowledgedAt());
@@ -4845,7 +4847,7 @@ const App: React.FC = () => {
                     <div className="w-full px-1 pb-2 mt-1 border-t border-white/5 pt-2 relative">
                         {showSessionPopover && (
                             <div className="absolute left-14 bottom-2 w-64 bg-[#0a0a0d] border border-white/10 rounded-lg shadow-[0_0_24px_rgba(0,0,0,0.8)] p-4 z-50 animate-in fade-in zoom-in-95"
-                                 onMouseLeave={() => setShowSessionPopover(false)}
+                                 // Se removió onMouseLeave para evitar que se cierre accidentalmente
                             >
                                 {session ? (
                                     <div className="flex flex-col gap-3">
@@ -4869,28 +4871,37 @@ const App: React.FC = () => {
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-3">
-                                        <div className="flex flex-col items-center gap-2 text-center">
-                                            <div className="w-12 h-12 rounded-full border border-white/10 bg-white/[0.03] flex items-center justify-center mb-1">
-                                                <UserCircle2 size={24} className="text-gray-500" />
-                                            </div>
-                                            <h3 className="text-sm text-gray-200 font-medium">Modo Invitado</h3>
-                                            <p className="text-xs text-gray-500 leading-relaxed">
-                                                Tus proyectos no se guardarán en la nube. Inicia sesión para sincronizar.
-                                            </p>
-                                        </div>
-                                        <div className="h-px bg-white/10 w-full my-1" />
-                                        <button 
-                                            onClick={() => { setShowSessionPopover(false); setActiveModal('auth'); }}
-                                            className="w-full py-2 text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded transition-colors text-center"
-                                        >
-                                            Vincular Cuenta
-                                        </button>
-                                        <button 
-                                            onClick={() => { setShowSessionPopover(false); window.location.href = import.meta.env.PROD ? 'https://hollowbits.com/login' : '/login'; }}
-                                            className="w-full py-2 text-xs font-medium text-gray-400 hover:text-white bg-transparent border border-white/10 hover:bg-white/5 rounded transition-colors text-center"
-                                        >
-                                            Ir al Portal de Login
-                                        </button>
+                                        {sessionPopoverView === 'login' ? (
+                                            <MiniAuthPanel 
+                                                onSuccess={() => { setShowSessionPopover(false); setSessionPopoverView('main'); }} 
+                                                onBack={() => setSessionPopoverView('main')} 
+                                            />
+                                        ) : (
+                                            <>
+                                                <div className="flex flex-col items-center gap-2 text-center">
+                                                    <div className="w-12 h-12 rounded-full border border-white/10 bg-white/[0.03] flex items-center justify-center mb-1">
+                                                        <UserCircle2 size={24} className="text-gray-500" />
+                                                    </div>
+                                                    <h3 className="text-sm text-gray-200 font-medium">Modo Invitado</h3>
+                                                    <p className="text-xs text-gray-500 leading-relaxed">
+                                                        Tus proyectos no se guardarán en la nube. Inicia sesión para sincronizar.
+                                                    </p>
+                                                </div>
+                                                <div className="h-px bg-white/10 w-full my-1" />
+                                                <button 
+                                                    onClick={() => setSessionPopoverView('login')}
+                                                    className="w-full py-2 text-xs font-medium text-black bg-daw-cyan hover:bg-daw-cyan/90 rounded transition-colors text-center font-bold tracking-wider uppercase"
+                                                >
+                                                    Vincular Cuenta
+                                                </button>
+                                                <button 
+                                                    onClick={() => { setShowSessionPopover(false); window.location.href = import.meta.env.PROD ? 'https://hollowbits.com/login' : '/login'; }}
+                                                    className="w-full py-2 text-xs font-medium text-gray-400 hover:text-white bg-transparent border border-white/10 hover:bg-white/5 rounded transition-colors text-center"
+                                                >
+                                                    Ir al Portal de Login
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -5406,12 +5417,6 @@ const App: React.FC = () => {
                 />
             </Modal>
 
-            {activeModal === 'auth' && (
-                <CollabAuthModal 
-                    onClose={() => setActiveModal(null)} 
-                    onSuccess={() => setActiveModal(null)} 
-                />
-            )}
         </div>
     );
 };

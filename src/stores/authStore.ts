@@ -101,17 +101,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
     hydrateSession()
       .then(async (session) => {
-        clearTimeout(safetyTimeout);
         if (session?.user) {
           const [needsMfa, profile] = await Promise.all([safeMfaCheck(), fetchProfile(session.user.id)]);
           set({ user: session.user, session, profile, requiresMfa: needsMfa, isLoading: false });
         } else {
           set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
         }
+        clearTimeout(safetyTimeout);
       })
       .catch(() => {
-        clearTimeout(safetyTimeout);
         set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
+        clearTimeout(safetyTimeout);
       });
 
     /**

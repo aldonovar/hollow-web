@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 
 import { usePageMotion } from '../components/usePageMotion';
@@ -16,24 +16,21 @@ export function Console() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const isFetchingRef = useRef(false);
 
-  useEffect(() => {
-    if (user) {
-      fetchProjects();
-    } else {
-      // If there's no user (e.g. session expired), stop loading
-      setLoading(false);
-    }
-  }, [user]);
-
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
+    if (!user) return;
+    if (isFetchingRef.current) return;
+    
+    isFetchingRef.current = true;
     setLoading(true);
+    
     try {
       // First, get workspace IDs the user belongs to
       const { data: memberships, error: memberErr } = await supabase
         .from('workspace_members')
         .select('workspace_id')
-        .eq('user_id', user!.id);
+        .eq('user_id', user.id);
 
       if (memberErr || !memberships || memberships.length === 0) {
         console.warn('[Console] No workspaces found or error:', memberErr?.message);
@@ -43,20 +40,46 @@ export function Console() {
 
       const workspaceIds = memberships.map(m => m.workspace_id);
 
+      if (workspaceIds.length === 0) {
+        setProjects([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('projects')
         .select('*')
         .in('workspace_id', workspaceIds)
         .order('created_at', { ascending: false });
 
-      if (!error && data) setProjects(data);
-      else if (error) console.error('[Console] Error fetching projects:', error.message);
+      if (!error && data) {
+        setProjects(data);
+      } else if (error) {
+        console.error('[Console] Error fetching projects:', error.message);
+      }
     } catch (err) {
       console.error('[Console] Error fetching projects:', err);
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    if (user) {
+      fetchProjects().then(() => {
+        if (!mounted) return;
+        setLoading(false);
+      });
+    } else {
+      if (mounted) setLoading(false);
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [user, fetchProjects]);
 
   const handleOpenDaw = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
