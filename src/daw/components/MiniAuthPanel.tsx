@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, AlertCircle, ArrowLeft } from 'lucide-react';
-import { supabase } from '../../services/supabase';
+import { supabase } from '../services/supabase';
 import { useAuthStore } from '../../stores/authStore';
 
 interface MiniAuthPanelProps {
