@@ -14,13 +14,9 @@ interface AuthState {
 }
 
 interface AuthActions {
-  /** Bootstrap: call once in App root to hydrate session & subscribe to changes */
   initialize: () => () => void;
-  /** Sign out and clear all state */
   signOut: () => Promise<void>;
-  /** Re-fetch the profile from the database (after edits) */
   refreshProfile: () => Promise<void>;
-  /** Re-check MFA status after successful verification */
   checkMfa: () => Promise<void>;
 }
 
@@ -35,23 +31,21 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
       .select('*')
       .eq('id', userId)
       .single();
-
     if (error) {
-      console.warn('[authStore] Profile fetch failed (non-blocking):', error.message);
+      console.warn('[authStore] Profile fetch failed:', error.message);
       return null;
     }
     return data;
   } catch (err) {
-    console.warn('[authStore] Profile fetch exception (non-blocking):', err);
+    console.warn('[authStore] Profile fetch exception:', err);
     return null;
   }
 }
 
-/** Safely check MFA — returns false on any error instead of hanging */
 async function safeMfaCheck(): Promise<boolean> {
   try {
-    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    return aalData?.currentLevel === 'aal1' && aalData?.nextLevel === 'aal2';
+    const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    return data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2';
   } catch {
     return false;
   }
@@ -60,72 +54,98 @@ async function safeMfaCheck(): Promise<boolean> {
 /* ─── Store ──────────────────────────────────────────────────────── */
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
-  // --- initial state ---
   user: null,
   session: null,
   profile: null,
   isLoading: true,
   requiresMfa: false,
 
-  // --- actions ---
   initialize: () => {
-    // SAFETY NET: Always resolve loading within 4 seconds no matter what.
+    // Safety net: max 5s for initial hydration
     const safetyTimeout = setTimeout(() => {
-      console.warn('[authStore] Safety timeout — forcing isLoading=false');
       if (get().isLoading) {
+        console.warn('[authStore] Safety timeout — forcing isLoading=false');
         set({ isLoading: false });
       }
-    }, 4000);
+    }, 5000);
 
-    // Helper to sync a session into the store and clear the safety timeout
-    const commitSession = async (session: Session | null) => {
-      try {
+    /**
+     * Cross-domain token handler:
+     * When navigating from hollowbits.com → play.hollowbits.com, tokens are
+     * passed in the URL hash as #access_token=...&refresh_token=...
+     * We consume them here and call setSession() before the standard hydration.
+     */
+    const hash = window.location.hash;
+    const hashHasTokens = hash.includes('access_token=') && hash.includes('refresh_token=');
+
+    const hydrateSession = async () => {
+      if (hashHasTokens) {
+        try {
+          const params = new URLSearchParams(hash.substring(1));
+          const accessToken = params.get('access_token') || '';
+          const refreshToken = params.get('refresh_token') || '';
+          // Clean the hash from URL immediately
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          if (accessToken.length > 30 && refreshToken.length > 10) {
+            const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+            if (data.session && !error) return data.session;
+          }
+        } catch (err) {
+          console.warn('[authStore] Hash token exchange failed:', err);
+        }
+      }
+      // Standard hydration from ssoStorage (localStorage primary)
+      const { data: { session } } = await supabase.auth.getSession();
+      return session;
+    };
+
+    hydrateSession()
+      .then(async (session) => {
+        clearTimeout(safetyTimeout);
         if (session?.user) {
-          const needsMfa = await safeMfaCheck();
-          const profile = await fetchProfile(session.user.id);
+          const [needsMfa, profile] = await Promise.all([safeMfaCheck(), fetchProfile(session.user.id)]);
           set({ user: session.user, session, profile, requiresMfa: needsMfa, isLoading: false });
         } else {
           set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
         }
-      } catch {
+      })
+      .catch(() => {
+        clearTimeout(safetyTimeout);
         set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
-      }
-      clearTimeout(safetyTimeout);
-    };
+      });
 
     /**
-     * Standard session hydration.
-     * detectSessionInUrl:true en supabase.ts maneja automáticamente:
-     * - OAuth callbacks (Google, etc.) con ?code=
-     * - Magic Link callbacks con #access_token=
-     * Solo necesitamos obtener la sesión activa del storage.
+     * Subscribe to auth events for SUBSEQUENT changes (login, logout, etc.)
+     * IMPORTANT: We do NOT set isLoading:true here to avoid blocking the UI
+     * during background updates. We update the state directly once resolved.
      */
-    supabase.auth.getSession().then(({ data: { session } }) => commitSession(session))
-      .catch(() => commitSession(null));
-
-    // Subscribe to auth state changes (login, logout, token refresh)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
-        // Skip token refresh events to avoid flicker
+        // Skip token refresh — handled transparently by Supabase
         if (event === 'TOKEN_REFRESHED') return;
 
-        // Inmediatamente marcamos como cargando para bloquear ProtectedRoute
-        // y evitar condiciones de carrera si Auth.tsx intenta navegar muy rápido.
-        set({ isLoading: true });
+        // Skip INITIAL_SESSION — already handled by getSession() above
+        if (event === 'INITIAL_SESSION') return;
 
-        if (session?.user) {
-          const needsMfa = await safeMfaCheck();
-          const profile = await fetchProfile(session.user.id);
-          set({ user: session.user, session, profile, requiresMfa: needsMfa, isLoading: false });
-        } else {
-          set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
+        try {
+          if (session?.user) {
+            const [needsMfa, profile] = await Promise.all([
+              safeMfaCheck(),
+              fetchProfile(session.user.id),
+            ]);
+            // Update session WITHOUT touching isLoading to avoid UI flash
+            set({ user: session.user, session, profile, requiresMfa: needsMfa });
+          } else {
+            // SIGNED_OUT: clear everything
+            set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
+          }
+        } catch (err) {
+          console.error('[authStore] onAuthStateChange error:', err);
+          // On error, don't clear session — keep whatever we had
         }
       }
     );
 
-    // Return unsubscribe handle for cleanup
     return () => {
       clearTimeout(safetyTimeout);
       subscription.unsubscribe();
@@ -135,18 +155,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   signOut: async () => {
     set({ isLoading: true });
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) console.error('[authStore] Sign-out error:', error.message);
+      await supabase.auth.signOut();
     } catch (err) {
-      console.error('[authStore] Sign-out exception:', err);
+      console.error('[authStore] Sign-out error:', err);
     }
     set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
   },
 
   refreshProfile: async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      const profile = await fetchProfile(session.user.id);
+    const { user } = get();
+    if (user) {
+      const profile = await fetchProfile(user.id);
       set({ profile });
     }
   },

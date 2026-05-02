@@ -50,11 +50,16 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
         return;
       }
       
-      // Si la confirmación de email está desactivada, el usuario se loguea instantáneamente
       if (data.session) {
-        // AuthStore detectará el login y redirigirá a /console automáticamente
+        // Email confirmation OFF — sesión inmediata. Inyectamos en el store y navegamos.
+        useAuthStore.setState({
+          user: data.session.user,
+          session: data.session,
+          isLoading: false,
+        });
+        navigate('/console', { replace: true });
       } else {
-        // Si la confirmación sigue activa, mostramos la pantalla de "Revisa tu correo"
+        // Email confirmation ON — mostrar pantalla de verificación
         setStatus('success');
       }
       
@@ -76,14 +81,17 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
       }
 
       if (data.session) {
-        // Login exitoso: forzamos la sesión en el store ANTES de navegar
-        // para evitar la condición de carrera entre onAuthStateChange y GuestRoute.
+        // Login exitoso: forzamos la sesión en el store ANTES de navegar.
+        // Esto evita cualquier condición de carrera con onAuthStateChange.
         useAuthStore.setState({
           user: data.session.user,
           session: data.session,
           isLoading: false,
         });
         navigate('/console', { replace: true });
+      } else {
+        setStatus('error');
+        setErrorMessage('No se pudo establecer sesión. Intenta de nuevo.');
       }
     }
   };

@@ -61,13 +61,30 @@ export function Console() {
   const handleOpenDaw = async (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     const isPlayApp = window.location.hostname.startsWith('play.') || window.location.hostname.startsWith('console.');
-    
+
     if (isPlayApp) {
+      // Same domain: simple React Router navigation, session store persists.
       navigate('/engine');
     } else {
-      // Usamos el sistema de Cookies SSO nativo (ssoStorage) configurado en supabase.ts
-      // Ya no necesitamos inyectar tokens frágiles en la URL
-      window.location.href = 'https://play.hollowbits.com/engine';
+      // Cross-domain (hollowbits.com → play.hollowbits.com):
+      // localStorage is NOT shared between subdomains. We pass the session
+      // tokens in the URL hash so play.hollowbits.com can hydrate the session.
+      try {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        if (activeSession?.access_token && activeSession?.refresh_token) {
+          const params = new URLSearchParams({
+            access_token: activeSession.access_token,
+            refresh_token: activeSession.refresh_token,
+            token_type: 'bearer',
+          });
+          window.location.href = `https://play.hollowbits.com/engine#${params.toString()}`;
+        } else {
+          // No active session — redirect to login on play subdomain
+          window.location.href = 'https://play.hollowbits.com/login';
+        }
+      } catch {
+        window.location.href = 'https://play.hollowbits.com/engine';
+      }
     }
   };
 

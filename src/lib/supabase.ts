@@ -13,34 +13,55 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const isOnHollowbits = typeof window !== 'undefined' &&
   window.location.hostname.includes('hollowbits.com');
 
+// Cookie helpers for cross-subdomain SSO (.hollowbits.com)
+const COOKIE_DOMAIN = 'domain=.hollowbits.com;';
+const COOKIE_OPTS = `path=/; max-age=604800; SameSite=Lax; Secure`; // 7 days
+
+function setCookie(name: string, value: string): void {
+  const domainPart = isOnHollowbits ? COOKIE_DOMAIN : '';
+  document.cookie = `${name}=${value}; ${domainPart} ${COOKIE_OPTS}`;
+}
+
+function getCookie(name: string): string | null {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = document.cookie.match(new RegExp('(?:^|; )' + escaped + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function deleteCookie(name: string): void {
+  const expired = 'expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  document.cookie = `${name}=; path=/; ${expired}`;
+  if (isOnHollowbits) {
+    document.cookie = `${name}=; ${COOKIE_DOMAIN} path=/; ${expired}`;
+  }
+}
+
 /**
- * Cross-domain SSO Storage Strategy:
- * - PRIMARY:   localStorage (always reliable, no parsing issues)
- * - SECONDARY: .hollowbits.com domain cookie (for cross-subdomain sync)
+ * Hybrid storage: localStorage as primary (same-domain, always reliable),
+ * cookie as secondary (cross-subdomain, .hollowbits.com shared).
  *
- * On hollowbits.com → play.hollowbits.com, the browser shares cookies
- * at the root domain level, so both subdomains see the session.
+ * The Supabase session JSON can be 3–8KB, which exceeds cookie limits.
+ * We write to localStorage always. We also write to cookies but only if the
+ * value fits. On play.hollowbits.com, we read localStorage first, then
+ * fall back to the cookie (which would have been written by hollowbits.com).
  */
 const ssoStorage = {
   getItem: (key: string): string | null => {
     if (typeof window === 'undefined') return null;
 
-    // 1. Always prefer localStorage as primary source
-    const localVal = window.localStorage.getItem(key);
-    if (localVal) return localVal;
+    // 1. Primary: localStorage (always try first)
+    try {
+      const local = window.localStorage.getItem(key);
+      if (local) return local;
+    } catch { /* private browsing mode may throw */ }
 
-    // 2. Fallback: try reading from the shared domain cookie
+    // 2. Fallback: shared domain cookie
     if (typeof document !== 'undefined') {
-      // Escape special chars in the key for the regex
-      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const match = document.cookie.match(
-        new RegExp('(?:^|; )' + escapedKey + '=([^;]*)')
-      );
-      if (match) {
-        const val = decodeURIComponent(match[1]);
-        // Promote back to localStorage so future reads are instant
-        try { window.localStorage.setItem(key, val); } catch { /* ignore */ }
-        return val;
+      const cookieVal = getCookie(key);
+      if (cookieVal) {
+        // Promote to localStorage for future reads
+        try { window.localStorage.setItem(key, cookieVal); } catch { /* ignore */ }
+        return cookieVal;
       }
     }
 
@@ -50,16 +71,21 @@ const ssoStorage = {
   setItem: (key: string, value: string): void => {
     if (typeof window === 'undefined') return;
 
-    // Always write to localStorage first
+    // Always write to localStorage
     try { window.localStorage.setItem(key, value); } catch { /* ignore */ }
 
-    // Also write to the shared domain cookie for cross-subdomain SSO
-    if (typeof document !== 'undefined' && isOnHollowbits) {
+    // Write to cookie only when on hollowbits.com and value fits cookie limit
+    // Note: cookies have 4096 byte per-cookie limit. We allow up to 3900 chars
+    // to stay safely under. Supabase session JSON is often 2–4KB encoded.
+    if (isOnHollowbits && typeof document !== 'undefined') {
       try {
         const encoded = encodeURIComponent(value);
-        // Cap cookie size: Supabase tokens can be large, only store if < 4KB
-        if (encoded.length < 4000) {
-          document.cookie = `${key}=${encoded}; domain=.hollowbits.com; path=/; max-age=31536000; SameSite=Lax; Secure`;
+        if (encoded.length <= 3900) {
+          setCookie(key, encoded);
+        } else {
+          // Value too large for cookie — that's OK, localStorage is reliable
+          // on same-domain. Cross-domain will need token-passing instead.
+          console.debug('[ssoStorage] Value too large for cookie, localStorage only:', key);
         }
       } catch { /* ignore */ }
     }
@@ -67,16 +93,8 @@ const ssoStorage = {
 
   removeItem: (key: string): void => {
     if (typeof window === 'undefined') return;
-
     try { window.localStorage.removeItem(key); } catch { /* ignore */ }
-
-    if (typeof document !== 'undefined') {
-      // Delete from both with and without domain to cover all cases
-      document.cookie = `${key}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-      if (isOnHollowbits) {
-        document.cookie = `${key}=; domain=.hollowbits.com; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-      }
-    }
+    if (typeof document !== 'undefined') deleteCookie(key);
   },
 };
 
@@ -85,8 +103,6 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     storage: ssoStorage,
     autoRefreshToken: true,
     persistSession: true,
-    // Re-enabled: needed for OAuth (Google) and Magic Link callbacks
-    // to properly exchange the code/hash for a session token.
     detectSessionInUrl: true,
   },
 });
