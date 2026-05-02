@@ -31,90 +31,99 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
         setErrorMessage('Por favor, completa todos los campos obligatorios.');
         return;
       }
-      
-      const { data, error } = await supabase.auth.signUp({
-        email: trimmedEmail,
-        password: password,
-        options: {
-          data: {
-            full_name: fullName,
-            username: username
-          },
-          emailRedirectTo: `${window.location.origin}/console`,
-        }
-      });
-
-      if (error) {
-        setStatus('error');
-        setErrorMessage(error.message);
-        return;
-      }
-      
-      if (data.session) {
-        // Email confirmation OFF — sesión inmediata. Inyectamos en el store y navegamos.
-        useAuthStore.setState({
-          user: data.session.user,
-          session: data.session,
-          isLoading: false,
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: trimmedEmail,
+          password: password,
+          options: {
+            data: {
+              full_name: fullName,
+              username: username
+            },
+            emailRedirectTo: `${window.location.origin}/console`,
+          }
         });
-        navigate('/console', { replace: true });
-      } else {
-        // Email confirmation ON — mostrar pantalla de verificación
-        setStatus('success');
+
+        if (error) {
+          setStatus('error');
+          setErrorMessage(error.message);
+          return;
+        }
+        
+        if (data.session) {
+          useAuthStore.setState({
+            user: data.session.user,
+            session: data.session,
+            isLoading: false,
+          });
+          navigate('/console', { replace: true });
+        } else {
+          setStatus('success');
+        }
+      } catch (err: any) {
+        setStatus('error');
+        setErrorMessage(err.message || 'Error inesperado de conexión.');
       }
-      
     } else {
       // Login
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: trimmedEmail,
-        password: password,
-      });
-
-      if (error) {
-        setStatus('error');
-        if (error.message.includes('Invalid login credentials')) {
-          setErrorMessage('El correo o la contraseña son incorrectos.');
-        } else {
-          setErrorMessage(error.message);
-        }
-        return;
-      }
-
-      if (data.session) {
-        // Login exitoso: forzamos la sesión en el store ANTES de navegar.
-        // Esto evita cualquier condición de carrera con onAuthStateChange.
-        useAuthStore.setState({
-          user: data.session.user,
-          session: data.session,
-          isLoading: false,
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password: password,
         });
-        navigate('/console', { replace: true });
-      } else {
+
+        if (error) {
+          setStatus('error');
+          if (error.message.includes('Invalid login credentials')) {
+            setErrorMessage('El correo o la contraseña son incorrectos.');
+          } else {
+            setErrorMessage(error.message);
+          }
+          return;
+        }
+
+        if (data.session) {
+          // Login exitoso: forzamos la sesión en el store ANTES de navegar.
+          // Esto evita cualquier condición de carrera con onAuthStateChange.
+          useAuthStore.setState({
+            user: data.session.user,
+            session: data.session,
+            isLoading: false,
+          });
+          navigate('/console', { replace: true });
+        } else {
+          setStatus('error');
+          setErrorMessage('No se pudo establecer sesión. Intenta de nuevo.');
+        }
+      } catch (err: any) {
         setStatus('error');
-        setErrorMessage('No se pudo establecer sesión. Intenta de nuevo.');
+        setErrorMessage(err.message || 'Ocurrió un error inesperado de conexión.');
       }
     }
   };
 
   const handleGoogleLogin = async () => {
     setStatus('loading');
-    // Redirigimos al callback de Supabase en el mismo dominio para que procese
-    // el token y luego nos lleve a /console con sesión activa.
-    const callbackUrl = `${window.location.origin}/console`;
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: callbackUrl,
-        queryParams: {
-          // Forzamos re-selección de cuenta para evitar logins fantasma
-          prompt: 'select_account',
-        },
-      }
-    });
+    setErrorMessage(null);
+    try {
+      const callbackUrl = `${window.location.origin}/console`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: callbackUrl,
+          queryParams: {
+            prompt: 'select_account',
+          },
+        }
+      });
 
-    if (error) {
+      if (error) {
+        setStatus('error');
+        setErrorMessage(error.message);
+      }
+    } catch (err: any) {
       setStatus('error');
-      setErrorMessage(error.message);
+      setErrorMessage(err.message || 'Error inesperado al conectar con Google.');
     }
   };
 
