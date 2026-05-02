@@ -1,4 +1,4 @@
-// path: src/App.tsx
+﻿// path: src/App.tsx
 import './index.css';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Transport from './components/Transport';
@@ -323,7 +323,7 @@ const App: React.FC = () => {
     const initialCollabSnapshot = useMemo(() => loadCollabSessionSnapshot(), []);
 
     // --- STATE ---
-    const [projectName, setProjectName] = useState("Sin TÃ­tulo");
+    const [projectName, setProjectName] = useState("Sin TÃƒÂ­tulo");
     const [loadingProject, setLoadingProject] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState("");
     const [importProgress, setImportProgress] = useState<{ total: number; completed: number; currentFile: string | null } | null>(null);
@@ -3570,7 +3570,7 @@ const App: React.FC = () => {
             notationOverrides: workspace.notationOverrides.map((override) => ({ ...override })),
             confidenceRegions: workspace.confidenceRegions.map((region) => ({ ...region }))
         })));
-        setProjectName(preferredName || projectData.name || 'Sin TÃ­tulo');
+        setProjectName(preferredName || projectData.name || 'Sin TÃƒÂ­tulo');
 
         engineAdapter.setBpm(normalizedTransport.bpm);
         engineAdapter.setMasterPitch(normalizedTransport.masterTranspose);
@@ -3671,7 +3671,7 @@ const App: React.FC = () => {
 
     const resetProjectToEmpty = useCallback(() => {
         replaceTracks([], { recolor: false });
-        setProjectName("Sin TÃ­tulo");
+        setProjectName("Sin TÃƒÂ­tulo");
         setSelectedTrackId(null);
         setSelectedClipId(null);
         setScoreWorkspaces([]);
@@ -3724,7 +3724,7 @@ const App: React.FC = () => {
 
         } catch (err) {
             console.error("Open Project Error", err);
-            alert("Error crÃ­tico al leer el archivo. El formato puede estar corrupto.");
+            alert("Error crÃƒÂ­tico al leer el archivo. El formato puede estar corrupto.");
         } finally {
             setLoadingProject(false);
             setLoadingMessage("");
@@ -3915,13 +3915,13 @@ const App: React.FC = () => {
 
         const validTracks = importedTracks.filter((track): track is Track => track !== null);
         if (validTracks.length === 0) {
-            throw new Error('No se pudo decodificar ningÃºn archivo de audio.');
+            throw new Error('No se pudo decodificar ningÃƒÂºn archivo de audio.');
         }
 
         appendTracks(validTracks, { reason: 'import-audio-files', recolor: true });
 
         if (validTracks.length < sources.length) {
-            alert('Algunos archivos no se pudieron importar, pero el resto se agregÃ³ correctamente.');
+            alert('Algunos archivos no se pudieron importar, pero el resto se agregÃƒÂ³ correctamente.');
         }
     }, [appendTracks, buildAudioClipFromBuffer, tracks.length, getProgressiveTrackColor]);
 
@@ -4776,7 +4776,7 @@ const App: React.FC = () => {
                 <div className="w-[50px] bg-[#1a1a1a] border-r border-daw-border flex flex-col items-center py-3 gap-3 z-[100] shrink-0 relative shadow-xl">
                     {/* ... Sidebar Icons (unchanged) ... */}
                     <div className="relative group" ref={fileMenuRef}>
-                        <button onClick={() => setShowFileMenu(!showFileMenu)} className={`w-10 h-10 flex items-center justify-center rounded-sm transition-all duration-100 relative ${showFileMenu ? 'bg-[#333] text-white' : 'text-gray-400 hover:text-white hover:bg-[#222]'}`} title="MenÃº de Proyecto">
+                        <button onClick={() => setShowFileMenu(!showFileMenu)} className={`w-10 h-10 flex items-center justify-center rounded-sm transition-all duration-100 relative ${showFileMenu ? 'bg-[#333] text-white' : 'text-gray-400 hover:text-white hover:bg-[#222]'}`} title="MenÃƒÂº de Proyecto">
                             <Folder size={20} strokeWidth={1.5} />
                         </button>
                         {showFileMenu && (
@@ -4809,14 +4809,14 @@ const App: React.FC = () => {
                     <div className="w-6 h-px bg-white/5 my-1"></div>
                     <div className="flex flex-col gap-2 w-full items-center">
                         <SidebarItem icon={LayoutGrid} label="Vista de Arreglo" active={mainView === 'arrange'} onClick={() => setMainView('arrange')} />
-                        <SidebarItem icon={PlayCircle} label="Vista de SesiÃ³n (Live)" active={mainView === 'session'} onClick={() => setMainView('session')} color="text-daw-ruby" />
+                        <SidebarItem icon={PlayCircle} label="Vista de SesiÃƒÂ³n (Live)" active={mainView === 'session'} onClick={() => setMainView('session')} color="text-daw-ruby" />
                         <SidebarItem icon={Sliders} label="Mezclador" active={mainView === 'mixer'} onClick={() => setMainView('mixer')} />
                     </div>
                     <div className="w-6 h-px bg-white/5 my-1"></div>
                     <div className="flex flex-col gap-2 w-full items-center">
                         <SidebarItem icon={Cpu} label="Rack de Dispositivos" onClick={() => setBottomView('devices')} active={bottomView === 'devices'} />
                         <SidebarItem icon={Layers} label="Editor de Notas/Audio" onClick={() => setBottomView('editor')} active={bottomView === 'editor'} />
-                        <button onClick={handleImportAudio} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/5 rounded-md transition-all" title="Importar RÃ¡pido">
+                        <button onClick={handleImportAudio} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/5 rounded-md transition-all" title="Importar RÃƒÂ¡pido">
                             <FolderInput size={18} />
                         </button>
                     </div>
@@ -4825,7 +4825,7 @@ const App: React.FC = () => {
                         <button onClick={redo} disabled={!canRedo} className={`w-8 h-8 flex items-center justify-center rounded-md transition-all ${!canRedo ? 'text-gray-700 cursor-not-allowed opacity-30' : 'text-gray-400 hover:text-white hover:bg-white/5'}`} title="Rehacer (Ctrl+Y)"><Redo2 size={16} /></button>
                     </div>
                     <div className="mt-auto flex flex-col gap-3 w-full items-center pb-3">
-                        <SidebarItem icon={Users} label="ColaboraciÃ³n" onClick={() => setActiveModal('collab')} active={activeModal === 'collab'} />
+                        <SidebarItem icon={Users} label="ColaboraciÃƒÂ³n" onClick={() => setActiveModal('collab')} active={activeModal === 'collab'} />
                         <SidebarItem icon={Settings} label="Preferencias de Audio/MIDI" onClick={() => setShowSettings(true)} active={showSettings} />
                     </div>
                     <input type="file" ref={fileInputRef} className="hidden" multiple accept=".wav,.mp3,.aif,.aiff,.ogg,.flac" onChange={handleFileImport} />
@@ -5177,7 +5177,7 @@ const App: React.FC = () => {
                                         {entry.failureReason || lastPhase?.message || 'Sin detalle adicional.'}
                                     </div>
                                     <div className="mt-2 text-[10px] text-gray-500 font-mono">
-                                        Phase: {lastPhase?.phase || 'unknown'}{typeof lastPhase?.barTime === 'number' ? ` · bar ${lastPhase.barTime.toFixed(3)}` : ''}
+                                        Phase: {lastPhase?.phase || 'unknown'}{typeof lastPhase?.barTime === 'number' ? ` Â· bar ${lastPhase.barTime.toFixed(3)}` : ''}
                                     </div>
                                 </div>
                             );
@@ -5260,11 +5260,11 @@ const App: React.FC = () => {
                                             <span className={route.active ? 'text-emerald-300' : 'text-gray-500'}>
                                                 {route.active ? 'Active' : 'Idle'}
                                             </span>
-                                            <span className="text-gray-500">·</span>
+                                            <span className="text-gray-500">Â·</span>
                                             <span className="text-gray-300">{route.mode}</span>
                                             {route.pendingFinalize && (
                                                 <>
-                                                    <span className="text-gray-500">·</span>
+                                                    <span className="text-gray-500">Â·</span>
                                                     <span className="text-amber-200">Pending Finalize</span>
                                                 </>
                                             )}
@@ -5296,9 +5296,9 @@ const App: React.FC = () => {
                     </div>
                 </div>
             </Modal>
-            <Modal isOpen={activeModal === 'new-project-confirm'} onClose={() => setActiveModal(null)} title="Nuevo Proyecto"><div className="flex flex-col gap-6"><div className="flex items-start gap-4 text-white"><div className="p-3 bg-daw-ruby/20 rounded-full shrink-0"><AlertTriangle className="text-daw-ruby" size={24} /></div><div><h3 className="font-bold text-lg mb-1">Â¿Deseas guardar los cambios?</h3><p className="text-gray-400 text-xs leading-relaxed">Si continÃºas sin guardar, perderÃ¡s todo el trabajo actual para abrir un espacio de trabajo limpio.</p></div></div><div className="flex flex-col gap-2"><button onClick={async () => { await handleSaveProject(); resetProjectToEmpty(); }} className="w-full flex items-center justify-between px-4 py-3 bg-white text-black rounded-sm font-bold text-xs hover:bg-gray-200 transition-all group"><div className="flex items-center gap-3"><Save size={16} /><span>GUARDAR Y CREAR NUEVO</span></div></button><button onClick={resetProjectToEmpty} className="w-full flex items-center gap-3 px-4 py-3 bg-[#222] text-daw-ruby border border-daw-ruby/30 rounded-sm font-bold text-xs hover:bg-daw-ruby hover:text-white transition-all"><Trash2 size={16} /><span>CONTINUAR SIN GUARDAR</span></button><button onClick={() => setActiveModal(null)} className="w-full py-2 text-gray-500 hover:text-white text-[10px] font-bold uppercase tracking-widest mt-2">CANCELAR</button></div></div></Modal>
+            <Modal isOpen={activeModal === 'new-project-confirm'} onClose={() => setActiveModal(null)} title="Nuevo Proyecto"><div className="flex flex-col gap-6"><div className="flex items-start gap-4 text-white"><div className="p-3 bg-daw-ruby/20 rounded-full shrink-0"><AlertTriangle className="text-daw-ruby" size={24} /></div><div><h3 className="font-bold text-lg mb-1">Ã‚Â¿Deseas guardar los cambios?</h3><p className="text-gray-400 text-xs leading-relaxed">Si continÃƒÂºas sin guardar, perderÃƒÂ¡s todo el trabajo actual para abrir un espacio de trabajo limpio.</p></div></div><div className="flex flex-col gap-2"><button onClick={async () => { await handleSaveProject(); resetProjectToEmpty(); }} className="w-full flex items-center justify-between px-4 py-3 bg-white text-black rounded-sm font-bold text-xs hover:bg-gray-200 transition-all group"><div className="flex items-center gap-3"><Save size={16} /><span>GUARDAR Y CREAR NUEVO</span></div></button><button onClick={resetProjectToEmpty} className="w-full flex items-center gap-3 px-4 py-3 bg-[#222] text-daw-ruby border border-daw-ruby/30 rounded-sm font-bold text-xs hover:bg-daw-ruby hover:text-white transition-all"><Trash2 size={16} /><span>CONTINUAR SIN GUARDAR</span></button><button onClick={() => setActiveModal(null)} className="w-full py-2 text-gray-500 hover:text-white text-[10px] font-bold uppercase tracking-widest mt-2">CANCELAR</button></div></div></Modal>
 
-            <Modal isOpen={activeModal === 'collab'} onClose={() => setActiveModal(null)} title="ColaboraciÃ³n">
+            <Modal isOpen={activeModal === 'collab'} onClose={() => setActiveModal(null)} title="ColaboraciÃƒÂ³n">
                 <CollabPanel
                     sessionId={collabSessionId}
                     userName={collabUserName}
