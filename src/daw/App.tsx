@@ -371,6 +371,7 @@ const App: React.FC = () => {
     const [recoverySnapshot, setRecoverySnapshot] = useState<ProjectAutosaveSnapshot | null>(null);
     const [lastAutosaveAt, setLastAutosaveAt] = useState<number | null>(null);
     const [lastAutosaveReason, setLastAutosaveReason] = useState<string>('initial-snapshot');
+    const [showSessionPopover, setShowSessionPopover] = useState(false);
     const [projectIntegrityReport, setProjectIntegrityReport] = useState<ProjectIntegrityReport | null>(null);
     const [recordingJournalEntries, setRecordingJournalEntries] = useState<RecordingJournalEntry[]>(() => loadRecordingJournalEntries());
     const [recordingRecoveryAcknowledgedAt, setRecordingRecoveryAcknowledgedAt] = useState<number>(() => loadRecordingJournalRecoveryAcknowledgedAt());
@@ -4840,31 +4841,76 @@ const App: React.FC = () => {
                     </div>
 
                     {/* ── SESSION WIDGET ─────────────────────────────────────── */}
-                    <div className="w-full px-1 pb-2 mt-1 border-t border-white/5 pt-2">
+                    <div className="w-full px-1 pb-2 mt-1 border-t border-white/5 pt-2 relative">
+                        {showSessionPopover && (
+                            <div className="absolute left-14 bottom-2 w-64 bg-[#0a0a0d] border border-white/10 rounded-lg shadow-[0_0_24px_rgba(0,0,0,0.8)] p-4 z-50 animate-in fade-in zoom-in-95"
+                                 onMouseLeave={() => setShowSessionPopover(false)}
+                            >
+                                {session ? (
+                                    <div className="flex flex-col gap-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-rose-500 flex items-center justify-center text-white font-bold text-lg">
+                                                {(profile?.full_name || user?.email || '?').charAt(0)}
+                                            </div>
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-sm text-gray-200 font-medium truncate">{profile?.full_name || 'Usuario DAW'}</span>
+                                                <span className="text-[10px] text-gray-500 truncate">{user?.email}</span>
+                                            </div>
+                                        </div>
+                                        <div className="h-px bg-white/10 w-full my-1" />
+                                        <button onClick={() => { setShowSessionPopover(false); window.location.href = import.meta.env.PROD ? 'https://hollowbits.com/console' : '/console'; }} className="w-full py-2 text-xs text-gray-300 hover:bg-white/5 hover:text-white rounded text-left px-2 transition-colors flex items-center gap-2">
+                                            <span>Ir al Dashboard</span>
+                                        </button>
+                                        <button onClick={() => { setShowSessionPopover(false); authSignOut(); }} className="w-full py-2 text-xs text-rose-400 hover:bg-rose-500/10 rounded text-left px-2 transition-colors flex items-center gap-2">
+                                            <LogOut size={12} />
+                                            <span>Cerrar Sesión</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-3">
+                                        <div className="flex flex-col items-center gap-2 text-center">
+                                            <div className="w-12 h-12 rounded-full border border-white/10 bg-white/[0.03] flex items-center justify-center mb-1">
+                                                <UserCircle2 size={24} className="text-gray-500" />
+                                            </div>
+                                            <h3 className="text-sm text-gray-200 font-medium">Modo Invitado</h3>
+                                            <p className="text-xs text-gray-500 leading-relaxed">
+                                                Tus proyectos no se guardarán en la nube. Inicia sesión para sincronizar.
+                                            </p>
+                                        </div>
+                                        <div className="h-px bg-white/10 w-full my-1" />
+                                        <button 
+                                            onClick={() => { setShowSessionPopover(false); setActiveModal('collab'); }}
+                                            className="w-full py-2 text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded transition-colors text-center"
+                                        >
+                                            Vincular Cuenta
+                                        </button>
+                                        <button 
+                                            onClick={() => { setShowSessionPopover(false); window.location.href = import.meta.env.PROD ? 'https://hollowbits.com/login' : '/login'; }}
+                                            className="w-full py-2 text-xs font-medium text-gray-400 hover:text-white bg-transparent border border-white/10 hover:bg-white/5 rounded transition-colors text-center"
+                                        >
+                                            Ir al Portal de Login
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
                         {session ? (
-                            <div className="group relative flex flex-col items-center gap-1">
+                            <button onClick={() => setShowSessionPopover(!showSessionPopover)} className="group relative flex flex-col items-center gap-1 w-full outline-none">
                                 {/* Avatar con iniciales */}
-                                <div className="relative w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-rose-500 flex items-center justify-center shadow-[0_0_10px_rgba(168,85,247,0.4)] ring-1 ring-white/10 cursor-default" title={(profile?.full_name || user?.email) ?? 'Sesión activa'}>
+                                <div className="relative w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-rose-500 flex items-center justify-center shadow-[0_0_10px_rgba(168,85,247,0.4)] ring-1 ring-white/10 cursor-pointer hover:ring-white/30 transition-all" title={(profile?.full_name || user?.email) ?? 'Sesión activa'}>
                                     <span className="text-white text-[10px] font-bold uppercase select-none">
                                         {(profile?.full_name || user?.email || '?').charAt(0)}
                                     </span>
                                     {/* Online dot */}
                                     <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-green-400 ring-1 ring-[#1a1a1a]" />
                                 </div>
-                                {/* Logout on hover */}
-                                <button
-                                    onClick={() => authSignOut()}
-                                    className="w-8 h-6 flex items-center justify-center rounded-sm text-gray-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all opacity-0 group-hover:opacity-100 duration-200"
-                                    title="Cerrar sesión"
-                                >
-                                    <LogOut size={12} />
-                                </button>
-                            </div>
+                            </button>
                         ) : (
                             <button
-                                onClick={() => window.location.href = import.meta.env.PROD ? 'https://hollowbits.com/login' : '/login'}
-                                className="flex flex-col items-center gap-1 group cursor-pointer"
-                                title="Iniciar Sesión / Vincular Cuenta"
+                                onClick={() => setShowSessionPopover(!showSessionPopover)}
+                                className="flex flex-col items-center gap-1 group cursor-pointer w-full outline-none"
+                                title="Estado de Sesión"
                             >
                                 <div className="w-8 h-8 rounded-full border border-white/10 bg-white/[0.03] group-hover:bg-white/10 group-hover:border-purple-500/50 flex items-center justify-center transition-all duration-300">
                                     <UserCircle2 size={16} className="text-gray-600 group-hover:text-purple-400 transition-colors duration-300" />
