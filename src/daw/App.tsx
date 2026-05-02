@@ -1,4 +1,4 @@
-﻿// path: src/App.tsx
+// path: src/App.tsx
 import './index.css';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Transport from './components/Transport';
@@ -118,7 +118,7 @@ import {
 } from './services/takeLaneControlService';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import {
-    FolderInput, Settings, Cpu, LayoutGrid, Search, Users, Layers, Sliders, Sparkles, AlertTriangle, Undo2, Redo2, PlayCircle, Folder, HardDrive, Save, Trash2, Piano
+    FolderInput, Settings, Cpu, LayoutGrid, Search, Users, Layers, Sliders, Sparkles, AlertTriangle, Undo2, Redo2, PlayCircle, Folder, HardDrive, Save, Trash2, Piano, LogOut, UserCircle2
 } from 'lucide-react';
 import { HardwareSettingsModal } from './components/HardwareSettingsModal';
 import { audioEngine } from './services/audioEngine';
@@ -126,6 +126,7 @@ import {
     getTransportClockSnapshot,
     setTransportClockSnapshot
 } from './services/transportClockStore';
+import { useAuthStore } from './stores/authStore';
 
 const AISidebar = React.lazy(() => import('./components/AISidebar'));
 const PianoScoreWorkspace = React.lazy(() => import('./components/PianoScoreWorkspace'));
@@ -322,8 +323,17 @@ const toPersistentClip = (clip: Clip): Clip => {
 const App: React.FC = () => {
     const initialCollabSnapshot = useMemo(() => loadCollabSessionSnapshot(), []);
 
+    // Auth session (used for session indicator widget in sidebar)
+    const { user, profile, session, signOut: authSignOut, initialize: authInitialize } = useAuthStore();
+
+    useEffect(() => {
+        // Initialize auth store inside DAW — handles hash token SSO from cross-domain redirect
+        const unsubscribe = authInitialize();
+        return () => unsubscribe();
+    }, [authInitialize]);
+
     // --- STATE ---
-    const [projectName, setProjectName] = useState("Sin TÃƒÂ­tulo");
+    const [projectName, setProjectName] = useState("Sin Título");
     const [loadingProject, setLoadingProject] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState("");
     const [importProgress, setImportProgress] = useState<{ total: number; completed: number; currentFile: string | null } | null>(null);
@@ -3570,7 +3580,7 @@ const App: React.FC = () => {
             notationOverrides: workspace.notationOverrides.map((override) => ({ ...override })),
             confidenceRegions: workspace.confidenceRegions.map((region) => ({ ...region }))
         })));
-        setProjectName(preferredName || projectData.name || 'Sin TÃƒÂ­tulo');
+        setProjectName(preferredName || projectData.name || 'Sin Título');
 
         engineAdapter.setBpm(normalizedTransport.bpm);
         engineAdapter.setMasterPitch(normalizedTransport.masterTranspose);
@@ -3671,7 +3681,7 @@ const App: React.FC = () => {
 
     const resetProjectToEmpty = useCallback(() => {
         replaceTracks([], { recolor: false });
-        setProjectName("Sin TÃƒÂ­tulo");
+        setProjectName("Sin Título");
         setSelectedTrackId(null);
         setSelectedClipId(null);
         setScoreWorkspaces([]);
@@ -3724,7 +3734,7 @@ const App: React.FC = () => {
 
         } catch (err) {
             console.error("Open Project Error", err);
-            alert("Error crÃƒÂ­tico al leer el archivo. El formato puede estar corrupto.");
+            alert("Error crítico al leer el archivo. El formato puede estar corrupto.");
         } finally {
             setLoadingProject(false);
             setLoadingMessage("");
@@ -3915,13 +3925,13 @@ const App: React.FC = () => {
 
         const validTracks = importedTracks.filter((track): track is Track => track !== null);
         if (validTracks.length === 0) {
-            throw new Error('No se pudo decodificar ningÃƒÂºn archivo de audio.');
+            throw new Error('No se pudo decodificar ningún archivo de audio.');
         }
 
         appendTracks(validTracks, { reason: 'import-audio-files', recolor: true });
 
         if (validTracks.length < sources.length) {
-            alert('Algunos archivos no se pudieron importar, pero el resto se agregÃƒÂ³ correctamente.');
+            alert('Algunos archivos no se pudieron importar, pero el resto se agregó correctamente.');
         }
     }, [appendTracks, buildAudioClipFromBuffer, tracks.length, getProgressiveTrackColor]);
 
@@ -4776,7 +4786,7 @@ const App: React.FC = () => {
                 <div className="w-[50px] bg-[#1a1a1a] border-r border-daw-border flex flex-col items-center py-3 gap-3 z-[100] shrink-0 relative shadow-xl">
                     {/* ... Sidebar Icons (unchanged) ... */}
                     <div className="relative group" ref={fileMenuRef}>
-                        <button onClick={() => setShowFileMenu(!showFileMenu)} className={`w-10 h-10 flex items-center justify-center rounded-sm transition-all duration-100 relative ${showFileMenu ? 'bg-[#333] text-white' : 'text-gray-400 hover:text-white hover:bg-[#222]'}`} title="MenÃƒÂº de Proyecto">
+                        <button onClick={() => setShowFileMenu(!showFileMenu)} className={`w-10 h-10 flex items-center justify-center rounded-sm transition-all duration-100 relative ${showFileMenu ? 'bg-[#333] text-white' : 'text-gray-400 hover:text-white hover:bg-[#222]'}`} title="Menú de Proyecto">
                             <Folder size={20} strokeWidth={1.5} />
                         </button>
                         {showFileMenu && (
@@ -4809,14 +4819,14 @@ const App: React.FC = () => {
                     <div className="w-6 h-px bg-white/5 my-1"></div>
                     <div className="flex flex-col gap-2 w-full items-center">
                         <SidebarItem icon={LayoutGrid} label="Vista de Arreglo" active={mainView === 'arrange'} onClick={() => setMainView('arrange')} />
-                        <SidebarItem icon={PlayCircle} label="Vista de SesiÃƒÂ³n (Live)" active={mainView === 'session'} onClick={() => setMainView('session')} color="text-daw-ruby" />
+                        <SidebarItem icon={PlayCircle} label="Vista de Sesión (Live)" active={mainView === 'session'} onClick={() => setMainView('session')} color="text-daw-ruby" />
                         <SidebarItem icon={Sliders} label="Mezclador" active={mainView === 'mixer'} onClick={() => setMainView('mixer')} />
                     </div>
                     <div className="w-6 h-px bg-white/5 my-1"></div>
                     <div className="flex flex-col gap-2 w-full items-center">
                         <SidebarItem icon={Cpu} label="Rack de Dispositivos" onClick={() => setBottomView('devices')} active={bottomView === 'devices'} />
                         <SidebarItem icon={Layers} label="Editor de Notas/Audio" onClick={() => setBottomView('editor')} active={bottomView === 'editor'} />
-                        <button onClick={handleImportAudio} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/5 rounded-md transition-all" title="Importar RÃƒÂ¡pido">
+                        <button onClick={handleImportAudio} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/5 rounded-md transition-all" title="Importar Rápido">
                             <FolderInput size={18} />
                         </button>
                     </div>
@@ -4825,12 +4835,46 @@ const App: React.FC = () => {
                         <button onClick={redo} disabled={!canRedo} className={`w-8 h-8 flex items-center justify-center rounded-md transition-all ${!canRedo ? 'text-gray-700 cursor-not-allowed opacity-30' : 'text-gray-400 hover:text-white hover:bg-white/5'}`} title="Rehacer (Ctrl+Y)"><Redo2 size={16} /></button>
                     </div>
                     <div className="mt-auto flex flex-col gap-3 w-full items-center pb-3">
-                        <SidebarItem icon={Users} label="ColaboraciÃƒÂ³n" onClick={() => setActiveModal('collab')} active={activeModal === 'collab'} />
+                        <SidebarItem icon={Users} label="Colaboración" onClick={() => setActiveModal('collab')} active={activeModal === 'collab'} />
                         <SidebarItem icon={Settings} label="Preferencias de Audio/MIDI" onClick={() => setShowSettings(true)} active={showSettings} />
                     </div>
+
+                    {/* ── SESSION WIDGET ─────────────────────────────────────── */}
+                    <div className="w-full px-1 pb-2 mt-1 border-t border-white/5 pt-2">
+                        {session ? (
+                            <div className="group relative flex flex-col items-center gap-1">
+                                {/* Avatar con iniciales */}
+                                <div className="relative w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-rose-500 flex items-center justify-center shadow-[0_0_10px_rgba(168,85,247,0.4)] ring-1 ring-white/10 cursor-default" title={(profile?.full_name || user?.email) ?? 'Sesión activa'}>
+                                    <span className="text-white text-[10px] font-bold uppercase select-none">
+                                        {(profile?.full_name || user?.email || '?').charAt(0)}
+                                    </span>
+                                    {/* Online dot */}
+                                    <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-green-400 ring-1 ring-[#1a1a1a]" />
+                                </div>
+                                {/* Logout on hover */}
+                                <button
+                                    onClick={() => authSignOut()}
+                                    className="w-8 h-6 flex items-center justify-center rounded-sm text-gray-600 hover:text-rose-400 hover:bg-rose-500/10 transition-all opacity-0 group-hover:opacity-100 duration-200"
+                                    title="Cerrar sesión"
+                                >
+                                    <LogOut size={12} />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center gap-1" title="Sin sesión activa — abre la consola para conectarte">
+                                <div className="w-8 h-8 rounded-full border border-white/10 bg-white/[0.03] flex items-center justify-center">
+                                    <UserCircle2 size={16} className="text-gray-600" />
+                                </div>
+                                <span className="text-[8px] text-gray-700 uppercase tracking-wider">Guest</span>
+                            </div>
+                        )}
+                    </div>
+                    {/* ─────────────────────────────────────────────────────────── */}
+
                     <input type="file" ref={fileInputRef} className="hidden" multiple accept=".wav,.mp3,.aif,.aiff,.ogg,.flac" onChange={handleFileImport} />
                     {/* Project Input removed in favor of platformService */}
                 </div>
+
 
                 {!isScannerImmersive && hasLoadedAISidebar && (
                     <React.Suspense fallback={null}>
@@ -5296,9 +5340,9 @@ const App: React.FC = () => {
                     </div>
                 </div>
             </Modal>
-            <Modal isOpen={activeModal === 'new-project-confirm'} onClose={() => setActiveModal(null)} title="Nuevo Proyecto"><div className="flex flex-col gap-6"><div className="flex items-start gap-4 text-white"><div className="p-3 bg-daw-ruby/20 rounded-full shrink-0"><AlertTriangle className="text-daw-ruby" size={24} /></div><div><h3 className="font-bold text-lg mb-1">Ã‚Â¿Deseas guardar los cambios?</h3><p className="text-gray-400 text-xs leading-relaxed">Si continÃƒÂºas sin guardar, perderÃƒÂ¡s todo el trabajo actual para abrir un espacio de trabajo limpio.</p></div></div><div className="flex flex-col gap-2"><button onClick={async () => { await handleSaveProject(); resetProjectToEmpty(); }} className="w-full flex items-center justify-between px-4 py-3 bg-white text-black rounded-sm font-bold text-xs hover:bg-gray-200 transition-all group"><div className="flex items-center gap-3"><Save size={16} /><span>GUARDAR Y CREAR NUEVO</span></div></button><button onClick={resetProjectToEmpty} className="w-full flex items-center gap-3 px-4 py-3 bg-[#222] text-daw-ruby border border-daw-ruby/30 rounded-sm font-bold text-xs hover:bg-daw-ruby hover:text-white transition-all"><Trash2 size={16} /><span>CONTINUAR SIN GUARDAR</span></button><button onClick={() => setActiveModal(null)} className="w-full py-2 text-gray-500 hover:text-white text-[10px] font-bold uppercase tracking-widest mt-2">CANCELAR</button></div></div></Modal>
+            <Modal isOpen={activeModal === 'new-project-confirm'} onClose={() => setActiveModal(null)} title="Nuevo Proyecto"><div className="flex flex-col gap-6"><div className="flex items-start gap-4 text-white"><div className="p-3 bg-daw-ruby/20 rounded-full shrink-0"><AlertTriangle className="text-daw-ruby" size={24} /></div><div><h3 className="font-bold text-lg mb-1">Ã‚Â¿Deseas guardar los cambios?</h3><p className="text-gray-400 text-xs leading-relaxed">Si continúas sin guardar, perderás todo el trabajo actual para abrir un espacio de trabajo limpio.</p></div></div><div className="flex flex-col gap-2"><button onClick={async () => { await handleSaveProject(); resetProjectToEmpty(); }} className="w-full flex items-center justify-between px-4 py-3 bg-white text-black rounded-sm font-bold text-xs hover:bg-gray-200 transition-all group"><div className="flex items-center gap-3"><Save size={16} /><span>GUARDAR Y CREAR NUEVO</span></div></button><button onClick={resetProjectToEmpty} className="w-full flex items-center gap-3 px-4 py-3 bg-[#222] text-daw-ruby border border-daw-ruby/30 rounded-sm font-bold text-xs hover:bg-daw-ruby hover:text-white transition-all"><Trash2 size={16} /><span>CONTINUAR SIN GUARDAR</span></button><button onClick={() => setActiveModal(null)} className="w-full py-2 text-gray-500 hover:text-white text-[10px] font-bold uppercase tracking-widest mt-2">CANCELAR</button></div></div></Modal>
 
-            <Modal isOpen={activeModal === 'collab'} onClose={() => setActiveModal(null)} title="ColaboraciÃƒÂ³n">
+            <Modal isOpen={activeModal === 'collab'} onClose={() => setActiveModal(null)} title="Colaboración">
                 <CollabPanel
                     sessionId={collabSessionId}
                     userName={collabUserName}
