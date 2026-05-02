@@ -15,6 +15,7 @@ import Modal from './components/Modal';
 import { FluidPanel } from './components/FluidPanel';
 import AsciiPerformerDock from './components/AsciiPerformerDock';
 import CollabPanel, { CollabActivityEntry } from './components/CollabPanel';
+import { CollabAuthModal } from './components/CollabAuthModal';
 import { INITIAL_TRACKS, getTrackColorByPosition } from './constants';
 import { LoopMode, Note, SessionHealthSnapshot, StudioPerformanceProfile, Track, TransportState, TrackType, AudioSettings, Clip, ProjectData, AutomationMode, ScannedFileEntry, PunchRange, TransportAuthoritySnapshot, MonitoringRouteMode, RecordingCommitResult, RecordingJournalEntry, AutomationRuntimeFrame, AudioIncidentWindow, DiagnosticsVisibilityMode, VisualPerformanceSnapshot, AudioClipEditorViewState, ScoreWorkspaceState } from './types';
 import { engineAdapter, type EngineDiagnostics } from './services/engineAdapter';
@@ -366,7 +367,7 @@ const App: React.FC = () => {
     // Menus & Modals
     const [showFileMenu, setShowFileMenu] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
-    const [activeModal, setActiveModal] = useState<'settings' | 'help' | 'collab' | 'new-project-confirm' | 'recovery' | 'recording-recovery' | 'monitoring-routes' | null>(null);
+    const [activeModal, setActiveModal] = useState<'settings' | 'help' | 'collab' | 'auth' | 'new-project-confirm' | 'recovery' | 'recording-recovery' | 'monitoring-routes' | null>(null);
     const [showExportModal, setShowExportModal] = useState(false);
     const [recoverySnapshot, setRecoverySnapshot] = useState<ProjectAutosaveSnapshot | null>(null);
     const [lastAutosaveAt, setLastAutosaveAt] = useState<number | null>(null);
@@ -4879,7 +4880,7 @@ const App: React.FC = () => {
                                         </div>
                                         <div className="h-px bg-white/10 w-full my-1" />
                                         <button 
-                                            onClick={() => { setShowSessionPopover(false); setActiveModal('collab'); }}
+                                            onClick={() => { setShowSessionPopover(false); setActiveModal('auth'); }}
                                             className="w-full py-2 text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded transition-colors text-center"
                                         >
                                             Vincular Cuenta
@@ -5404,6 +5405,13 @@ const App: React.FC = () => {
                     onCopyInvite={handleCopyCollabInvite}
                 />
             </Modal>
+
+            {activeModal === 'auth' && (
+                <CollabAuthModal 
+                    onClose={() => setActiveModal(null)} 
+                    onSuccess={() => setActiveModal(null)} 
+                />
+            )}
         </div>
     );
 };
