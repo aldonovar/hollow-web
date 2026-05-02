@@ -118,11 +118,9 @@ function App() {
             <Route
               path="/engine"
               element={
-                <ProtectedRoute>
-                  <Suspense fallback={<div className="min-h-screen bg-[#06080a] flex items-center justify-center text-white font-mono text-sm">CARGANDO MOTOR AUDIO...</div>}>
-                    <DawApp />
-                  </Suspense>
-                </ProtectedRoute>
+                <Suspense fallback={<div style={{ background:'#06080a', minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontFamily:'monospace', fontSize:'13px' }}>CARGANDO MOTOR AUDIO...</div>}>
+                  <DawApp />
+                </Suspense>
               }
             />
             <Route path="*" element={<Navigate to="/console" replace />} />
@@ -163,11 +161,9 @@ function App() {
             <Route
               path="/engine"
               element={
-                <ProtectedRoute>
-                  <Suspense fallback={<div className="min-h-screen bg-[#06080a] flex items-center justify-center text-white font-mono text-sm">CARGANDO MOTOR AUDIO...</div>}>
-                    <DawApp />
-                  </Suspense>
-                </ProtectedRoute>
+                <Suspense fallback={<div style={{ background:'#06080a', minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontFamily:'monospace', fontSize:'13px' }}>CARGANDO MOTOR AUDIO...</div>}>
+                  <DawApp />
+                </Suspense>
               }
             />
           </>

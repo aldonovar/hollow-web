@@ -2,7 +2,7 @@ import React from 'react';
 import { Copy, Radio, Users, Wifi, WifiOff } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { CollabAuthModal } from './CollabAuthModal';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface CollabActivityEntry {
     id: string;
@@ -35,13 +35,8 @@ const CollabPanel: React.FC<CollabPanelProps> = ({
     onStopSession,
     onCopyInvite
 }) => {
-    const { session, user, initialize } = useAuthStore();
+    const { session, user } = useAuthStore();
     const [showAuth, setShowAuth] = useState(false);
-
-    useEffect(() => {
-        const unsubscribe = initialize();
-        return () => unsubscribe();
-    }, [initialize]);
 
     const handleStartSession = () => {
         if (!session) {

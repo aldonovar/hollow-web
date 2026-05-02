@@ -63,12 +63,13 @@ export function Console() {
     const isPlayApp = window.location.hostname.startsWith('play.') || window.location.hostname.startsWith('console.');
 
     if (isPlayApp) {
-      // Same domain: simple React Router navigation, session store persists.
+      // Misma aplicación: navegación React Router directa, el store persiste.
       navigate('/engine');
     } else {
       // Cross-domain (hollowbits.com → play.hollowbits.com):
-      // localStorage is NOT shared between subdomains. We pass the session
-      // tokens in the URL hash so play.hollowbits.com can hydrate the session.
+      // El DAW siempre abre. Si hay sesión activa, pasamos los tokens en el
+      // hash para que play.hollowbits.com los hidrate automáticamente (SSO).
+      // Si no hay sesión, el DAW abre en modo invitado.
       try {
         const { data: { session: activeSession } } = await supabase.auth.getSession();
         if (activeSession?.access_token && activeSession?.refresh_token) {
@@ -79,8 +80,8 @@ export function Console() {
           });
           window.location.href = `https://play.hollowbits.com/engine#${params.toString()}`;
         } else {
-          // No active session — redirect to login on play subdomain
-          window.location.href = 'https://play.hollowbits.com/login';
+          // Sin sesión — el DAW abre en modo invitado
+          window.location.href = 'https://play.hollowbits.com/engine';
         }
       } catch {
         window.location.href = 'https://play.hollowbits.com/engine';
