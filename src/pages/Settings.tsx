@@ -14,7 +14,7 @@ type FeedbackStatus = 'idle' | 'saving' | 'success' | 'error';
 export function Settings() {
   const pageRef = usePageMotion();
   const navigate = useNavigate();
-  const { user, profile, signOut, refreshProfile } = useAuthStore();
+  const { user, session, profile, signOut, refreshProfile } = useAuthStore();
 
   /* ─── Profile state ─────────────────────────────────────────── */
   const [fullName, setFullName] = useState('');
@@ -809,7 +809,7 @@ export function Settings() {
                 <p style={{ color: 'var(--text-2)', fontSize: '13px' }}>No hay sesiones activas adicionales.</p>
               ) : (
                 sessions.map(s => {
-                  const isCurrent = s.id === user?.session?.id; // Note: session ID might not strictly match if Supabase GoTrue rotates them, but we will assume for display logic
+                  const isCurrent = s.id === session?.id; // Note: session ID might not strictly match if Supabase GoTrue rotates them, but we will assume for display logic
                   const userAgent = s.user_agent || '';
                   const isDesktop = userAgent.toLowerCase().includes('windows') || userAgent.toLowerCase().includes('macintosh') || userAgent.toLowerCase().includes('linux');
                   const parsedName = userAgent.split(' ').slice(0, 3).join(' ') || 'Dispositivo Desconocido';
