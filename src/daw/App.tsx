@@ -1209,6 +1209,8 @@ const App: React.FC = () => {
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
+        const projectId = urlParams.get('project');
+
         if (token) {
             const loadSharedSession = async () => {
                 setLoadingProject(true);
@@ -1231,6 +1233,17 @@ const App: React.FC = () => {
                         } else {
                             alert('Has entrado en modo EDITOR.');
                         }
+
+                        // Load data if present
+                        if (sharedSession.data) {
+                            const integrityReport = await hydrateProjectData(sharedSession.data as unknown as ProjectData, sharedSession.name, {
+                                source: 'open-project',
+                                rememberReport: true
+                            });
+                            if (integrityReport.issueCount > 0) {
+                                console.warn('Project integrity repaired during open.', integrityReport);
+                            }
+                        }
                     }
                 } catch (e) {
                     console.error('Error loading shared session:', e);
@@ -1239,6 +1252,35 @@ const App: React.FC = () => {
                 }
             };
             loadSharedSession();
+        } else if (projectId) {
+            const loadCloudProject = async () => {
+                setLoadingProject(true);
+                setLoadingMessage('Cargando proyecto de la nube...');
+                try {
+                    const { data, error } = await supabase.from('projects').select('*').eq('id', projectId).single();
+                    if (error || !data) {
+                        alert('No se pudo encontrar el proyecto en la nube.');
+                    } else {
+                        setProjectName(data.name);
+                        setCollabSessionId(data.id);
+                        
+                        if (data.data && Object.keys(data.data).length > 0) {
+                            const integrityReport = await hydrateProjectData(data.data as unknown as ProjectData, data.name, {
+                                source: 'open-project',
+                                rememberReport: true
+                            });
+                            if (integrityReport.issueCount > 0) {
+                                console.warn('Project integrity repaired during open.', integrityReport);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error loading cloud project:', e);
+                } finally {
+                    setLoadingProject(false);
+                }
+            };
+            loadCloudProject();
         }
     }, []);
 
@@ -3820,14 +3862,32 @@ const App: React.FC = () => {
                 const integrityResult = repairProjectData(projectMetadata, { source: 'save-project' });
                 rememberProjectIntegrityReport(integrityResult.report);
                 const jsonString = JSON.stringify(integrityResult.project, null, 2);
-                setLoadingMessage("Escribiendo disco...");
 
-                // FIX: Update Project Name from Save Result
-                const result = await platformService.saveProject(jsonString, projectName);
-                if (result.success && result.filePath) {
-                    setProjectName(result.filePath);
+                if (collabSessionId) {
+                    setLoadingMessage("Guardando en la nube...");
+                    try {
+                        const { error } = await supabase.from('projects').update({
+                            data: integrityResult.project as any,
+                            name: projectName,
+                            updated_at: new Date().toISOString()
+                        }).eq('id', collabSessionId);
+                        
+                        if (error) throw error;
+                    } catch (e) {
+                        console.error('Error saving to cloud:', e);
+                        alert("Error al guardar en la nube.");
+                    }
+                } else {
+                    setLoadingMessage("Escribiendo disco...");
+                    // FIX: Update Project Name from Save Result
+                    const result = await platformService.saveProject(jsonString, projectName);
+                    if (result.success && result.filePath) {
+                        setProjectName(result.filePath);
+                    }
                 }
-                if (result.success && integrityResult.report.issueCount > 0) {
+                
+                // Fallback result for integrity report (using success always if cloud or fallback done without throw)
+                if (integrityResult.report.issueCount > 0) {
                     console.warn('Project integrity repaired during save.', integrityResult.report);
                     alert(summarizeProjectIntegrityReport(integrityResult.report, 'Proyecto guardado'));
                 }

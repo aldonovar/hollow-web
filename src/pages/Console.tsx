@@ -81,13 +81,18 @@ export function Console() {
     };
   }, [user, fetchProjects]);
 
-  const handleOpenDaw = async (e?: React.MouseEvent) => {
+  const handleOpenDaw = async (e?: React.MouseEvent, projectId?: string) => {
     if (e) e.preventDefault();
     const isPlayApp = window.location.hostname.startsWith('play.') || window.location.hostname.startsWith('console.');
 
+    let urlSuffix = '/engine';
+    if (projectId) {
+      urlSuffix += `?project=${projectId}`;
+    }
+
     if (isPlayApp) {
       // Misma aplicación: navegación React Router directa, el store persiste.
-      navigate('/engine');
+      navigate(urlSuffix);
     } else {
       // Cross-domain (hollowbits.com → play.hollowbits.com):
       // El DAW siempre abre. Si hay sesión activa, pasamos los tokens en el
@@ -101,13 +106,13 @@ export function Console() {
             refresh_token: activeSession.refresh_token,
             token_type: 'bearer',
           });
-          window.location.href = `https://play.hollowbits.com/engine#${params.toString()}`;
+          window.location.href = `https://play.hollowbits.com${urlSuffix}#${params.toString()}`;
         } else {
           // Sin sesión — el DAW abre en modo invitado
-          window.location.href = 'https://play.hollowbits.com/engine';
+          window.location.href = `https://play.hollowbits.com${urlSuffix}`;
         }
       } catch {
-        window.location.href = 'https://play.hollowbits.com/engine';
+        window.location.href = `https://play.hollowbits.com${urlSuffix}`;
       }
     }
   };
@@ -131,11 +136,12 @@ export function Console() {
 
     const { data, error } = await supabase
       .from('projects')
-      .insert([{ name: 'Nuevo Proyecto', workspace_id: workspaceId }])
+      .insert([{ name: 'Nuevo Proyecto', workspace_id: workspaceId, data: {} }])
       .select();
 
     if (!error && data) {
       setProjects([...data, ...projects]);
+      handleOpenDaw(undefined, data[0].id);
     }
   };
 
@@ -330,7 +336,7 @@ export function Console() {
                   position: 'relative',
                   overflow: 'hidden'
                 }}
-                onClick={handleOpenDaw}
+                onClick={(e) => handleOpenDaw(e, p.id)}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(168,85,247,0.5)';
                   (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';

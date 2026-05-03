@@ -120,6 +120,7 @@ export type Database = {
           updated_at: string
           workspace_id: string
           yjs_room_id: string
+          data?: Json | null
         }
         Insert: {
           bpm?: number
@@ -131,6 +132,7 @@ export type Database = {
           updated_at?: string
           workspace_id: string
           yjs_room_id?: string
+            data?: Json | null
         }
         Update: {
           bpm?: number
@@ -142,6 +144,7 @@ export type Database = {
           updated_at?: string
           workspace_id?: string
           yjs_room_id?: string
+            data?: Json | null
         }
         Relationships: [
           {
@@ -248,6 +251,7 @@ export type Database = {
           project_id: string
           sample_rate: number
           yjs_room_id: string
+          data?: Json | null
         }[]
       }
       revoke_device_session: {
