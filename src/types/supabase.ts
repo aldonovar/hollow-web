@@ -74,6 +74,41 @@ export type Database = {
         }
         Relationships: []
       }
+      project_shares: {
+        Row: {
+          access_level: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          project_id: string | null
+          token: string
+        }
+        Insert: {
+          access_level: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          project_id?: string | null
+          token?: string
+        }
+        Update: {
+          access_level?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          project_id?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_shares_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           bpm: number
@@ -202,6 +237,17 @@ export type Database = {
           ip: unknown
           last_active: string
           user_agent: string
+        }[]
+      }
+      get_project_by_share_token: {
+        Args: { p_token: string }
+        Returns: {
+          access_level: string
+          bpm: number
+          name: string
+          project_id: string
+          sample_rate: number
+          yjs_room_id: string
         }[]
       }
       revoke_device_session: {
@@ -341,8 +387,9 @@ export const Constants = {
   },
 } as const
 
+export type Project = Tables<'projects'>;
+export type License = Tables<'licenses'>;
+export type ProjectShare = Tables<'project_shares'>;
 export type Profile = Tables<'profiles'>;
 export type Workspace = Tables<'workspaces'>;
 export type WorkspaceMember = Tables<'workspace_members'>;
-export type Project = Tables<'projects'>;
-export type License = Tables<'licenses'>;

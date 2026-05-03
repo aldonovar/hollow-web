@@ -120,10 +120,12 @@ import {
 } from './services/takeLaneControlService';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import {
-    FolderInput, Settings, Cpu, LayoutGrid, Search, Users, Layers, Sliders, Sparkles, AlertTriangle, Undo2, Redo2, PlayCircle, Folder, HardDrive, Save, Trash2, Piano, LogOut, UserCircle2
+    FolderInput, Settings, Cpu, LayoutGrid, Search, Users, Layers, Sliders, Sparkles, AlertTriangle, Undo2, Redo2, PlayCircle, Folder, HardDrive, Save, Trash2, Piano, LogOut, UserCircle2, Share2
 } from 'lucide-react';
 import { HardwareSettingsModal } from './components/HardwareSettingsModal';
+import { ShareProjectModal } from './components/ShareProjectModal';
 import { audioEngine } from './services/audioEngine';
+import { supabase } from './services/supabase';
 import {
     getTransportClockSnapshot,
     setTransportClockSnapshot
@@ -355,6 +357,7 @@ const App: React.FC = () => {
     const [activeMixSnapshot, setActiveMixSnapshot] = useState<MixSnapshotSlot | null>(null);
     const [projectCommandCount, setProjectCommandCount] = useState(() => initialCollabSnapshot.commandCount);
     const [collabSessionId, setCollabSessionId] = useState<string | null>(() => initialCollabSnapshot.sessionId);
+    const [isReadOnly, setIsReadOnly] = useState(false);
     const [collabUserName, setCollabUserName] = useState(() => initialCollabSnapshot.userName);
     const [collabActivity, setCollabActivity] = useState<CollabActivityEntry[]>(() => initialCollabSnapshot.activity);
     const [collabCommandJournal, setCollabCommandJournal] = useState<CollabCommandRecord[]>(() => initialCollabSnapshot.commandJournal);
@@ -368,7 +371,7 @@ const App: React.FC = () => {
     // Menus & Modals
     const [showFileMenu, setShowFileMenu] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
-    const [activeModal, setActiveModal] = useState<'settings' | 'help' | 'collab' | 'auth' | 'new-project-confirm' | 'recovery' | 'recording-recovery' | 'monitoring-routes' | null>(null);
+    const [activeModal, setActiveModal] = useState<'settings' | 'help' | 'collab' | 'auth' | 'new-project-confirm' | 'recovery' | 'recording-recovery' | 'monitoring-routes' | 'share' | null>(null);
     const [showExportModal, setShowExportModal] = useState(false);
     const [recoverySnapshot, setRecoverySnapshot] = useState<ProjectAutosaveSnapshot | null>(null);
     const [lastAutosaveAt, setLastAutosaveAt] = useState<number | null>(null);
@@ -667,6 +670,11 @@ const App: React.FC = () => {
         recipe: (currentTracks: Track[]) => Track[],
         options?: TrackMutationOptions
     ) => {
+        if (isReadOnly) {
+            console.warn("Project is read-only. Track mutation blocked.");
+            return;
+        }
+
         const commitMutation = (prevTracks: Track[]) => {
             const nextTracks = recipe(prevTracks);
             if (nextTracks === prevTracks) return prevTracks;
@@ -685,7 +693,7 @@ const App: React.FC = () => {
         setTracks(commitMutation, {
             groupKey: options?.historyGroupId || undefined
         });
-    }, [applyTrackGradientColors, setTracks, setTracksNoHistory]);
+    }, [applyTrackGradientColors, setTracks, setTracksNoHistory, isReadOnly]);
 
     const updateTrackById = useCallback((trackId: string, updates: Partial<Track>, options?: TrackMutationOptions) => {
         applyTrackMutation((prevTracks) => prevTracks.map((track) => (
@@ -1198,6 +1206,42 @@ const App: React.FC = () => {
     }, [collabActivity, collabCommandJournal, collabSessionId, collabUserName, projectCommandCount]);
 
     // Sync Tracks with Audio Engine
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        if (token) {
+            const loadSharedSession = async () => {
+                setLoadingProject(true);
+                setLoadingMessage('Resolviendo token de colaboración...');
+                try {
+                    const { data, error } = await supabase.rpc('get_project_by_share_token', { p_token: token });
+                    if (error || !data || data.length === 0) {
+                        alert('El enlace de colaboración es inválido o ha expirado.');
+                    } else {
+                        const sharedSession = data[0];
+                        if (sharedSession.access_level === 'viewer') {
+                            setIsReadOnly(true);
+                        }
+                        setProjectName(sharedSession.name);
+                        setCollabSessionId(sharedSession.project_id);
+                        
+                        // Si es viewer, alertar al usuario
+                        if (sharedSession.access_level === 'viewer') {
+                            alert('Has entrado en modo VISOR. No podrás guardar cambios en este proyecto.');
+                        } else {
+                            alert('Has entrado en modo EDITOR.');
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error loading shared session:', e);
+                } finally {
+                    setLoadingProject(false);
+                }
+            };
+            loadSharedSession();
+        }
+    }, []);
+
     useEffect(() => {
         latestTracksRef.current = tracks;
     }, [tracks]);
@@ -3748,6 +3792,11 @@ const App: React.FC = () => {
     };
 
     const handleSaveProject = useCallback(async () => {
+        if (isReadOnly) {
+            alert("No tienes permisos para guardar cambios en este proyecto.");
+            return;
+        }
+        
         setLoadingProject(true);
         setLoadingMessage("Guardando metadatos...");
 
@@ -3793,7 +3842,7 @@ const App: React.FC = () => {
                 setShowFileMenu(false);
             }
         }, 20);
-    }, [createProjectDataSnapshot, projectName, rememberProjectIntegrityReport, transport]);
+    }, [createProjectDataSnapshot, projectName, rememberProjectIntegrityReport, transport, isReadOnly]);
 
     const assignClipToSessionSlot = useCallback((track: Track, sceneIndex: number, clip: Clip): Track => {
         const safeSceneIndex = Math.max(0, Math.min(7, sceneIndex));
@@ -4840,6 +4889,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="mt-auto flex flex-col gap-3 w-full items-center pb-3">
                         <SidebarItem icon={Users} label="Colaboración" onClick={() => setActiveModal('collab')} active={activeModal === 'collab'} />
+                        <SidebarItem icon={Share2} label="Compartir Enlace" onClick={() => { if (collabSessionId) { setActiveModal('share'); } else { alert('Debes guardar el proyecto en la nube primero (Colaboración) antes de poder compartirlo.'); } }} active={activeModal === 'share'} color="text-gray-400 group-hover:text-blue-400" />
                         <SidebarItem icon={Settings} label="Preferencias de Audio/MIDI" onClick={() => setShowSettings(true)} active={showSettings} />
                     </div>
 
@@ -5403,6 +5453,14 @@ const App: React.FC = () => {
                 </div>
             </Modal>
             <Modal isOpen={activeModal === 'new-project-confirm'} onClose={() => setActiveModal(null)} title="Nuevo Proyecto"><div className="flex flex-col gap-6"><div className="flex items-start gap-4 text-white"><div className="p-3 bg-daw-ruby/20 rounded-full shrink-0"><AlertTriangle className="text-daw-ruby" size={24} /></div><div><h3 className="font-bold text-lg mb-1">Ã‚Â¿Deseas guardar los cambios?</h3><p className="text-gray-400 text-xs leading-relaxed">Si continúas sin guardar, perderás todo el trabajo actual para abrir un espacio de trabajo limpio.</p></div></div><div className="flex flex-col gap-2"><button onClick={async () => { await handleSaveProject(); resetProjectToEmpty(); }} className="w-full flex items-center justify-between px-4 py-3 bg-white text-black rounded-sm font-bold text-xs hover:bg-gray-200 transition-all group"><div className="flex items-center gap-3"><Save size={16} /><span>GUARDAR Y CREAR NUEVO</span></div></button><button onClick={resetProjectToEmpty} className="w-full flex items-center gap-3 px-4 py-3 bg-[#222] text-daw-ruby border border-daw-ruby/30 rounded-sm font-bold text-xs hover:bg-daw-ruby hover:text-white transition-all"><Trash2 size={16} /><span>CONTINUAR SIN GUARDAR</span></button><button onClick={() => setActiveModal(null)} className="w-full py-2 text-gray-500 hover:text-white text-[10px] font-bold uppercase tracking-widest mt-2">CANCELAR</button></div></div></Modal>
+
+            {activeModal === 'share' && collabSessionId && (
+                <ShareProjectModal 
+                    projectId={collabSessionId} 
+                    projectName={projectName} 
+                    onClose={() => setActiveModal(null)} 
+                />
+            )}
 
             <Modal isOpen={activeModal === 'collab'} onClose={() => setActiveModal(null)} title="Colaboración">
                 <CollabPanel
