@@ -120,29 +120,37 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
      * during background updates. We update the state directly once resolved.
      */
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session: Session | null) => {
+      (event: AuthChangeEvent, session: Session | null) => {
         // Skip token refresh — handled transparently by Supabase
         if (event === 'TOKEN_REFRESHED') return;
 
         // Skip INITIAL_SESSION — already handled by getSession() above
         if (event === 'INITIAL_SESSION') return;
 
-        try {
-          if (session?.user) {
-            const [needsMfa, profile] = await Promise.all([
-              safeMfaCheck(),
-              fetchProfile(session.user.id),
-            ]);
-            // Update session WITHOUT touching isLoading to avoid UI flash
-            set({ user: session.user, session, profile, requiresMfa: needsMfa });
-          } else {
-            // SIGNED_OUT: clear everything
-            set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
+        // IMPORTANT: We do not await this function so we don't return a Promise to onAuthStateChange.
+        // If we return a Promise, GoTrue awaits it while holding the auth mutex lock.
+        // fetchProfile calls supabase.from() which calls getSession(), which tries to acquire the same lock,
+        // causing an eternal deadlock (the "Procesando..." forever bug).
+        const hydrate = async () => {
+          try {
+            if (session?.user) {
+              const [needsMfa, profile] = await Promise.all([
+                safeMfaCheck(),
+                fetchProfile(session.user.id),
+              ]);
+              // Update session WITHOUT touching isLoading to avoid UI flash
+              set({ user: session.user, session, profile, requiresMfa: needsMfa });
+            } else {
+              // SIGNED_OUT: clear everything
+              set({ user: null, session: null, profile: null, requiresMfa: false, isLoading: false });
+            }
+          } catch (err) {
+            console.error('[authStore] onAuthStateChange error:', err);
+            // On error, don't clear session — keep whatever we had
           }
-        } catch (err) {
-          console.error('[authStore] onAuthStateChange error:', err);
-          // On error, don't clear session — keep whatever we had
-        }
+        };
+
+        hydrate();
       }
     );
 
