@@ -22,49 +22,59 @@ export const CollabAuthModal: React.FC<CollabAuthModalProps> = ({ onClose, onSuc
 
     const trimmedEmail = email.trim().toLowerCase();
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email: trimmedEmail,
-      password,
-    });
-
-    if (signInError) {
-      if (signInError.message.includes('Invalid login credentials')) {
-        setError('El correo o la contraseña son incorrectos.');
-      } else {
-        setError(signInError.message);
-      }
-      setLoading(false);
-      return;
-    }
-
-    if (data.session) {
-      useAuthStore.setState({
-        user: data.session.user,
-        session: data.session,
-        isLoading: false,
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
       });
-      onSuccess();
-    } else {
-      setError('No se pudo establecer sesión. Intenta de nuevo.');
+
+      if (signInError) {
+        if (signInError.message.includes('Invalid login credentials')) {
+          setError('El correo o la contraseña son incorrectos.');
+        } else {
+          setError(signInError.message);
+        }
+        setLoading(false);
+        return;
+      }
+
+      if (data.session) {
+        useAuthStore.setState({
+          user: data.session.user,
+          session: data.session,
+          isLoading: false,
+        });
+        onSuccess();
+      } else {
+        setError('No se pudo establecer sesión. Intenta de nuevo.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Ocurrió un error inesperado de red. Verifica tu conexión.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    const callbackUrl = `${window.location.origin}/engine`; // Regresar al DAW
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: callbackUrl,
-        queryParams: {
-          prompt: 'select_account',
-        },
-      }
-    });
+    try {
+      const callbackUrl = `${window.location.origin}/engine`; // Regresar al DAW
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: callbackUrl,
+          queryParams: {
+            prompt: 'select_account',
+          },
+        }
+      });
 
-    if (oauthError) {
-      setError(oauthError.message);
+      if (oauthError) {
+        setError(oauthError.message);
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Ocurrió un error inesperado de red. Verifica tu conexión.');
       setLoading(false);
     }
   };
