@@ -809,7 +809,7 @@ export function Settings() {
                 <p style={{ color: 'var(--text-2)', fontSize: '13px' }}>No hay sesiones activas adicionales.</p>
               ) : (
                 sessions.map(s => {
-                  const isCurrent = s.id === session?.id; // Note: session ID might not strictly match if Supabase GoTrue rotates them, but we will assume for display logic
+                  const isCurrent = false; // Cannot reliably determine session ID from frontend without decoding JWT
                   const userAgent = s.user_agent || '';
                   const isDesktop = userAgent.toLowerCase().includes('windows') || userAgent.toLowerCase().includes('macintosh') || userAgent.toLowerCase().includes('linux');
                   const parsedName = userAgent.split(' ').slice(0, 3).join(' ') || 'Dispositivo Desconocido';
