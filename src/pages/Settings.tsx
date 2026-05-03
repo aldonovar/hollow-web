@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   User, AtSign, Mail, Lock, Shield, Camera, Save, AlertCircle, CheckCircle,
-  LogOut, KeyRound, Eye, EyeOff, Loader2, ChevronRight, Copy, X, Clock
+  LogOut, KeyRound, Eye, EyeOff, Loader2, ChevronRight, Copy, X, Clock, MonitorSmartphone, CreditCard, Laptop, Globe, Trash2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
@@ -23,6 +23,11 @@ export function Settings() {
   const [profileStatus, setProfileStatus] = useState<FeedbackStatus>('idle');
   const [profileMsg, setProfileMsg] = useState('');
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  /* ─── License & Sessions state ──────────────────────────────── */
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [license, setLicense] = useState<any>(null);
+  const [loadingExtra, setLoadingExtra] = useState(true);
 
   /* ─── Password state ────────────────────────────────────────── */
   const [currentPassword, setCurrentPassword] = useState('');
@@ -95,6 +100,49 @@ export function Settings() {
       }
     })();
   }, []);
+
+  /* ─── Fetch Sessions and License ────────────────────────────── */
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchExtraData = async () => {
+      try {
+        setLoadingExtra(true);
+        // Fetch sessions
+        const { data: sessionData, error: sessionError } = await supabase.rpc('get_active_sessions');
+        if (!sessionError && sessionData) setSessions(sessionData);
+
+        // Fetch license
+        const { data: licenseData, error: licenseError } = await supabase
+          .from('licenses')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+        if (!licenseError && licenseData) setLicense(licenseData);
+      } catch (err) {
+        console.error('[Settings] Error fetching extra settings data:', err);
+      } finally {
+        setLoadingExtra(false);
+      }
+    };
+
+    fetchExtraData();
+  }, [user]);
+
+  const handleRevokeSession = async (sessionId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('revoke_device_session', { target_session_id: sessionId });
+      if (error) {
+        console.error('[Settings] Failed to revoke session:', error);
+        return;
+      }
+      if (data) {
+        setSessions(s => s.filter(x => x.id !== sessionId));
+      }
+    } catch (err) {
+      console.error('[Settings] Revoke error:', err);
+    }
+  };
 
   /* ─── Save Profile ──────────────────────────────────────────── */
   const handleSaveProfile = async () => {
@@ -470,6 +518,50 @@ export function Settings() {
           </div>
         </section>
 
+        {/* ─── LICENSE SECTION ─── */}
+        <section className="settings__section">
+          <div className="settings__section-label">
+            <CreditCard size={14} />
+            <span>Licencia y Suscripción</span>
+          </div>
+
+          <div className="settings__card">
+            <h3 className="settings__card-title">Plan Actual</h3>
+            <p className="settings__card-desc">Administra tu nivel de acceso a Hollow Bits.</p>
+            
+            {loadingExtra ? (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: 'var(--text-2)' }}>
+                <Loader2 size={16} className="settings__spinner" /> Cargando licencia...
+              </div>
+            ) : license ? (
+              <div className="settings__license-box" style={{ background: 'rgba(0,0,0,0.4)', padding: '20px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '18px', fontWeight: 600, color: '#fff', textTransform: 'capitalize' }}>
+                      {license.tier === 'free' ? 'Plan Básico' : `Plan ${license.tier}`}
+                    </span>
+                    <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', background: license.status === 'active' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: license.status === 'active' ? '#22c55e' : '#ef4444', padding: '4px 8px', borderRadius: '4px' }}>
+                      {license.status}
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-2)' }}>
+                    {license.tier === 'free' 
+                      ? 'Acceso a funcionalidades esenciales del DAW.' 
+                      : `Suscripción válida hasta ${license.current_period_end ? new Date(license.current_period_end).toLocaleDateString() : 'N/A'}.`}
+                  </p>
+                </div>
+                {license.tier === 'free' && (
+                  <button className="settings__save-btn" onClick={() => navigate('/pricing')} style={{ width: 'auto' }}>
+                    Mejorar Plan
+                  </button>
+                )}
+              </div>
+            ) : (
+              <p style={{ color: 'var(--text-2)', fontSize: '13px' }}>No se encontró información de licencia.</p>
+            )}
+          </div>
+        </section>
+
         {/* ─── SECURITY SECTION ─── */}
         <section className="settings__section">
           <div className="settings__section-label">
@@ -697,6 +789,65 @@ export function Settings() {
                 {mfaEnabled ? <CheckCircle size={15} /> : <AlertCircle size={15} />} {mfaMsg}
               </div>
             )}
+          </div>
+
+          {/* Active Devices */}
+          <div className="settings__card">
+            <h3 className="settings__card-title">
+              <MonitorSmartphone size={18} /> Dispositivos Activos
+            </h3>
+            <p className="settings__card-desc">
+              Revisa y revoca el acceso a dispositivos donde tienes sesiones abiertas.
+            </p>
+
+            <div className="settings__sessions-list" style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {loadingExtra ? (
+                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: 'var(--text-2)' }}>
+                   <Loader2 size={16} className="settings__spinner" /> Cargando sesiones...
+                 </div>
+              ) : sessions.length === 0 ? (
+                <p style={{ color: 'var(--text-2)', fontSize: '13px' }}>No hay sesiones activas adicionales.</p>
+              ) : (
+                sessions.map(s => {
+                  const isCurrent = s.id === user?.session?.id; // Note: session ID might not strictly match if Supabase GoTrue rotates them, but we will assume for display logic
+                  const userAgent = s.user_agent || '';
+                  const isDesktop = userAgent.toLowerCase().includes('windows') || userAgent.toLowerCase().includes('macintosh') || userAgent.toLowerCase().includes('linux');
+                  const parsedName = userAgent.split(' ').slice(0, 3).join(' ') || 'Dispositivo Desconocido';
+                  
+                  return (
+                    <div key={s.id} className="settings__session-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px' }}>
+                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                        <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-1)' }}>
+                          {isDesktop ? <Laptop size={18} /> : <Globe size={18} />}
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h4 style={{ margin: 0, fontSize: '14px', color: '#fff' }}>{parsedName}</h4>
+                            {isCurrent && (
+                              <span style={{ fontSize: '10px', background: 'rgba(168, 85, 247, 0.2)', color: '#a855f7', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Este Dispositivo
+                              </span>
+                            )}
+                          </div>
+                          <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-2)' }}>
+                            IP: {s.ip || 'Oculta'} • Última act: {new Date(s.last_active).toLocaleString('es-MX')}
+                          </p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => handleRevokeSession(s.id)}
+                        title="Revocar sesión"
+                        style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', padding: '8px', transition: 'all 0.2s' }}
+                        onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-2)'}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </section>
 

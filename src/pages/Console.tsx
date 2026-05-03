@@ -145,6 +145,7 @@ export function Console() {
   };
 
   const displayName = profile?.username || profile?.full_name || user?.email || 'Usuario';
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || null;
 
   if (loading) {
     return (
@@ -158,27 +159,59 @@ export function Console() {
     <div className="page-shell" ref={pageRef} style={{ paddingTop: '120px' }}>
       <section className="dashboard" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
-          <div>
-            <h1 style={{ fontFamily: 'Plus Jakarta Sans', fontSize: '2rem', marginBottom: '8px' }}>Mis Proyectos</h1>
-            <p style={{ color: 'var(--text-2)' }}>
-              Bienvenido, <strong>{displayName}</strong>
-              {profile?.tier && profile.tier !== 'free' && (
-                <span style={{
-                  marginLeft: '8px',
-                  padding: '2px 8px',
-                  background: 'rgba(168,85,247,0.15)',
-                  border: '1px solid rgba(168,85,247,0.3)',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontFamily: 'JetBrains Mono',
-                  color: 'var(--purple)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                }}>
-                  {profile.tier}
-                </span>
-              )}
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={displayName}
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  border: '2px solid var(--border)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.05)',
+                border: '2px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-2)',
+                fontSize: '24px',
+                fontWeight: 'bold'
+              }}>
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <h1 style={{ fontFamily: 'Plus Jakarta Sans', fontSize: '2rem', marginBottom: '4px', lineHeight: 1 }}>Mis Proyectos</h1>
+              <p style={{ color: 'var(--text-2)', margin: 0 }}>
+                Bienvenido, <strong>{displayName}</strong>
+                {profile?.tier && profile.tier !== 'free' && (
+                  <span style={{
+                    marginLeft: '8px',
+                    padding: '2px 8px',
+                    background: 'rgba(168,85,247,0.15)',
+                    border: '1px solid rgba(168,85,247,0.3)',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontFamily: 'JetBrains Mono',
+                    color: 'var(--purple)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    {profile.tier}
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <a

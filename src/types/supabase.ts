@@ -8,11 +8,42 @@ export type Json =
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
+      licenses: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          id: string
+          status: string
+          tier: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          status: string
+          tier: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          status?: string
+          tier?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -163,7 +194,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_active_sessions: {
+        Args: never
+        Returns: {
+          created_at: string
+          id: string
+          ip: unknown
+          last_active: string
+          user_agent: string
+        }[]
+      }
+      revoke_device_session: {
+        Args: { target_session_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
@@ -291,8 +335,14 @@ export type CompositeTypes<
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
-/** Convenience type aliases for domain use */
-export type Profile = Tables<'profiles'>
-export type Workspace = Tables<'workspaces'>
-export type WorkspaceMember = Tables<'workspace_members'>
-export type Project = Tables<'projects'>
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const
+
+export type Profile = Tables<'profiles'>;
+export type Workspace = Tables<'workspaces'>;
+export type WorkspaceMember = Tables<'workspace_members'>;
+export type Project = Tables<'projects'>;
+export type License = Tables<'licenses'>;
