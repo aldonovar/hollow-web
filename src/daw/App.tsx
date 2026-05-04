@@ -3951,10 +3951,15 @@ const App: React.FC = () => {
                 } else if (user) {
                     setLoadingMessage("Creando proyecto en la nube...");
                     try {
-                        const { data: workspaces, error: wsError } = await supabase.from('workspaces').select('id').eq('created_by', user.id).limit(1);
-                        if (wsError || !workspaces || workspaces.length === 0) throw new Error("Workspace no encontrado");
+                        const { data: memberships, error: wsError } = await supabase
+                            .from('workspace_members')
+                            .select('workspace_id')
+                            .eq('user_id', user.id)
+                            .limit(1);
                         
-                        const workspaceId = workspaces[0].id;
+                        if (wsError || !memberships || memberships.length === 0) throw new Error("Workspace no encontrado");
+                        
+                        const workspaceId = memberships[0].workspace_id;
                         const { data: newProject, error: createError } = await supabase.from('projects').insert([{
                             name: projectName,
                             workspace_id: workspaceId,
