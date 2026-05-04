@@ -3789,11 +3789,13 @@ const App: React.FC = () => {
             scaleRoot: 0,
             scaleType: 'minor'
         }));
+        setCollabSessionId(null);
+        window.history.pushState({}, '', window.location.pathname);
         setActiveModal(null);
         engineAdapter.stop(true);
         isPlayingRef.current = false;
         pauseResumeArmedRef.current = false;
-    }, [closeAllToolPanels, replaceTracks]);
+    }, [closeAllToolPanels, replaceTracks, setCollabSessionId]);
 
     const handleNewProject = useCallback(() => { setActiveModal('new-project-confirm'); }, []);
 
@@ -3832,6 +3834,41 @@ const App: React.FC = () => {
             closeAllToolPanels();
         }
     };
+
+    const handleDownloadProject = useCallback(async () => {
+        setLoadingProject(true);
+        setLoadingMessage("Preparando archivo local...");
+
+        setTimeout(async () => {
+            try {
+                if (transport.isPlaying) {
+                    engineAdapter.pause();
+                    setTransport((prev: TransportState) => ({ ...prev, isPlaying: false }));
+                    isPlayingRef.current = false;
+                    pauseResumeArmedRef.current = false;
+                }
+                const clockSnapshot = getTransportClockSnapshot();
+                const projectMetadata = createProjectDataSnapshot({
+                    ...transport,
+                    isPlaying: false,
+                    isRecording: false,
+                    currentBar: clockSnapshot.currentBar,
+                    currentBeat: clockSnapshot.currentBeat,
+                    currentSixteenth: clockSnapshot.currentSixteenth
+                }, projectName);
+                const integrityResult = repairProjectData(projectMetadata, { source: 'save-project' });
+                rememberProjectIntegrityReport(integrityResult.report);
+                const jsonString = JSON.stringify(integrityResult.project, null, 2);
+
+                await platformService.saveProject(jsonString, projectName);
+            } catch (err) {
+                console.error("Error al descargar proyecto:", err);
+                alert("Hubo un error al intentar descargar el proyecto.");
+            } finally {
+                setLoadingProject(false);
+            }
+        }, 50);
+    }, [transport, projectName, createProjectDataSnapshot]);
 
     const handleSaveProject = useCallback(async () => {
         if (isReadOnly) {
@@ -3876,6 +3913,31 @@ const App: React.FC = () => {
                     } catch (e) {
                         console.error('Error saving to cloud:', e);
                         alert("Error al guardar en la nube.");
+                    }
+                } else if (user) {
+                    setLoadingMessage("Creando proyecto en la nube...");
+                    try {
+                        const { data: workspaces, error: wsError } = await supabase.from('workspaces').select('id').eq('created_by', user.id).limit(1);
+                        if (wsError || !workspaces || workspaces.length === 0) throw new Error("Workspace no encontrado");
+                        
+                        const workspaceId = workspaces[0].id;
+                        const { data: newProject, error: createError } = await supabase.from('projects').insert([{
+                            name: projectName,
+                            workspace_id: workspaceId,
+                            data: integrityResult.project as any
+                        }]).select().single();
+                        
+                        if (createError || !newProject) throw createError;
+                        
+                        setCollabSessionId(newProject.id);
+                        window.history.pushState({}, '', `${window.location.pathname}?project=${newProject.id}`);
+                    } catch (e) {
+                        console.error('Error creating cloud project:', e);
+                        alert("Error al crear el proyecto en la nube. Se descargará localmente como respaldo.");
+                        const result = await platformService.saveProject(jsonString, projectName);
+                        if (result.success && result.filePath) {
+                            setProjectName(result.filePath);
+                        }
                     }
                 } else {
                     setLoadingMessage("Escribiendo disco...");
@@ -4919,6 +4981,7 @@ const App: React.FC = () => {
 
                                 <div className="h-px bg-daw-border w-1/2 my-2"></div>
                                 <button onClick={handleSaveProject} className="text-xs text-left px-4 py-2 text-gray-300 hover:bg-white/10 hover:text-white transition-colors flex justify-between group"><span>Guardar Proyecto</span><span className="opacity-50 text-[10px]">Ctrl+S</span></button>
+                                <button onClick={() => { handleDownloadProject(); setShowFileMenu(false); }} className="text-xs text-left px-4 py-2 text-gray-300 hover:bg-white/10 hover:text-white transition-colors flex justify-between group"><span>Descargar Proyecto Local</span></button>
                                 <button onClick={() => setShowExportModal(true)} className="text-xs text-left px-4 py-2 text-gray-300 hover:bg-white/10 hover:text-white transition-colors flex justify-between group"><span>Exportar Audio</span></button>
                             </div>
                         )}
