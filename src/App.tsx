@@ -15,6 +15,7 @@ import { Contact } from './pages/Contact';
 import { Auth } from './pages/Auth';
 import { Settings } from './pages/Settings';
 import { MfaChallenge } from './pages/MfaChallenge';
+import { Privacy } from './pages/Privacy';
 import { useAuthStore } from './stores/authStore';
 
 const DawApp = lazy(() => import('./daw/App'));
@@ -136,6 +137,7 @@ function App() {
               <Route path="pricing" element={<Pricing />} />
               <Route path="roadmap" element={<Roadmap />} />
               <Route path="contact" element={<Contact />} />
+              <Route path="privacy" element={<Privacy />} />
               <Route path="login" element={<GuestRoute><Auth type="login" /></GuestRoute>} />
               <Route path="signup" element={<GuestRoute><Auth type="signup" /></GuestRoute>} />
               

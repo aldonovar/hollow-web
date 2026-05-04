@@ -208,7 +208,7 @@ export function Layout() {
           <div className="site-footer__col">
             <h4>Legal</h4>
             <Link to="/contact">Términos</Link>
-            <Link to="/contact">Privacidad</Link>
+            <Link to="/privacy">Privacidad</Link>
           </div>
         </div>
         <div className="site-footer__bottom">
