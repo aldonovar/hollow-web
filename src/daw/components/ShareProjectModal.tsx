@@ -16,6 +16,7 @@ export function ShareProjectModal({ projectId, projectName, onClose }: ShareProj
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [invitedEmail, setInvitedEmail] = useState('');
 
   useEffect(() => {
     fetchShares();
@@ -43,13 +44,15 @@ export function ShareProjectModal({ projectId, projectName, onClose }: ShareProj
       .insert({
         project_id: projectId,
         access_level: accessLevel,
-        created_by: user.id
+        created_by: user.id,
+        invited_email: invitedEmail.trim()
       })
       .select()
       .single();
 
     if (!error && data) {
       setShares([data, ...shares]);
+      setInvitedEmail('');
     }
     setCreating(false);
   };
@@ -92,23 +95,32 @@ export function ShareProjectModal({ projectId, projectName, onClose }: ShareProj
         {/* Content */}
         <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
           
-          <div className="flex gap-2 mb-6">
-            <button
-              onClick={() => createShare('viewer')}
-              disabled={creating}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-            >
-              <Eye size={16} className="text-blue-400" />
-              <span>Link Visor</span>
-            </button>
-            <button
-              onClick={() => createShare('editor')}
-              disabled={creating}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-            >
-              <Edit2 size={16} className="text-rose-400" />
-              <span>Link Editor</span>
-            </button>
+          <div className="flex flex-col gap-3 mb-6">
+            <input 
+              type="email" 
+              placeholder="Correo electrónico del usuario..." 
+              value={invitedEmail}
+              onChange={(e) => setInvitedEmail(e.target.value)}
+              className="w-full bg-black/50 border border-white/10 rounded-md px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-daw-violet"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => createShare('viewer')}
+                disabled={creating || !invitedEmail.trim()}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+              >
+                <Eye size={16} className="text-blue-400" />
+                <span>Invitar Visor</span>
+              </button>
+              <button
+                onClick={() => createShare('editor')}
+                disabled={creating || !invitedEmail.trim()}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+              >
+                <Edit2 size={16} className="text-rose-400" />
+                <span>Invitar Editor</span>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -131,7 +143,9 @@ export function ShareProjectModal({ projectId, projectName, onClose }: ShareProj
                     </div>
                     <div className="truncate">
                       <p className="text-sm font-medium text-gray-200 capitalize">{share.access_level}</p>
-                      <p className="text-xs text-gray-500 font-mono mt-0.5 truncate max-w-[120px] sm:max-w-[180px]">{share.token}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[120px] sm:max-w-[180px]">
+                        {share.invited_email || 'Cualquiera con el enlace'}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">

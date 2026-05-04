@@ -82,6 +82,7 @@ export type Database = {
           id: string
           project_id: string | null
           token: string
+          invited_email: string | null
         }
         Insert: {
           access_level: string
@@ -90,6 +91,7 @@ export type Database = {
           id?: string
           project_id?: string | null
           token?: string
+          invited_email?: string | null
         }
         Update: {
           access_level?: string
@@ -98,6 +100,7 @@ export type Database = {
           id?: string
           project_id?: string | null
           token?: string
+          invited_email?: string | null
         }
         Relationships: [
           {
