@@ -120,7 +120,7 @@ import {
 } from './services/takeLaneControlService';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import {
-    FolderInput, Settings, Cpu, LayoutGrid, Search, Users, Layers, Sliders, Sparkles, AlertTriangle, Undo2, Redo2, PlayCircle, Folder, HardDrive, Save, Trash2, Piano, LogOut, UserCircle2, Share2
+    FolderInput, Settings, Cpu, LayoutGrid, Search, Users, Layers, Sliders, Sparkles, AlertTriangle, Undo2, Redo2, PlayCircle, Folder, HardDrive, Save, Trash2, Piano, LogOut, UserCircle2, Share2, Cloud, CloudOff
 } from 'lucide-react';
 import { HardwareSettingsModal } from './components/HardwareSettingsModal';
 import { ShareProjectModal } from './components/ShareProjectModal';
@@ -3767,6 +3767,40 @@ const App: React.FC = () => {
         return () => window.clearTimeout(timeoutId);
     }, [autosaveTransportSnapshot, createProjectDataSnapshot, projectCommandCount, projectName]);
 
+    // ── CLOUD AUTO-SAVE (every 30s when connected to cloud project) ──
+    const lastCloudSaveCommandRef = useRef(0);
+    useEffect(() => {
+        if (!collabSessionId || !user) return;
+
+        const intervalId = window.setInterval(async () => {
+            if (projectCommandCount <= lastCloudSaveCommandRef.current) return;
+            try {
+                const clockSnapshot = getTransportClockSnapshot();
+                const snapshot = createProjectDataSnapshot({
+                    ...transport,
+                    isPlaying: false,
+                    isRecording: false,
+                    currentBar: clockSnapshot.currentBar,
+                    currentBeat: clockSnapshot.currentBeat,
+                    currentSixteenth: clockSnapshot.currentSixteenth
+                }, projectName);
+                const integrityResult = repairProjectData(snapshot, { source: 'cloud-autosave' });
+
+                await supabase.from('projects').update({
+                    data: integrityResult.project as any,
+                    name: projectName,
+                    updated_at: new Date().toISOString()
+                }).eq('id', collabSessionId);
+
+                lastCloudSaveCommandRef.current = projectCommandCount;
+            } catch (err) {
+                console.warn('[CloudAutoSave] Silent save failed:', err);
+            }
+        }, 30000);
+
+        return () => window.clearInterval(intervalId);
+    }, [collabSessionId, user, projectCommandCount, transport, projectName, createProjectDataSnapshot]);
+
     // ... (Project management handlers remain same)
 
     const resetProjectToEmpty = useCallback(() => {
@@ -5297,8 +5331,17 @@ const App: React.FC = () => {
                 <div className="h-8 bg-[#11131a]/96 border-t border-white/10 flex items-center justify-between px-4 select-none shrink-0 z-50 backdrop-blur-sm">
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2 px-2.5 h-5 rounded-sm border border-white/10 bg-white/[0.03] text-gray-300">
-                            <HardDrive size={11} className="text-daw-violet" />
+                            {collabSessionId ? (
+                                <Cloud size={11} className="text-green-400" />
+                            ) : user ? (
+                                <CloudOff size={11} className="text-amber-400" />
+                            ) : (
+                                <HardDrive size={11} className="text-daw-violet" />
+                            )}
                             <span className="text-[9px] font-bold uppercase tracking-[0.14em]">{projectName}</span>
+                            {collabSessionId && (
+                                <span className="text-[8px] text-green-400/60 font-mono">NUBE</span>
+                            )}
                         </div>
                         {selectedTrack && (
                             <div className="flex items-center gap-2 px-2.5 h-5 rounded-sm border border-white/10 bg-white/[0.03]">

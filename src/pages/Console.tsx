@@ -1,14 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-
 import { usePageMotion } from '../components/usePageMotion';
-import { Plus, FolderOpen, Settings, Play } from 'lucide-react';
+import { Plus, FolderOpen, Settings, Play, MoreVertical, Trash2, Copy, Pencil, Upload, Cloud, CloudOff, X, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 import type { Project } from '../types/supabase';
-
-
 
 export function Console() {
   const pageRef = usePageMotion();
@@ -18,15 +15,22 @@ export function Console() {
   const navigate = useNavigate();
   const isFetchingRef = useRef(false);
 
+  // Project management state
+  const [contextMenuId, setContextMenuId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [importingFile, setImportingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const fetchProjects = useCallback(async () => {
     if (!user) return;
     if (isFetchingRef.current) return;
-    
+
     isFetchingRef.current = true;
     setLoading(true);
-    
+
     try {
-      // First, get workspace IDs the user belongs to
       const { data: memberships, error: memberErr } = await supabase
         .from('workspace_members')
         .select('workspace_id')
@@ -49,7 +53,7 @@ export function Console() {
         .from('projects')
         .select('*')
         .in('workspace_id', workspaceIds)
-        .order('created_at', { ascending: false });
+        .order('updated_at', { ascending: false });
 
       if (!error && data) {
         setProjects(data);
@@ -81,6 +85,15 @@ export function Console() {
     };
   }, [user, fetchProjects]);
 
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleClick = () => setContextMenuId(null);
+    if (contextMenuId) {
+      window.addEventListener('click', handleClick);
+      return () => window.removeEventListener('click', handleClick);
+    }
+  }, [contextMenuId]);
+
   const handleOpenDaw = async (e?: React.MouseEvent, projectId?: string) => {
     if (e) e.preventDefault();
     const isPlayApp = window.location.hostname.startsWith('play.') || window.location.hostname.startsWith('console.');
@@ -91,13 +104,8 @@ export function Console() {
     }
 
     if (isPlayApp) {
-      // Misma aplicación: navegación React Router directa, el store persiste.
       navigate(urlSuffix);
     } else {
-      // Cross-domain (hollowbits.com → play.hollowbits.com):
-      // El DAW siempre abre. Si hay sesión activa, pasamos los tokens en el
-      // hash para que play.hollowbits.com los hidrate automáticamente (SSO).
-      // Si no hay sesión, el DAW abre en modo invitado.
       try {
         const { data: { session: activeSession } } = await supabase.auth.getSession();
         if (activeSession?.access_token && activeSession?.refresh_token) {
@@ -108,7 +116,6 @@ export function Console() {
           });
           window.location.href = `https://play.hollowbits.com${urlSuffix}#${params.toString()}`;
         } else {
-          // Sin sesión — el DAW abre en modo invitado
           window.location.href = `https://play.hollowbits.com${urlSuffix}`;
         }
       } catch {
@@ -120,7 +127,6 @@ export function Console() {
   const createProject = async () => {
     if (!user) return;
 
-    // Fetch user's first workspace to create project in
     const { data: memberships } = await supabase
       .from('workspace_members')
       .select('workspace_id')
@@ -145,6 +151,107 @@ export function Console() {
     }
   };
 
+  // --- RENAME ---
+  const startRename = (project: Project) => {
+    setRenamingId(project.id);
+    setRenameValue(project.name);
+    setContextMenuId(null);
+  };
+
+  const confirmRename = async () => {
+    if (!renamingId || !renameValue.trim()) return;
+    const { error } = await supabase
+      .from('projects')
+      .update({ name: renameValue.trim(), updated_at: new Date().toISOString() })
+      .eq('id', renamingId);
+
+    if (!error) {
+      setProjects(prev => prev.map(p => p.id === renamingId ? { ...p, name: renameValue.trim() } : p));
+    }
+    setRenamingId(null);
+  };
+
+  // --- DELETE ---
+  const confirmDelete = async (id: string) => {
+    const { error } = await supabase.from('projects').delete().eq('id', id);
+    if (!error) {
+      setProjects(prev => prev.filter(p => p.id !== id));
+    }
+    setDeleteConfirmId(null);
+  };
+
+  // --- DUPLICATE ---
+  const duplicateProject = async (project: Project) => {
+    if (!user) return;
+    setContextMenuId(null);
+
+    const { data: memberships } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', user.id)
+      .limit(1);
+
+    if (!memberships || memberships.length === 0) return;
+
+    const { data, error } = await supabase
+      .from('projects')
+      .insert([{
+        name: `${project.name} (Copia)`,
+        workspace_id: memberships[0].workspace_id,
+        bpm: project.bpm,
+        sample_rate: project.sample_rate,
+        data: (project as any).data || {}
+      }])
+      .select();
+
+    if (!error && data) {
+      setProjects(prev => [...data, ...prev]);
+    }
+  };
+
+  // --- IMPORT LOCAL .esp ---
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setImportingFile(true);
+    try {
+      const text = await file.text();
+      const projectData = JSON.parse(text);
+
+      const { data: memberships } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .limit(1);
+
+      if (!memberships || memberships.length === 0) throw new Error('No workspace');
+
+      const projectName = projectData.name || file.name.replace(/\.esp$/i, '') || 'Proyecto Importado';
+
+      const { data, error } = await supabase
+        .from('projects')
+        .insert([{
+          name: projectName,
+          workspace_id: memberships[0].workspace_id,
+          bpm: projectData.bpm || 124,
+          sample_rate: projectData.sampleRate || 44100,
+          data: projectData
+        }])
+        .select();
+
+      if (!error && data) {
+        setProjects(prev => [...data, ...prev]);
+      }
+    } catch (err) {
+      console.error('[Console] Import error:', err);
+      alert('Error al importar el archivo. Verifica que sea un archivo .esp válido.');
+    } finally {
+      setImportingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
@@ -152,6 +259,21 @@ export function Console() {
 
   const displayName = profile?.username || profile?.full_name || user?.email || 'Usuario';
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || null;
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHrs = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Ahora mismo';
+    if (diffMins < 60) return `Hace ${diffMins} min`;
+    if (diffHrs < 24) return `Hace ${diffHrs}h`;
+    if (diffDays < 7) return `Hace ${diffDays}d`;
+    return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
 
   if (loading) {
     return (
@@ -163,35 +285,66 @@ export function Console() {
 
   return (
     <div className="page-shell" ref={pageRef} style={{ paddingTop: '120px' }}>
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".esp,.json"
+        style={{ display: 'none' }}
+        onChange={handleImportFile}
+      />
+
+      {/* Delete confirmation overlay */}
+      {deleteConfirmId && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+          zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{
+            background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
+            padding: '32px', maxWidth: '420px', width: '90%', textAlign: 'center'
+          }}>
+            <Trash2 size={32} style={{ color: '#ef4444', margin: '0 auto 16px' }} />
+            <h3 style={{ fontFamily: 'Plus Jakarta Sans', fontSize: '1.2rem', marginBottom: '8px' }}>¿Eliminar este proyecto?</h3>
+            <p style={{ color: 'var(--text-2)', fontSize: '0.9rem', marginBottom: '24px' }}>
+              Esta acción es irreversible. Todos los datos del proyecto serán eliminados permanentemente.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                style={{
+                  padding: '10px 24px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
+                  borderRadius: '4px', color: 'var(--text)', cursor: 'pointer', fontFamily: 'JetBrains Mono',
+                  fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em'
+                }}
+              >Cancelar</button>
+              <button
+                onClick={() => confirmDelete(deleteConfirmId)}
+                style={{
+                  padding: '10px 24px', background: '#ef4444', border: 'none', borderRadius: '4px',
+                  color: '#fff', cursor: 'pointer', fontFamily: 'JetBrains Mono', fontSize: '12px',
+                  fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em'
+                }}
+              >Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="dashboard" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', width: '100%' }}>
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt={displayName}
-                style={{
-                  width: '64px',
-                  height: '64px',
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  border: '2px solid var(--border)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                }}
-              />
+              <img src={avatarUrl} alt={displayName} style={{
+                width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover',
+                border: '2px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+              }} />
             ) : (
               <div style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '50%',
-                background: 'rgba(255,255,255,0.05)',
-                border: '2px solid var(--border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--text-2)',
-                fontSize: '24px',
-                fontWeight: 'bold'
+                width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)',
+                border: '2px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-2)', fontSize: '24px', fontWeight: 'bold'
               }}>
                 {displayName.charAt(0).toUpperCase()}
               </div>
@@ -202,15 +355,9 @@ export function Console() {
                 Bienvenido, <strong>{displayName}</strong>
                 {profile?.tier && profile.tier !== 'free' && (
                   <span style={{
-                    marginLeft: '8px',
-                    padding: '2px 8px',
-                    background: 'rgba(168,85,247,0.15)',
-                    border: '1px solid rgba(168,85,247,0.3)',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontFamily: 'JetBrains Mono',
-                    color: 'var(--purple)',
-                    textTransform: 'uppercase',
+                    marginLeft: '8px', padding: '2px 8px', background: 'rgba(168,85,247,0.15)',
+                    border: '1px solid rgba(168,85,247,0.3)', borderRadius: '4px', fontSize: '11px',
+                    fontFamily: 'JetBrains Mono', color: 'var(--purple)', textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                   }}>
                     {profile.tier}
@@ -220,54 +367,41 @@ export function Console() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importingFile}
+              style={{
+                background: 'rgba(255,255,255,0.05)', color: 'var(--text-2)',
+                border: '1px solid var(--border)', padding: '12px 20px', borderRadius: '2px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold',
+                fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', fontSize: '12px',
+                letterSpacing: '0.05em', opacity: importingFile ? 0.5 : 1
+              }}
+            >
+              <Upload size={14} /> {importingFile ? 'Importando...' : 'Importar .esp'}
+            </button>
             <a
               href="https://play.hollowbits.com/engine"
               onClick={handleOpenDaw}
               style={{
-                background: 'rgba(255,255,255,0.05)',
-                color: 'var(--text)',
-                border: '1px solid var(--border)',
-                padding: '12px 24px',
-                borderRadius: '2px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontWeight: 'bold',
-                fontFamily: 'JetBrains Mono, monospace',
-                textTransform: 'uppercase',
-                fontSize: '13px',
-                letterSpacing: '0.05em',
-                textDecoration: 'none'
+                background: 'rgba(255,255,255,0.05)', color: 'var(--text)',
+                border: '1px solid var(--border)', padding: '12px 24px', borderRadius: '2px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold',
+                fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', fontSize: '13px',
+                letterSpacing: '0.05em', textDecoration: 'none'
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--purple)';
-                e.currentTarget.style.background = 'rgba(168,85,247,0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border)';
-                e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--purple)'; e.currentTarget.style.background = 'rgba(168,85,247,0.1)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
             >
               <Play size={16} /> Abrir Motor DAW
             </a>
             <button
               onClick={createProject}
               style={{
-                background: 'var(--text)',
-                color: 'var(--bg)',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '2px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontWeight: 'bold',
-                fontFamily: 'JetBrains Mono, monospace',
-                textTransform: 'uppercase',
-                fontSize: '13px',
-                letterSpacing: '0.05em'
+                background: 'var(--text)', color: 'var(--bg)', border: 'none', padding: '12px 24px',
+                borderRadius: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                fontWeight: 'bold', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase',
+                fontSize: '13px', letterSpacing: '0.05em'
               }}
             >
               <Plus size={18} /> Nuevo Proyecto
@@ -276,15 +410,9 @@ export function Console() {
               onClick={() => navigate('/settings')}
               title="Configuración de la cuenta"
               style={{
-                background: 'var(--glass)',
-                color: 'var(--text-2)',
-                border: '1px solid var(--border)',
-                padding: '12px',
-                borderRadius: '2px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                transition: 'all 0.2s ease',
+                background: 'var(--glass)', color: 'var(--text-2)', border: '1px solid var(--border)',
+                padding: '12px', borderRadius: '2px', cursor: 'pointer', display: 'flex',
+                alignItems: 'center', transition: 'all 0.2s ease',
               }}
             >
               <Settings size={18} />
@@ -292,51 +420,52 @@ export function Console() {
           </div>
         </div>
 
+        {/* Project Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '24px' }}>
           {projects.length === 0 ? (
             <div style={{
-              padding: '60px',
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '12px',
-              textAlign: 'center',
-              gridColumn: '1 / -1',
+              padding: '60px', background: 'var(--bg-surface)', border: '1px solid var(--border)',
+              borderRadius: '12px', textAlign: 'center', gridColumn: '1 / -1',
             }}>
+              <Cloud size={40} style={{ color: 'var(--text-3)', margin: '0 auto 16px', opacity: 0.4 }} />
               <p style={{ color: 'var(--text-2)', marginBottom: '16px' }}>No tienes proyectos activos.</p>
-              <button
-                onClick={createProject}
-                style={{
-                  background: 'transparent',
-                  color: 'var(--purple)',
-                  border: '1px solid var(--border)',
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontFamily: 'Inter, sans-serif',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <Plus size={16} /> Crear tu primer proyecto
-              </button>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button
+                  onClick={createProject}
+                  style={{
+                    background: 'transparent', color: 'var(--purple)', border: '1px solid var(--border)',
+                    padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                    display: 'inline-flex', alignItems: 'center', gap: '8px',
+                  }}
+                >
+                  <Plus size={16} /> Crear tu primer proyecto
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    background: 'transparent', color: 'var(--text-2)', border: '1px solid var(--border)',
+                    padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                    display: 'inline-flex', alignItems: 'center', gap: '8px',
+                  }}
+                >
+                  <Upload size={16} /> Importar archivo .esp
+                </button>
+              </div>
             </div>
           ) : (
             projects.map(p => (
               <div
                 key={p.id}
                 style={{
-                  background: 'rgba(10, 10, 10, 0.8)',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '2px',
-                  padding: '24px',
-                  transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  overflow: 'hidden'
+                  background: 'rgba(10, 10, 10, 0.8)', backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '2px',
+                  padding: '24px', transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+                  cursor: 'pointer', position: 'relative', overflow: 'hidden'
                 }}
-                onClick={(e) => handleOpenDaw(e, p.id)}
+                onClick={(e) => {
+                  if (renamingId === p.id || deleteConfirmId === p.id) return;
+                  handleOpenDaw(e, p.id);
+                }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(168,85,247,0.5)';
                   (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
@@ -348,23 +477,93 @@ export function Console() {
                   (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
                 }}
               >
+                {/* Top row: icon + name + context menu */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                   <div style={{ background: 'rgba(168,85,247,0.1)', padding: '12px', borderRadius: '8px', color: 'var(--purple)' }}>
                     <FolderOpen size={24} />
                   </div>
-                  <h3 style={{ fontFamily: 'Plus Jakarta Sans', fontSize: '1.2rem', margin: 0 }}>{p.name}</h3>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {renamingId === p.id ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} onClick={e => e.stopPropagation()}>
+                        <input
+                          autoFocus
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') confirmRename(); if (e.key === 'Escape') setRenamingId(null); }}
+                          style={{
+                            fontFamily: 'Plus Jakarta Sans', fontSize: '1.1rem', background: 'rgba(255,255,255,0.08)',
+                            border: '1px solid rgba(168,85,247,0.5)', borderRadius: '4px', padding: '4px 8px',
+                            color: 'var(--text)', outline: 'none', width: '100%'
+                          }}
+                        />
+                        <button onClick={confirmRename} style={{ background: 'none', border: 'none', color: '#22c55e', cursor: 'pointer', padding: '4px' }}>
+                          <Check size={16} />
+                        </button>
+                        <button onClick={() => setRenamingId(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}>
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <h3 style={{ fontFamily: 'Plus Jakarta Sans', fontSize: '1.2rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</h3>
+                    )}
+                  </div>
+
+                  {/* Context menu trigger */}
+                  <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setContextMenuId(contextMenuId === p.id ? null : p.id); }}
+                      style={{
+                        background: 'none', border: 'none', color: 'var(--text-3)', cursor: 'pointer',
+                        padding: '4px', borderRadius: '4px', transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'none'; }}
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+
+                    {contextMenuId === p.id && (
+                      <div style={{
+                        position: 'absolute', right: 0, top: '100%', marginTop: '4px', width: '180px',
+                        background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 100, overflow: 'hidden'
+                      }}>
+                        {[
+                          { icon: <Pencil size={13} />, label: 'Renombrar', action: () => startRename(p) },
+                          { icon: <Copy size={13} />, label: 'Duplicar', action: () => duplicateProject(p) },
+                          { icon: <Trash2 size={13} />, label: 'Eliminar', action: () => { setDeleteConfirmId(p.id); setContextMenuId(null); }, danger: true },
+                        ].map((item, i) => (
+                          <button
+                            key={i}
+                            onClick={item.action}
+                            style={{
+                              width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                              padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer',
+                              color: item.danger ? '#ef4444' : 'var(--text)', fontSize: '13px',
+                              fontFamily: 'Inter, sans-serif', textAlign: 'left', transition: 'background 0.1s'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                          >
+                            {item.icon} {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {/* Bottom row: metadata */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-3)', fontFamily: 'JetBrains Mono', margin: 0 }}>
-                    {new Date(p.created_at).toLocaleDateString()}
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Cloud size={11} style={{ color: 'rgba(168,85,247,0.6)' }} />
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-3)', fontFamily: 'JetBrains Mono', margin: 0 }}>
+                      {formatDate(p.updated_at)}
+                    </p>
+                  </div>
                   <span style={{
-                    fontSize: '11px',
-                    fontFamily: 'JetBrains Mono',
-                    color: 'var(--text-3)',
-                    background: 'rgba(255,255,255,0.05)',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
+                    fontSize: '11px', fontFamily: 'JetBrains Mono', color: 'var(--text-3)',
+                    background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px',
                   }}>
                     {p.bpm} BPM · {(p.sample_rate / 1000).toFixed(1)}kHz
                   </span>
