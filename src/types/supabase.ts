@@ -50,6 +50,8 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
+          stripe_customer_id: string | null
+          subscription_status: string | null
           tier: string | null
           updated_at: string
           username: string | null
@@ -59,6 +61,8 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id: string
+          stripe_customer_id?: string | null
+          subscription_status?: string | null
           tier?: string | null
           updated_at?: string
           username?: string | null
@@ -68,6 +72,8 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          stripe_customer_id?: string | null
+          subscription_status?: string | null
           tier?: string | null
           updated_at?: string
           username?: string | null
@@ -80,27 +86,27 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           id: string
+          invited_email: string | null
           project_id: string | null
           token: string
-          invited_email: string | null
         }
         Insert: {
           access_level: string
           created_at?: string | null
           created_by?: string | null
           id?: string
+          invited_email?: string | null
           project_id?: string | null
           token?: string
-          invited_email?: string | null
         }
         Update: {
           access_level?: string
           created_at?: string | null
           created_by?: string | null
           id?: string
+          invited_email?: string | null
           project_id?: string | null
           token?: string
-          invited_email?: string | null
         }
         Relationships: [
           {
@@ -116,6 +122,7 @@ export type Database = {
         Row: {
           bpm: number
           created_at: string
+          data: Json | null
           id: string
           is_public: boolean
           name: string
@@ -123,11 +130,11 @@ export type Database = {
           updated_at: string
           workspace_id: string
           yjs_room_id: string
-          data?: Json | null
         }
         Insert: {
           bpm?: number
           created_at?: string
+          data?: Json | null
           id?: string
           is_public?: boolean
           name: string
@@ -135,11 +142,11 @@ export type Database = {
           updated_at?: string
           workspace_id: string
           yjs_room_id?: string
-            data?: Json | null
         }
         Update: {
           bpm?: number
           created_at?: string
+          data?: Json | null
           id?: string
           is_public?: boolean
           name?: string
@@ -147,7 +154,6 @@ export type Database = {
           updated_at?: string
           workspace_id?: string
           yjs_room_id?: string
-            data?: Json | null
         }
         Relationships: [
           {
@@ -155,6 +161,74 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string | null
+          project_id: string | null
+          sender_id: string | null
+          status: string
+          team_id: string | null
+          type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          project_id?: string | null
+          sender_id?: string | null
+          status?: string
+          team_id?: string | null
+          type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          project_id?: string | null
+          sender_id?: string | null
+          status?: string
+          team_id?: string | null
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_notifications_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_notifications_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -197,6 +271,7 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          category: string | null
           created_at: string
           created_by: string
           id: string
@@ -205,6 +280,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           created_by: string
           id?: string
@@ -213,6 +289,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           created_by?: string
           id?: string
@@ -235,6 +312,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_project_with_limit: {
+        Args: {
+          p_bpm?: number
+          p_is_public?: boolean
+          p_name: string
+          p_sample_rate?: number
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       get_active_sessions: {
         Args: never
         Returns: {
@@ -254,7 +341,6 @@ export type Database = {
           project_id: string
           sample_rate: number
           yjs_room_id: string
-          data?: Json | null
         }[]
       }
       revoke_device_session: {
@@ -394,9 +480,36 @@ export const Constants = {
   },
 } as const
 
-export type Project = Tables<'projects'>;
-export type License = Tables<'licenses'>;
-export type ProjectShare = Tables<'project_shares'>;
-export type Profile = Tables<'profiles'>;
-export type Workspace = Tables<'workspaces'>;
-export type WorkspaceMember = Tables<'workspace_members'>;
+/* ── Convenience types derived from the generated schema ────────── */
+
+export type Profile = {
+  id: string;
+  username: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  updated_at: string | null;
+  tier: string | null;
+};
+
+export type Project = {
+  id: string;
+  name: string;
+  bpm: number;
+  sample_rate: number;
+  data: Json;
+  created_at: string;
+  updated_at: string;
+  is_public: boolean;
+  workspace_id: string;
+  yjs_room_id: string;
+};
+
+export type ProjectShare = {
+  id: string;
+  project_id: string | null;
+  access_level: string;
+  invited_email: string | null;
+  token: string;
+  created_at: string | null;
+  created_by: string | null;
+};

@@ -1,16 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { usePageMotion } from '../components/usePageMotion';
-import { Plus, FolderOpen, Settings, Play, MoreVertical, Trash2, Copy, Pencil, Upload, Cloud, CloudOff, X, Check } from 'lucide-react';
+import { Plus, FolderOpen, Settings, Play, MoreVertical, Trash2, Copy, Pencil, Upload, Cloud, CloudOff, X, Check, Users, UserPlus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 import type { Project } from '../types/supabase';
+import { NotificationsMenu } from '../components/NotificationsMenu';
+import { CreateTeamModal } from '../components/CreateTeamModal';
+import { InviteUserModal } from '../components/InviteUserModal';
 
 export function Console() {
   const pageRef = usePageMotion();
   const { user, profile, signOut } = useAuthStore();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [workspaces, setWorkspaces] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'personal' | 'shared' | 'teams'>('personal');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const isFetchingRef = useRef(false);
@@ -23,6 +28,9 @@ export function Console() {
   const [importingFile, setImportingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [showCreateTeam, setShowCreateTeam] = useState(false);
+  const [inviteContext, setInviteContext] = useState<{ type: 'team' | 'project', id: string, name: string } | null>(null);
+
   const fetchProjects = useCallback(async () => {
     if (!user) return;
     if (isFetchingRef.current) return;
@@ -33,14 +41,23 @@ export function Console() {
     try {
       const { data: memberships, error: memberErr } = await supabase
         .from('workspace_members')
-        .select('workspace_id')
+        .select('workspace_id, workspaces(created_by, category)')
         .eq('user_id', user.id);
 
       if (memberErr || !memberships || memberships.length === 0) {
         console.warn('[Console] No workspaces found or error:', memberErr?.message);
         setProjects([]);
+        setWorkspaces([]);
         return;
       }
+
+      const workspaceMap = new Map();
+      memberships.forEach((m: any) => {
+        if (m.workspaces) {
+          workspaceMap.set(m.workspace_id, m.workspaces);
+        }
+      });
+      setWorkspaces(Array.from(workspaceMap.entries()).map(([id, w]) => ({ id, ...w })));
 
       const workspaceIds = memberships.map(m => m.workspace_id);
 
@@ -140,14 +157,29 @@ export function Console() {
 
     const workspaceId = memberships[0].workspace_id;
 
-    const { data, error } = await supabase
-      .from('projects')
-      .insert([{ name: 'Nuevo Proyecto', workspace_id: workspaceId, data: {} }])
-      .select();
+    try {
+      const { data, error } = await supabase.rpc('create_project_with_limit', {
+        p_name: 'Nuevo Proyecto',
+        p_workspace_id: workspaceId,
+        p_bpm: 120,
+        p_sample_rate: 44100,
+        p_is_public: false
+      });
 
-    if (!error && data) {
-      setProjects([...data, ...projects]);
-      handleOpenDaw(undefined, data[0].id);
+      if (error) {
+        if (error.message.includes('limit reached')) {
+          alert('Has alcanzado el límite de proyectos para la capa gratuita. Por favor actualiza tu plan o elimina un proyecto.');
+        } else {
+          console.error('[Console] Error creating project:', error);
+        }
+        return;
+      }
+
+      if (data) {
+        handleOpenDaw(undefined, data as string);
+      }
+    } catch (err) {
+      console.error('[Console] Exception creating project:', err);
     }
   };
 
@@ -285,6 +317,22 @@ export function Console() {
 
   return (
     <div className="page-shell" ref={pageRef} style={{ paddingTop: '120px' }}>
+      {showCreateTeam && (
+        <CreateTeamModal 
+          onClose={() => setShowCreateTeam(false)} 
+          onSuccess={() => { setShowCreateTeam(false); fetchProjects(); }} 
+        />
+      )}
+
+      {inviteContext && (
+        <InviteUserModal 
+          onClose={() => setInviteContext(null)} 
+          teamId={inviteContext.type === 'team' ? inviteContext.id : undefined}
+          projectId={inviteContext.type === 'project' ? inviteContext.id : undefined}
+          contextName={inviteContext.name}
+        />
+      )}
+
       {/* Hidden file input for import */}
       <input
         ref={fileInputRef}
@@ -350,7 +398,7 @@ export function Console() {
               </div>
             )}
             <div>
-              <h1 style={{ fontFamily: 'Plus Jakarta Sans', fontSize: '2rem', marginBottom: '4px', lineHeight: 1 }}>Mis Proyectos</h1>
+              <h1 style={{ fontFamily: 'Plus Jakarta Sans', fontSize: '2rem', marginBottom: '4px', lineHeight: 1 }}>Motor de Creación</h1>
               <p style={{ color: 'var(--text-2)', margin: 0 }}>
                 Bienvenido, <strong>{displayName}</strong>
                 {profile?.tier && profile.tier !== 'free' && (
@@ -367,6 +415,7 @@ export function Console() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <NotificationsMenu />
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={importingFile}
@@ -406,6 +455,19 @@ export function Console() {
             >
               <Plus size={18} /> Nuevo Proyecto
             </button>
+            {activeTab === 'teams' && (
+              <button
+                onClick={() => setShowCreateTeam(true)}
+                style={{
+                  background: 'rgba(255,255,255,0.05)', color: 'var(--text)', border: '1px solid var(--purple)', padding: '12px 24px',
+                  borderRadius: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                  fontWeight: 'bold', fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase',
+                  fontSize: '13px', letterSpacing: '0.05em'
+                }}
+              >
+                <Cloud size={18} /> Crear Equipo
+              </button>
+            )}
             <button
               onClick={() => navigate('/settings')}
               title="Configuración de la cuenta"
@@ -420,40 +482,85 @@ export function Console() {
           </div>
         </div>
 
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '24px', borderBottom: '1px solid var(--border)', marginBottom: '32px' }}>
+          {[
+            { id: 'personal', label: 'Mis Proyectos', icon: <FolderOpen size={16} /> },
+            { id: 'shared', label: 'Colaborativos', icon: <Users size={16} /> },
+            { id: 'teams', label: 'Equipos', icon: <Cloud size={16} /> }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              style={{
+                background: 'none', border: 'none', color: activeTab === tab.id ? 'var(--text)' : 'var(--text-3)',
+                padding: '0 0 12px 0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                fontFamily: 'Plus Jakarta Sans', fontSize: '1rem', fontWeight: activeTab === tab.id ? '600' : '400',
+                borderBottom: activeTab === tab.id ? '2px solid var(--purple)' : '2px solid transparent',
+                transition: 'all 0.2s ease', position: 'relative', top: '1px'
+              }}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* Project Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '24px' }}>
-          {projects.length === 0 ? (
-            <div style={{
-              padding: '60px', background: 'var(--bg-surface)', border: '1px solid var(--border)',
-              borderRadius: '12px', textAlign: 'center', gridColumn: '1 / -1',
-            }}>
-              <Cloud size={40} style={{ color: 'var(--text-3)', margin: '0 auto 16px', opacity: 0.4 }} />
-              <p style={{ color: 'var(--text-2)', marginBottom: '16px' }}>No tienes proyectos activos.</p>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                <button
-                  onClick={createProject}
-                  style={{
-                    background: 'transparent', color: 'var(--purple)', border: '1px solid var(--border)',
-                    padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-                    display: 'inline-flex', alignItems: 'center', gap: '8px',
-                  }}
-                >
-                  <Plus size={16} /> Crear tu primer proyecto
-                </button>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    background: 'transparent', color: 'var(--text-2)', border: '1px solid var(--border)',
-                    padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-                    display: 'inline-flex', alignItems: 'center', gap: '8px',
-                  }}
-                >
-                  <Upload size={16} /> Importar archivo .esp
-                </button>
-              </div>
-            </div>
-          ) : (
-            projects.map(p => (
+          {(() => {
+            let filteredProjects = [];
+            if (activeTab === 'personal') {
+              const myWsIds = workspaces.filter(w => w.created_by === user?.id && (!w.category || w.category === 'General')).map(w => w.id);
+              filteredProjects = projects.filter(p => myWsIds.includes(p.workspace_id));
+            } else if (activeTab === 'shared') {
+              const sharedWsIds = workspaces.filter(w => w.created_by !== user?.id && (!w.category || w.category === 'General')).map(w => w.id);
+              filteredProjects = projects.filter(p => sharedWsIds.includes(p.workspace_id));
+            } else {
+              const teamWsIds = workspaces.filter(w => w.category && w.category !== 'General').map(w => w.id);
+              filteredProjects = projects.filter(p => teamWsIds.includes(p.workspace_id));
+            }
+
+            if (filteredProjects.length === 0) {
+              return (
+                <div style={{
+                  padding: '60px', background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                  borderRadius: '12px', textAlign: 'center', gridColumn: '1 / -1',
+                }}>
+                  <Cloud size={40} style={{ color: 'var(--text-3)', margin: '0 auto 16px', opacity: 0.4 }} />
+                  <p style={{ color: 'var(--text-2)', marginBottom: '16px' }}>No hay proyectos en esta sección.</p>
+                  {activeTab === 'personal' && (
+                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                      <button
+                        onClick={createProject}
+                        style={{
+                          background: 'transparent', color: 'var(--purple)', border: '1px solid var(--border)',
+                          padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                          display: 'inline-flex', alignItems: 'center', gap: '8px',
+                        }}
+                      >
+                        <Plus size={16} /> Crear tu primer proyecto
+                      </button>
+                    </div>
+                  )}
+                  {activeTab === 'teams' && (
+                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                      <button
+                        onClick={() => setShowCreateTeam(true)}
+                        style={{
+                          background: 'transparent', color: 'var(--purple)', border: '1px solid var(--border)',
+                          padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                          display: 'inline-flex', alignItems: 'center', gap: '8px',
+                        }}
+                      >
+                        <Cloud size={16} /> Crear tu primer equipo
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            return filteredProjects.map(p => (
               <div
                 key={p.id}
                 style={{
@@ -529,6 +636,7 @@ export function Console() {
                         boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 100, overflow: 'hidden'
                       }}>
                         {[
+                          { icon: <UserPlus size={13} />, label: 'Invitar', action: () => { setInviteContext({ type: 'project', id: p.id, name: p.name }); setContextMenuId(null); } },
                           { icon: <Pencil size={13} />, label: 'Renombrar', action: () => startRename(p) },
                           { icon: <Copy size={13} />, label: 'Duplicar', action: () => duplicateProject(p) },
                           { icon: <Trash2 size={13} />, label: 'Eliminar', action: () => { setDeleteConfirmId(p.id); setContextMenuId(null); }, danger: true },
@@ -569,8 +677,8 @@ export function Console() {
                   </span>
                 </div>
               </div>
-            ))
-          )}
+            ));
+          })()}
         </div>
       </section>
     </div>

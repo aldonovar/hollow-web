@@ -1239,9 +1239,10 @@ const App: React.FC = () => {
                             alert('Has entrado en modo EDITOR.');
                         }
 
-                        // Load data if present
-                        if (sharedSession.data) {
-                            const integrityReport = await hydrateProjectData(sharedSession.data as unknown as ProjectData, sharedSession.name, {
+                        // Load full project data from projects table
+                        const { data: projectRow } = await supabase.from('projects').select('data').eq('id', sharedSession.project_id).single();
+                        if (projectRow?.data) {
+                            const integrityReport = await hydrateProjectData(projectRow.data as unknown as ProjectData, sharedSession.name, {
                                 source: 'open-project',
                                 rememberReport: true
                             });
@@ -4038,16 +4039,31 @@ const App: React.FC = () => {
                         if (wsError || !memberships || memberships.length === 0) throw new Error("Workspace no encontrado");
                         
                         const workspaceId = memberships[0].workspace_id;
-                        const { data: newProject, error: createError } = await supabase.from('projects').insert([{
-                            name: projectName,
-                            workspace_id: workspaceId,
-                            data: integrityResult.project as any
-                        }]).select().single();
+                        const { data: newProjectId, error: createError } = await supabase.rpc('create_project_with_limit', {
+                            p_name: projectName,
+                            p_workspace_id: workspaceId,
+                            p_bpm: 120,
+                            p_sample_rate: 44100,
+                            p_is_public: false,
+                            p_data: integrityResult.project as any
+                        });
                         
-                        if (createError || !newProject) throw createError;
+                        if (createError) {
+                            if (createError.message.includes('limit reached')) {
+                                alert('Has alcanzado el límite de proyectos para la capa gratuita. Por favor actualiza tu plan o elimina un proyecto.');
+                            } else {
+                                throw createError;
+                            }
+                            // Don't fallback to local, just stop
+                            setLoadingProject(false);
+                            setLoadingMessage("");
+                            return;
+                        }
                         
-                        setCollabSessionId(newProject.id);
-                        window.history.pushState({}, '', `${window.location.pathname}?project=${newProject.id}`);
+                        if (!newProjectId) throw new Error("No se devolvió ID del proyecto");
+                        
+                        setCollabSessionId(newProjectId as string);
+                        window.history.pushState({}, '', `${window.location.pathname}?project=${newProjectId}`);
                     } catch (e) {
                         console.error('Error creating cloud project:', e);
                         alert("Error al crear el proyecto en la nube. Se descargará localmente como respaldo.");
