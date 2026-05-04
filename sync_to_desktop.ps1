@@ -18,6 +18,10 @@ Copy-Item ".\src\daw\services\storage\cloudStorageService.ts" -Destination $stor
 Copy-Item ".\src\daw\services\storage\audioResourceManager.ts" -Destination $storageDir -Force
 Copy-Item ".\src\daw\services\storage\flacWorker.ts" -Destination $storageDir -Force
 
+# Ajustar import de Supabase para el entorno Desktop
+$cloudServicePath = "$storageDir\cloudStorageService.ts"
+(Get-Content $cloudServicePath) -replace "\.\./\.\./\.\./lib/supabase", "../supabase" | Set-Content $cloudServicePath
+
 # Copiar archivos Audio (Dominio 6)
 Copy-Item ".\src\daw\services\audio\audioEngineCore.ts" -Destination $audioDir -Force
 Copy-Item ".\public\worklets\core-engine.worklet.js" -Destination $workletDir -Force
