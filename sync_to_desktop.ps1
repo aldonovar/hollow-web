@@ -11,6 +11,7 @@ New-Item -ItemType Directory -Force -Path $storageDir | Out-Null
 Copy-Item ".\src\daw\services\storage\localAudioCache.ts" -Destination $storageDir -Force
 Copy-Item ".\src\daw\services\storage\cloudStorageService.ts" -Destination $storageDir -Force
 Copy-Item ".\src\daw\services\storage\audioResourceManager.ts" -Destination $storageDir -Force
+Copy-Item ".\src\daw\services\storage\flacWorker.ts" -Destination $storageDir -Force
 
 Write-Host "Instalando localforage en el repositorio desktop..."
 Set-Location $desktopPath
