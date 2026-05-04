@@ -247,8 +247,10 @@ class PlatformService {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.esp';
+      let resolved = false;
 
       input.onchange = async (event: Event) => {
+        resolved = true;
         const target = event.target as HTMLInputElement;
         const file = target.files?.[0];
         if (!file) {
@@ -265,6 +267,19 @@ class PlatformService {
           resolve(null);
         }
       };
+
+      // Detect cancel: when the file dialog closes without selection,
+      // the window regains focus. We use a delayed focus check to resolve null.
+      const onFocusBack = () => {
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            resolve(null);
+          }
+        }, 300);
+        window.removeEventListener('focus', onFocusBack);
+      };
+      window.addEventListener('focus', onFocusBack);
 
       input.click();
     });

@@ -120,7 +120,7 @@ import {
 } from './services/takeLaneControlService';
 import { useUndoRedo } from './hooks/useUndoRedo';
 import {
-    FolderInput, Settings, Cpu, LayoutGrid, Search, Users, Layers, Sliders, Sparkles, AlertTriangle, Undo2, Redo2, PlayCircle, Folder, HardDrive, Save, Trash2, Piano, LogOut, UserCircle2, Share2, Cloud, CloudOff
+    FolderInput, Settings, Cpu, LayoutGrid, Search, Users, Layers, Sliders, Sparkles, AlertTriangle, Undo2, Redo2, PlayCircle, Folder, HardDrive, Save, Trash2, Piano, LogOut, UserCircle2, Share2, Cloud, CloudOff, X
 } from 'lucide-react';
 import { HardwareSettingsModal } from './components/HardwareSettingsModal';
 import { ShareProjectModal } from './components/ShareProjectModal';
@@ -372,6 +372,11 @@ const App: React.FC = () => {
     const [showFileMenu, setShowFileMenu] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [activeModal, setActiveModal] = useState<'settings' | 'help' | 'collab' | 'auth' | 'new-project-confirm' | 'recovery' | 'recording-recovery' | 'monitoring-routes' | 'share' | null>(null);
+    const [isRenamingProject, setIsRenamingProject] = useState(false);
+    const [renameValue, setRenameValue] = useState("");
+    const [showProjectBrowser, setShowProjectBrowser] = useState(false);
+    const [cloudProjects, setCloudProjects] = useState<Array<{ id: string; name: string; updated_at: string; data: any }>>([]);
+    const [loadingCloudProjects, setLoadingCloudProjects] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
     const [recoverySnapshot, setRecoverySnapshot] = useState<ProjectAutosaveSnapshot | null>(null);
     const [lastAutosaveAt, setLastAutosaveAt] = useState<number | null>(null);
@@ -3833,8 +3838,81 @@ const App: React.FC = () => {
 
     const handleNewProject = useCallback(() => { setActiveModal('new-project-confirm'); }, []);
 
-    // Updated Open Project Handler using PlatformService
-    const handleOpenProject = async () => {
+    // Rename project handler — updates local state and syncs to cloud if connected
+    const handleRenameProject = useCallback(async (newName: string) => {
+        const trimmed = newName.trim();
+        if (!trimmed || trimmed === projectName) {
+            setIsRenamingProject(false);
+            return;
+        }
+        setProjectName(trimmed);
+        setIsRenamingProject(false);
+        // Sync rename to cloud if we have a session
+        if (collabSessionId && user) {
+            try {
+                await supabase.from('projects').update({ name: trimmed }).eq('id', collabSessionId);
+            } catch (e) {
+                console.error('[Rename] Cloud sync failed:', e);
+            }
+        }
+    }, [collabSessionId, projectName, user]);
+
+    // Open project browser — fetches cloud projects and shows the side panel
+    const handleOpenProjectBrowser = useCallback(async () => {
+        setShowFileMenu(false);
+        setShowProjectBrowser(true);
+        if (!user) return;
+        setLoadingCloudProjects(true);
+        try {
+            const { data: memberships } = await supabase
+                .from('workspace_members')
+                .select('workspace_id')
+                .eq('user_id', user.id);
+            if (memberships && memberships.length > 0) {
+                const wsIds = memberships.map(m => m.workspace_id);
+                const { data: projects } = await supabase
+                    .from('projects')
+                    .select('id, name, updated_at, data')
+                    .in('workspace_id', wsIds)
+                    .order('updated_at', { ascending: false });
+                if (projects) setCloudProjects(projects);
+            }
+        } catch (e) {
+            console.error('[ProjectBrowser] Error:', e);
+        } finally {
+            setLoadingCloudProjects(false);
+        }
+    }, [user]);
+
+    // Load a specific cloud project from the browser panel
+    const handleLoadCloudProject = useCallback(async (project: { id: string; name: string; data: any }) => {
+        setShowProjectBrowser(false);
+        setLoadingProject(true);
+        setLoadingMessage('Cargando proyecto...');
+        try {
+            setProjectName(project.name);
+            setCollabSessionId(project.id);
+            if (project.data && Object.keys(project.data).length > 0) {
+                const integrityReport = await hydrateProjectData(project.data as unknown as ProjectData, project.name, {
+                    source: 'open-project',
+                    rememberReport: true
+                });
+                if (integrityReport.issueCount > 0) {
+                    console.warn('Project integrity repaired during open.', integrityReport);
+                }
+            }
+        } catch (e) {
+            console.error('[LoadCloudProject] Error:', e);
+            alert('Error al cargar el proyecto.');
+        } finally {
+            setLoadingProject(false);
+            setLoadingMessage('');
+        }
+    }, [hydrateProjectData]);
+
+    // Import from local disk (.esp file)
+    const handleImportFromDisk = async () => {
+        setShowFileMenu(false);
         try {
             setLoadingProject(true);
             setLoadingMessage("Leyendo proyecto...");
@@ -3842,6 +3920,7 @@ const App: React.FC = () => {
             const result = await platformService.openProjectFile();
             if (!result) {
                 setLoadingProject(false);
+                setLoadingMessage("");
                 return; // User cancelled
             }
 
@@ -3864,7 +3943,6 @@ const App: React.FC = () => {
         } finally {
             setLoadingProject(false);
             setLoadingMessage("");
-            setShowFileMenu(false);
             closeAllToolPanels();
         }
     };
@@ -5007,7 +5085,8 @@ const App: React.FC = () => {
                             <div className="absolute left-[52px] top-0 w-56 bg-[#1a1a1a] border border-[#444] shadow-[0_5px_15px_rgba(0,0,0,0.5)] z-[101] flex flex-col py-1 animate-in slide-in-from-left-2 duration-100">
                                 <div className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-white/5 mb-1">Archivo</div>
                                 <button onClick={handleNewProject} className="text-xs text-left px-4 py-2 text-gray-300 hover:bg-white/10 hover:text-white transition-colors flex justify-between group"><span>Nuevo Proyecto</span></button>
-                                <button onClick={() => { handleOpenProject(); setShowFileMenu(false); }} className="text-xs text-left px-4 py-2 text-gray-300 hover:bg-white/10 hover:text-white transition-colors flex justify-between group"><span>Abrir Proyecto...</span></button>
+                                <button onClick={handleOpenProjectBrowser} className="text-xs text-left px-4 py-2 text-gray-300 hover:bg-white/10 hover:text-white transition-colors flex justify-between group"><span>Mis Proyectos</span></button>
+                                <button onClick={handleImportFromDisk} className="text-xs text-left px-4 py-2 text-gray-300 hover:bg-white/10 hover:text-white transition-colors flex justify-between group"><span>Importar desde disco...</span></button>
                                 <button
                                     onClick={() => {
                                         setShowSettings(true);
@@ -5335,7 +5414,16 @@ const App: React.FC = () => {
             {!isScannerImmersive && (
                 <div className="h-8 bg-[#11131a]/96 border-t border-white/10 flex items-center justify-between px-4 select-none shrink-0 z-50 backdrop-blur-sm">
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 px-2.5 h-5 rounded-sm border border-white/10 bg-white/[0.03] text-gray-300">
+                        <div
+                            className="flex items-center gap-2 px-2.5 h-5 rounded-sm border border-white/10 bg-white/[0.03] text-gray-300 cursor-pointer hover:border-daw-violet/50 hover:bg-white/[0.06] transition-all group/name"
+                            onClick={() => {
+                                if (!isRenamingProject) {
+                                    setRenameValue(projectName);
+                                    setIsRenamingProject(true);
+                                }
+                            }}
+                            title="Clic para renombrar proyecto"
+                        >
                             {collabSessionId ? (
                                 <Cloud size={11} className="text-green-400" />
                             ) : user ? (
@@ -5343,7 +5431,24 @@ const App: React.FC = () => {
                             ) : (
                                 <HardDrive size={11} className="text-daw-violet" />
                             )}
-                            <span className="text-[9px] font-bold uppercase tracking-[0.14em]">{projectName}</span>
+                            {isRenamingProject ? (
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    value={renameValue}
+                                    onChange={(e) => setRenameValue(e.target.value)}
+                                    onBlur={() => handleRenameProject(renameValue)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleRenameProject(renameValue);
+                                        if (e.key === 'Escape') setIsRenamingProject(false);
+                                        e.stopPropagation();
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-[9px] font-bold uppercase tracking-[0.14em] bg-transparent border-none outline-none text-white w-[120px] selection:bg-daw-violet/40"
+                                />
+                            ) : (
+                                <span className="text-[9px] font-bold uppercase tracking-[0.14em] group-hover/name:text-white transition-colors">{projectName}</span>
+                            )}
                             {collabSessionId && (
                                 <span className="text-[8px] text-green-400/60 font-mono">NUBE</span>
                             )}
@@ -5434,6 +5539,92 @@ const App: React.FC = () => {
                 <React.Suspense fallback={null}>
                     <ExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} tracks={tracks} totalBars={200} bpm={transport.bpm} />
                 </React.Suspense>
+            )}
+
+            {/* ====== PROJECT BROWSER SIDE PANEL ====== */}
+            {showProjectBrowser && (
+                <div className="fixed inset-0 z-[200] flex">
+                    {/* Backdrop */}
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => setShowProjectBrowser(false)} />
+                    {/* Panel */}
+                    <div className="relative w-[380px] max-w-[90vw] h-full bg-[#141619] border-r border-white/10 shadow-2xl flex flex-col animate-in slide-in-from-left duration-200">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+                            <div>
+                                <h2 className="text-sm font-bold text-white tracking-wide">Mis Proyectos</h2>
+                                <p className="text-[10px] text-gray-500 mt-0.5">Selecciona un proyecto para abrirlo</p>
+                            </div>
+                            <button
+                                onClick={() => setShowProjectBrowser(false)}
+                                className="w-7 h-7 flex items-center justify-center rounded-sm text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        {/* Project List */}
+                        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+                            {!user && (
+                                <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                                    <CloudOff size={32} className="text-gray-600 mb-3" />
+                                    <p className="text-xs text-gray-400">Inicia sesión para acceder a tus proyectos en la nube.</p>
+                                </div>
+                            )}
+                            {user && loadingCloudProjects && (
+                                <div className="flex flex-col items-center justify-center h-40">
+                                    <div className="w-5 h-5 border-2 border-daw-violet/30 border-t-daw-violet rounded-full animate-spin" />
+                                    <p className="text-[10px] text-gray-500 mt-3 font-mono">Cargando proyectos...</p>
+                                </div>
+                            )}
+                            {user && !loadingCloudProjects && cloudProjects.length === 0 && (
+                                <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                                    <Folder size={32} className="text-gray-600 mb-3" />
+                                    <p className="text-xs text-gray-400">No tienes proyectos guardados aún.</p>
+                                    <p className="text-[10px] text-gray-600 mt-1">Guarda tu primer proyecto con Ctrl+S</p>
+                                </div>
+                            )}
+                            {user && !loadingCloudProjects && cloudProjects.map((proj) => (
+                                <button
+                                    key={proj.id}
+                                    onClick={() => handleLoadCloudProject(proj)}
+                                    className={`w-full text-left px-4 py-3 rounded-md border transition-all duration-150 group ${
+                                        proj.id === collabSessionId
+                                            ? 'border-daw-violet/50 bg-daw-violet/10 text-white'
+                                            : 'border-transparent hover:border-white/10 hover:bg-white/[0.04] text-gray-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-sm flex items-center justify-center shrink-0 ${
+                                            proj.id === collabSessionId ? 'bg-daw-violet/20' : 'bg-white/5 group-hover:bg-white/10'
+                                        } transition-colors`}>
+                                            <Folder size={14} className={proj.id === collabSessionId ? 'text-daw-violet' : 'text-gray-500 group-hover:text-gray-300'} />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="text-xs font-semibold truncate">{proj.name}</div>
+                                            <div className="text-[10px] text-gray-500 mt-0.5 font-mono">
+                                                {new Date(proj.updated_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            </div>
+                                        </div>
+                                        {proj.id === collabSessionId && (
+                                            <span className="text-[8px] font-bold text-daw-violet uppercase tracking-wider shrink-0">Actual</span>
+                                        )}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-4 py-3 border-t border-white/10 flex flex-col gap-2">
+                            <button
+                                onClick={() => { setShowProjectBrowser(false); handleImportFromDisk(); }}
+                                className="w-full text-xs text-left px-3 py-2 text-gray-400 hover:text-white hover:bg-white/[0.05] rounded-sm transition-colors flex items-center gap-2"
+                            >
+                                <HardDrive size={12} />
+                                <span>Importar desde disco (.esp)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
             <Modal isOpen={activeModal === 'recovery'} onClose={handleDiscardRecoverySnapshot} title="RecuperaciÃ³n automÃ¡tica">
                 <div className="flex flex-col gap-4">
