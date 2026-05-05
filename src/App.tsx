@@ -17,6 +17,7 @@ import { Settings } from './pages/Settings';
 import { MfaChallenge } from './pages/MfaChallenge';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
+import { DesktopAuthBridge } from './pages/DesktopAuthBridge';
 import { useAuthStore } from './stores/authStore';
 
 const DawApp = lazy(() => import('./daw/App'));
@@ -98,6 +99,7 @@ function App() {
           <>
             {/* Si entran a la raíz de play.hollowbits.com, van directo a la consola */}
             <Route path="/" element={<Navigate to="/console" replace />} />
+            <Route path="/desktop-auth" element={<DesktopAuthBridge />} />
             <Route path="/login" element={<GuestRoute><Auth type="login" /></GuestRoute>} />
             <Route path="/signup" element={<GuestRoute><Auth type="signup" /></GuestRoute>} />
             
@@ -140,6 +142,7 @@ function App() {
               <Route path="contact" element={<Contact />} />
               <Route path="privacy" element={<Privacy />} />
               <Route path="terms" element={<Terms />} />
+              <Route path="desktop-auth" element={<DesktopAuthBridge />} />
               <Route path="login" element={<GuestRoute><Auth type="login" /></GuestRoute>} />
               <Route path="signup" element={<GuestRoute><Auth type="signup" /></GuestRoute>} />
               
