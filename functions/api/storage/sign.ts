@@ -28,11 +28,16 @@ interface SignRequest {
   contentType: string;
 }
 
+function isSafeObjectPath(path: string): boolean {
+  return !path.startsWith("/") && !path.includes("..") && !path.includes("//");
+}
+
 // ── Allowed buckets (whitelist) ────────────────────────────
 const ALLOWED_BUCKETS = new Set([
   "project-audio",
   "project-stems",
   "project-exports",
+  "asset-library",
   "user-avatars",
 ]);
 
@@ -41,6 +46,7 @@ const BUCKET_SIZE_LIMITS: Record<string, number> = {
   "project-audio": 100 * 1024 * 1024,   // 100 MB
   "project-stems": 200 * 1024 * 1024,    // 200 MB
   "project-exports": 500 * 1024 * 1024,  // 500 MB
+  "asset-library": 250 * 1024 * 1024,     // 250 MB
   "user-avatars": 5 * 1024 * 1024,       // 5 MB
 };
 
@@ -114,7 +120,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 
   // 4. Ensure the path is scoped to the authenticated user
-  if (!path.startsWith(`${user.id}/`)) {
+  if (!isSafeObjectPath(path) || !path.startsWith(`${user.id}/`)) {
     return new Response(
       JSON.stringify({ error: "Path must be scoped to your user ID" }),
       { status: 403, headers: { "Content-Type": "application/json" } }

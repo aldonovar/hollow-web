@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 import { usePageMotion } from '../components/usePageMotion';
+import { formatCountLimit, formatStorageLimit, getTierLimits, resolveTier } from '@hollowbits/core';
 import './Settings.css';
 
 type FeedbackStatus = 'idle' | 'saving' | 'success' | 'error';
@@ -518,47 +519,118 @@ export function Settings() {
           </div>
         </section>
 
-        {/* ─── LICENSE SECTION ─── */}
+        {/* ─── SUBSCRIPTION & BILLING SECTION ─── */}
         <section className="settings__section">
           <div className="settings__section-label">
             <CreditCard size={14} />
-            <span>Licencia y Suscripción</span>
+            <span>Suscripción y Facturación</span>
           </div>
 
           <div className="settings__card">
-            <h3 className="settings__card-title">Plan Actual</h3>
-            <p className="settings__card-desc">Administra tu nivel de acceso a Hollow Bits.</p>
+            <h3 className="settings__card-title">Tu Plan</h3>
+            <p className="settings__card-desc">Administra tu suscripción, límites y facturación.</p>
             
             {loadingExtra ? (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: 'var(--text-2)' }}>
-                <Loader2 size={16} className="settings__spinner" /> Cargando licencia...
+                <Loader2 size={16} className="settings__spinner" /> Cargando...
               </div>
-            ) : license ? (
-              <div className="settings__license-box" style={{ background: 'rgba(0,0,0,0.4)', padding: '20px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '18px', fontWeight: 600, color: '#fff', textTransform: 'capitalize' }}>
-                      {license.tier === 'free' ? 'Plan Básico' : `Plan ${license.tier}`}
-                    </span>
-                    <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', background: license.status === 'active' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: license.status === 'active' ? '#22c55e' : '#ef4444', padding: '4px 8px', borderRadius: '4px' }}>
-                      {license.status}
-                    </span>
+            ) : (() => {
+              const tierRaw = resolveTier(license?.tier || profile?.tier || 'free');
+              const tierName = tierRaw === 'studio' ? 'Studio' : tierRaw === 'pro' ? 'Pro' : 'Free';
+              const tierColor = tierRaw === 'studio' ? '#f59e0b' : tierRaw === 'pro' ? '#a855f7' : '#6b7280';
+              const tierBgColor = tierRaw === 'studio' ? 'rgba(245,158,11,0.1)' : tierRaw === 'pro' ? 'rgba(168,85,247,0.1)' : 'rgba(107,114,128,0.1)';
+              const isActive = license?.status === 'active';
+              const isCancelling = license?.cancel_at_period_end === true;
+              const periodEnd = license?.current_period_end ? new Date(license.current_period_end) : null;
+
+              const tierLimits = getTierLimits(tierRaw);
+              const currentLimits = {
+                storage: formatStorageLimit(tierLimits.storageBytes),
+                collab: tierLimits.maxCollaborators,
+                ai: formatCountLimit(tierLimits.aiRequestsPerMonth, '/mes'),
+                samples: tierLimits.sampleDownloadsPerMonth === 0
+                  ? '-'
+                  : formatCountLimit(tierLimits.sampleDownloadsPerMonth, '/mes'),
+              };
+
+              return (
+                <>
+                  {/* Plan badge + status */}
+                  <div style={{ background: 'rgba(0,0,0,0.4)', padding: '24px', borderRadius: '8px', border: `1px solid ${tierColor}22`, marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                          <span style={{
+                            fontSize: '22px', fontWeight: 700, color: tierColor,
+                            letterSpacing: '0.03em', textTransform: 'uppercase',
+                          }}>
+                            {tierName}
+                          </span>
+                          <span style={{
+                            fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em',
+                            background: isActive ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                            color: isActive ? '#22c55e' : '#ef4444',
+                            padding: '4px 10px', borderRadius: '4px', fontWeight: 600,
+                          }}>
+                            {isCancelling ? 'Cancela al final del período' : (isActive ? 'Activo' : (license?.status || 'Sin licencia'))}
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-2)' }}>
+                          {tierRaw === 'free'
+                            ? 'Acceso completo al motor de audio, instrumentos básicos y collab limitada.'
+                            : periodEnd
+                              ? `Próxima renovación: ${periodEnd.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}.`
+                              : 'Suscripción activa.'
+                          }
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                        {tierRaw !== 'studio' && (
+                          <button
+                            className="settings__save-btn"
+                            onClick={() => navigate('/pricing')}
+                            style={{ width: 'auto', fontSize: '13px', padding: '10px 20px' }}
+                          >
+                            {tierRaw === 'free' ? '⚡ Mejorar a Pro' : '⚡ Mejorar a Studio'}
+                          </button>
+                        )}
+                        {tierRaw !== 'free' && (
+                          <button
+                            className="settings__save-btn settings__save-btn--secondary"
+                            onClick={() => {
+                            // TODO: Connect to Mercado Pago / Niubiz Portal when secrets are configured
+                              window.alert('Portal de facturación (Mercado Pago) próximamente. Contacta soporte para gestionar tu suscripción.');
+                            }}
+                            style={{ width: 'auto', fontSize: '13px', padding: '10px 20px' }}
+                          >
+                            Gestionar Facturación
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-2)' }}>
-                    {license.tier === 'free' 
-                      ? 'Acceso a funcionalidades esenciales del DAW.' 
-                      : `Suscripción válida hasta ${license.current_period_end ? new Date(license.current_period_end).toLocaleDateString() : 'N/A'}.`}
-                  </p>
-                </div>
-                {license.tier === 'free' && (
-                  <button className="settings__save-btn" onClick={() => navigate('/pricing')} style={{ width: 'auto' }}>
-                    Mejorar Plan
-                  </button>
-                )}
-              </div>
-            ) : (
-              <p style={{ color: 'var(--text-2)', fontSize: '13px' }}>No se encontró información de licencia.</p>
-            )}
+
+                  {/* Quotas grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                    {[
+                      { label: 'Almacenamiento', value: currentLimits.storage, icon: '💾' },
+                      { label: 'Colaboradores RT', value: `${currentLimits.collab} usuarios`, icon: '👥' },
+                      { label: 'Requests IA', value: currentLimits.ai, icon: '🤖' },
+                      { label: 'Samples/mes', value: currentLimits.samples, icon: '🎵' },
+                    ].map(q => (
+                      <div key={q.label} style={{
+                        background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '6px',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                      }}>
+                        <div style={{ fontSize: '20px', marginBottom: '4px' }}>{q.icon}</div>
+                        <div style={{ fontSize: '15px', fontWeight: 600, color: '#fff' }}>{q.value}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-2)', marginTop: '2px' }}>{q.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </section>
 

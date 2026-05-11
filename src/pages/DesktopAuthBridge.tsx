@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ArrowRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
+import { logService } from '../daw/services/logService';
 import './Auth.css';
 
 type BridgeStatus = 'checking' | 'ready' | 'redirecting' | 'error';
@@ -58,6 +59,7 @@ export function DesktopAuthBridge() {
 
     const { data, error } = await supabase.auth.getSession();
     if (error) {
+      logService.error('Failed to get session during handoff', 'DesktopAuthBridge', error);
       setStatus('error');
       setErrorMessage(error.message);
       return;
@@ -65,11 +67,13 @@ export function DesktopAuthBridge() {
 
     const activeSession = data.session || session;
     if (!activeSession?.access_token || !activeSession.refresh_token) {
+      logService.info('No active session found, waiting for user login', 'DesktopAuthBridge');
       setStatus('ready');
       return;
     }
 
     const nextHandoffUrl = createHandoffUrl(activeSession.access_token, activeSession.refresh_token);
+    logService.info('Session found, redirecting to desktop app', 'DesktopAuthBridge', { returnTo });
     setHandoffUrl(nextHandoffUrl);
     setStatus('redirecting');
     window.location.assign(nextHandoffUrl);
@@ -84,6 +88,7 @@ export function DesktopAuthBridge() {
   const handleGoogleLogin = async () => {
     setStatus('checking');
     setErrorMessage(null);
+    logService.info('Initiating Google OAuth for desktop bridge', 'DesktopAuthBridge');
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -93,6 +98,7 @@ export function DesktopAuthBridge() {
     });
 
     if (error) {
+      logService.error('Google OAuth failed for desktop bridge', 'DesktopAuthBridge', error);
       setStatus('error');
       setErrorMessage(error.message);
     }

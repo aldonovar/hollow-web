@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRight, AlertCircle, ArrowLeft } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../../stores/authStore';
+import { platformService } from '../services/platformService';
 
 interface MiniAuthPanelProps {
   onSuccess: () => void;
@@ -73,6 +74,20 @@ export const MiniAuthPanel: React.FC<MiniAuthPanelProps> = ({ onSuccess, onBack 
           type="button"
           onClick={async () => {
             setLoading(true);
+            setError(null);
+
+            if (platformService.isDesktop) {
+              const result = await platformService.openDesktopAuth({
+                mode: 'login',
+                prompt: 'select_account',
+              });
+              if (!result.success) {
+                setError(result.error || 'No se pudo abrir el puente de autenticación.');
+                setLoading(false);
+              }
+              return;
+            }
+
             const { error: oauthError } = await supabase.auth.signInWithOAuth({
               provider: 'google',
               options: {
@@ -145,3 +160,4 @@ export const MiniAuthPanel: React.FC<MiniAuthPanelProps> = ({ onSuccess, onBack 
     </div>
   );
 };
+

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test:contract": "node scripts/verify-ecosystem-contract.mjs",
     "preview:edge": "npm run build && wrangler pages dev dist",
     "preview:vite": "vite preview"
   },

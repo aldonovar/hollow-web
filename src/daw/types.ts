@@ -141,6 +141,9 @@ export interface Device {
   id: string;
   name: string;
   type: 'instrument' | 'effect' | 'eq' | 'vst-loader';
+  latencyMs?: number;
+  /** Track ID whose post-fader signal feeds this device's sidechain input (key input). */
+  sidechainSourceTrackId?: string;
   params: {
     name: string;
     value: number;
@@ -318,6 +321,10 @@ export interface Track {
   vcaGroupId?: string;
   soloSafe?: boolean;
   automationMode?: AutomationMode;
+  /** When true, this track plays back a pre-rendered frozen buffer instead of processing live effects. */
+  isFrozen?: boolean;
+  /** The IndexedDB sourceId of the frozen AudioBuffer. */
+  frozenBufferSourceId?: string;
   clips: Clip[];
   sessionClips: ClipSlot[];
   devices: Device[];
@@ -523,6 +530,8 @@ export interface ProjectData {
   transport: TransportState;
   audioSettings: AudioSettings;
   scoreWorkspaces?: ScoreWorkspaceState[];
+  assetRefs?: unknown[];
+  workspaceId?: string;
   createdAt: number;
   lastModified: number;
 }
@@ -567,12 +576,37 @@ export interface DesktopWindowState {
   isFullScreen: boolean;
 }
 
+export interface DesktopOpenEditorRequest {
+  projectId?: string;
+  shareToken?: string;
+  localPath?: string;
+}
+
+export interface DesktopAuthRequest {
+  mode?: 'login' | 'signup';
+  prompt?: 'select_account' | 'none';
+}
+
+export interface DesktopAuthLaunchResult {
+  success: boolean;
+  url?: string;
+  state?: string;
+  error?: string;
+}
+
 export interface DesktopHostAPI {
   minimize: () => void;
   maximize: () => void;
   close: () => void;
   getWindowState?: () => Promise<DesktopWindowState>;
   onWindowStateChange?: (callback: (state: DesktopWindowState) => void) => (() => void);
+  openEditor?: (request?: DesktopOpenEditorRequest) => Promise<{ success: boolean; error?: string }>;
+  showHub?: () => Promise<{ success: boolean; error?: string }>;
+  openDesktopAuth?: (request?: DesktopAuthRequest) => Promise<DesktopAuthLaunchResult>;
+  openExternalUrl?: (url: string) => Promise<{ success: boolean; error?: string }>;
+  getPendingAuthCallback?: () => Promise<string | null>;
+  onAuthCallback?: (callback: (url: string) => void) => (() => void);
+  onHubRefresh?: (callback: () => void) => (() => void);
   selectFiles: () => Promise<FileData[]>;
   readFileFromPath?: (filePath: string) => Promise<FileData | null>;
   selectDirectory?: () => Promise<string | null>;

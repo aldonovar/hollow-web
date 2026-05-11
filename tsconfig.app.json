@@ -18,6 +18,10 @@
 
     /* Linting */
     "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@hollowbits/core": ["src/hollowbits-core/index.ts"]
+    },
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "erasableSyntaxOnly": false,

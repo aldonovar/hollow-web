@@ -588,6 +588,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, tracks, bpm 
                                     <div className="grid grid-cols-3 gap-2 mt-3">
                                         {BIT_DEPTH_OPTIONS.map((depth) => {
                                             const active = bitDepth === depth;
+                                            const label = depth === '32' ? '32-bit float' : `${depth}-bit`;
                                             return (
                                                 <button
                                                     key={depth}
@@ -598,7 +599,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, tracks, bpm 
                                                         : 'border-white/10 bg-[#121418] text-gray-400 hover:text-white hover:border-white/25'
                                                         }`}
                                                 >
-                                                    {depth}-bit
+                                                    {label}
                                                 </button>
                                             );
                                         })}
@@ -799,7 +800,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, tracks, bpm 
                                 <span className="text-gray-600">/</span>{' '}
                                 <span className="font-mono text-white">{sampleRate}Hz</span>{' '}
                                 <span className="text-gray-600">/</span>{' '}
-                                <span className="font-mono text-white">{bitDepth}bit</span>
+                                <span className="font-mono text-white">{bitDepth === '32' ? '32bit IEEE' : `${bitDepth}bit`}</span>
                             </div>
 
                             <div className="flex items-center gap-3">

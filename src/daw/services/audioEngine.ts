@@ -55,6 +55,8 @@ interface TrackMeterState {
 interface DeviceRuntime {
     input: AudioNode;
     output: AudioNode;
+    /** Optional second input node for sidechain-capable effects (e.g. compressor key input). */
+    sidechainInput?: GainNode;
     paramSetters: Map<string, (value: number, immediate?: boolean) => void>;
     cleanup?: () => void;
 }
@@ -71,6 +73,11 @@ interface TrackNodeGraph {
     sendLevels: Map<string, number>;
     outputTargetGroupId: string | null;
     deviceRuntimes: Map<string, DeviceRuntime>;
+    pdcDelay: DelayNode;
+    /** Post-fader tap that other tracks can use as a sidechain source. */
+    sidechainTap: GainNode;
+    /** Pre-rendered buffer for frozen tracks — replaces live effect processing. */
+    frozenBuffer: AudioBuffer | null;
 }
 
 interface TrackMixParamState {
@@ -288,6 +295,9 @@ class AudioEngine {
     schedulerClockSink: GainNode | null = null;
     schedulerMode: EngineSchedulerMode = 'worklet-clock';
     schedulerWorkletAvailable: boolean = false;
+    sidechainWorkletAvailable: boolean = false;
+    /** Pre-rendered frozen track buffers keyed by trackId. */
+    frozenBuffers: Map<string, AudioBuffer> = new Map();
     schedulerLoopRunning: boolean = false;
     schedulerLastTickAtMs: number = 0;
     schedulerExpectedNextTickAtMs: number = 0;
@@ -1462,13 +1472,88 @@ class AudioEngine {
         };
     }
 
+    /**
+     * Creates a sidechain-capable compressor using the AudioWorklet processor.
+     * Returns a DeviceRuntime with a sidechainInput GainNode for the key signal.
+     */
+    private createSidechainCompressorRuntime(): DeviceRuntime {
+        if (!this.ctx || !this.sidechainWorkletAvailable) {
+            // Fallback: if worklet isn't loaded, return a passthrough
+            return this.createPassThroughRuntime();
+        }
+
+        const workletNode = new AudioWorkletNode(this.ctx, 'sidechain-compressor-processor', {
+            numberOfInputs: 2,
+            numberOfOutputs: 1,
+            outputChannelCount: [2]
+        });
+
+        // The main signal enters through a gain node that feeds input 0
+        const mainInput = this.ctx.createGain();
+        mainInput.gain.value = 1;
+        mainInput.connect(workletNode, 0, 0);
+
+        // The sidechain key signal enters through a separate gain node that feeds input 1
+        const sidechainInput = this.ctx.createGain();
+        sidechainInput.gain.value = 1;
+        sidechainInput.connect(workletNode, 0, 1);
+
+        // Output
+        const output = this.ctx.createGain();
+        output.gain.value = 1;
+        workletNode.connect(output);
+
+        const paramSetters = new Map<string, (value: number, immediate?: boolean) => void>();
+
+        // Map device params to AudioWorklet params
+        const mapParam = (name: string, paramName: string, transform?: (v: number) => number) => {
+            paramSetters.set(name, (value: number, immediate?: boolean) => {
+                const param = workletNode.parameters.get(paramName);
+                if (!param) return;
+                const v = transform ? transform(value) : value;
+                if (immediate) {
+                    param.setValueAtTime(v, this.ctx?.currentTime ?? 0);
+                } else {
+                    param.setTargetAtTime(v, this.ctx?.currentTime ?? 0, 0.02);
+                }
+            });
+        };
+
+        mapParam('threshold', 'threshold');
+        mapParam('ratio', 'ratio');
+        mapParam('attack', 'attack', (v) => Math.max(0.0001, v / 1000));  // ms → seconds
+        mapParam('release', 'release', (v) => Math.max(0.005, v / 1000)); // ms → seconds
+        mapParam('makeupgain', 'makeupGain');
+        mapParam('makeup', 'makeupGain');
+        mapParam('mix', 'mix', (v) => v > 1 ? v / 100 : v);
+
+        return {
+            input: mainInput,
+            output,
+            sidechainInput,
+            paramSetters,
+            cleanup: () => {
+                try { mainInput.disconnect(); } catch {}
+                try { sidechainInput.disconnect(); } catch {}
+                try { workletNode.disconnect(); } catch {}
+                try { output.disconnect(); } catch {}
+            }
+        };
+    }
+
     private createDeviceRuntime(device: Device): DeviceRuntime {
         const normalizedType = device.type.toLowerCase();
         const normalizedName = this.normalizeParamName(device.name);
 
         let runtime: DeviceRuntime;
 
-        if (device.type === 'eq') {
+        // Detect sidechain compressor: a device named compressor/sidechain with a sidechainSourceTrackId
+        const isSidechainCompressor = device.sidechainSourceTrackId &&
+            (normalizedName.includes('compressor') || normalizedName.includes('sidechain'));
+
+        if (isSidechainCompressor) {
+            runtime = this.createSidechainCompressorRuntime();
+        } else if (device.type === 'eq') {
             runtime = this.createEqRuntime();
         } else if (normalizedName.includes('delay')) {
             runtime = this.createDelayRuntime();
@@ -1517,6 +1602,9 @@ class AudioEngine {
                     // already disconnected
                 }
             }
+            if (runtime.sidechainInput) {
+                try { runtime.sidechainInput.disconnect(); } catch {}
+            }
             runtime.cleanup?.();
         });
         trackGraph.deviceRuntimes.clear();
@@ -1529,9 +1617,23 @@ class AudioEngine {
             chainHead.connect(runtime.input);
             chainHead = runtime.output;
             trackGraph.deviceRuntimes.set(device.id, runtime);
+
+            // Wire sidechain input from the source track's sidechainTap
+            if (runtime.sidechainInput && device.sidechainSourceTrackId) {
+                const sourceGraph = this.trackNodes.get(device.sidechainSourceTrackId);
+                if (sourceGraph) {
+                    try {
+                        sourceGraph.sidechainTap.connect(runtime.sidechainInput);
+                    } catch (e) {
+                        console.warn(`[AudioEngine] Failed to wire sidechain from ${device.sidechainSourceTrackId} to device ${device.id}`, e);
+                    }
+                }
+            }
         });
 
-        chainHead.connect(trackGraph.preSendTap);
+        try { trackGraph.pdcDelay.disconnect(); } catch {}
+        chainHead.connect(trackGraph.pdcDelay);
+        trackGraph.pdcDelay.connect(trackGraph.preSendTap);
     }
 
     getSettings(): AudioSettings {
@@ -2125,6 +2227,15 @@ class AudioEngine {
                 console.error("Failed to load Granular Processor", e);
             }
 
+            try {
+                await this.ctx.audioWorklet.addModule('./worklets/sidechain-compressor-processor.js');
+                this.sidechainWorkletAvailable = true;
+                console.log("Sidechain Compressor Processor Loaded");
+            } catch (e) {
+                this.sidechainWorkletAvailable = false;
+                console.warn("Failed to load Sidechain Compressor Processor", e);
+            }
+
             this.schedulerWorkletAvailable = false;
             this.schedulerClockNode = null;
             this.schedulerClockSink = null;
@@ -2550,6 +2661,15 @@ class AudioEngine {
                 panner.connect(analyser);
                 this.analysers.set(track.id, analyser);
 
+                const pdcDelay = this.ctx!.createDelay(5.0);
+                pdcDelay.delayTime.value = 0;
+
+                // Post-fader sidechain tap — unity gain split off panner for
+                // other tracks' devices to use as a sidechain key input.
+                const sidechainTap = this.ctx!.createGain();
+                sidechainTap.gain.value = 1;
+                panner.connect(sidechainTap);
+
                 nodes = {
                     input,
                     preSendTap,
@@ -2561,7 +2681,10 @@ class AudioEngine {
                     sendModes: new Map(),
                     sendLevels: new Map(),
                     outputTargetGroupId: null,
-                    deviceRuntimes: new Map()
+                    deviceRuntimes: new Map(),
+                    pdcDelay,
+                    sidechainTap,
+                    frozenBuffer: null
                 };
                 this.trackNodes.set(track.id, nodes);
                 graphStats.createdTrackCount += 1;
@@ -2754,9 +2877,39 @@ class AudioEngine {
         });
 
         this.lastGraphUpdateStats = graphStats;
+        this.applyPluginDelayCompensation(safeTracks);
 
         this.syncCueRouting();
         this.syncMonitoringSessions(safeTracks);
+    }
+
+    private applyPluginDelayCompensation(tracks: Track[]) {
+        if (!this.ctx) return;
+        
+        let maxLatencyMs = 0;
+        const trackLatencies = new Map<string, number>();
+
+        tracks.forEach(track => {
+            let latency = 0;
+            if (track.devices) {
+                track.devices.forEach(device => {
+                    latency += (device.latencyMs || 0);
+                });
+            }
+            trackLatencies.set(track.id, latency);
+            if (latency > maxLatencyMs) {
+                maxLatencyMs = latency;
+            }
+        });
+
+        tracks.forEach(track => {
+            const nodes = this.trackNodes.get(track.id);
+            if (nodes && nodes.pdcDelay) {
+                const trackLatency = trackLatencies.get(track.id) || 0;
+                const compensationMs = maxLatencyMs - trackLatency;
+                nodes.pdcDelay.delayTime.setTargetAtTime(compensationMs / 1000, this.ctx!.currentTime, 0.05);
+            }
+        });
     }
 
     applyAutomationRuntimeFrame(frame: AutomationRuntimeFrame) {
@@ -4234,6 +4387,117 @@ class AudioEngine {
             }
         });
     }
+
+    // =========================================================================
+    // TRACK FREEZING — Pre-render a track with all effects to a flat buffer
+    // to eliminate real-time CPU load from device chains.
+    // =========================================================================
+
+    /**
+     * Freeze a track by rendering it (with all devices/effects) into a single
+     * stereo AudioBuffer. The frozen buffer replaces live playback, dramatically
+     * reducing CPU usage for complex device chains.
+     *
+     * Returns the frozen AudioBuffer so the caller can persist it (e.g., to IndexedDB).
+     */
+    async freezeTrack(
+        trackId: string,
+        allTracks: Track[],
+        bpm: number,
+        bars: number,
+        sampleRate?: number
+    ): Promise<AudioBuffer> {
+        const targetTrack = allTracks.find(t => t.id === trackId);
+        if (!targetTrack) {
+            throw new Error(`[AudioEngine.freezeTrack] Track ${trackId} not found.`);
+        }
+
+        const effectiveSampleRate = sampleRate || this.ctx?.sampleRate || 48000;
+
+        // Build isolated track set — same technique used by stem exporter:
+        // mute all tracks except the target and its group chain + returns.
+        const routeChain = new Set<string>([trackId]);
+        let cursor = targetTrack;
+        let guard = 0;
+        while (cursor?.groupId && guard < 32) {
+            const gid = cursor.groupId;
+            if (!gid || routeChain.has(gid)) break;
+            const groupTrack = allTracks.find(t => t.id === gid && t.type === TrackType.GROUP);
+            if (!groupTrack) break;
+            routeChain.add(gid);
+            cursor = groupTrack;
+            guard++;
+        }
+
+        const isolatedTracks = allTracks.map(track => {
+            const isReturn = track.type === TrackType.RETURN;
+            const isOnRoute = routeChain.has(track.id);
+            return {
+                ...track,
+                isMuted: (isReturn || isOnRoute) ? track.isMuted : true,
+                isSoloed: false,
+                soloSafe: false,
+                sends: (isReturn || isOnRoute) ? (track.sends || {}) : {},
+                sendModes: (isReturn || isOnRoute) ? (track.sendModes || {}) : {}
+            };
+        });
+
+        console.log(`[AudioEngine.freezeTrack] Rendering track "${targetTrack.name}" (${bars} bars @ ${effectiveSampleRate}Hz)...`);
+
+        const frozenBuffer = await this.renderProject(isolatedTracks, {
+            bars: Math.max(1, bars),
+            bpm,
+            sampleRate: effectiveSampleRate,
+            sourceId: `freeze-${trackId}`
+        });
+
+        // Store in runtime frozen buffer map
+        this.frozenBuffers.set(trackId, frozenBuffer);
+
+        // Update the track's node graph
+        const nodes = this.trackNodes.get(trackId);
+        if (nodes) {
+            nodes.frozenBuffer = frozenBuffer;
+        }
+
+        console.log(`[AudioEngine.freezeTrack] Track "${targetTrack.name}" frozen (${frozenBuffer.duration.toFixed(2)}s, ${frozenBuffer.length} samples).`);
+
+        return frozenBuffer;
+    }
+
+    /**
+     * Unfreeze a track — removes the frozen buffer and allows the device chain
+     * to process in real-time again.
+     */
+    unfreezeTrack(trackId: string): void {
+        this.frozenBuffers.delete(trackId);
+
+        const nodes = this.trackNodes.get(trackId);
+        if (nodes) {
+            nodes.frozenBuffer = null;
+        }
+
+        console.log(`[AudioEngine.unfreezeTrack] Track ${trackId} unfrozen.`);
+    }
+
+    /**
+     * Check whether a track is currently frozen (has a pre-rendered buffer).
+     */
+    isTrackFrozen(trackId: string): boolean {
+        return this.frozenBuffers.has(trackId);
+    }
+
+    /**
+     * Get the frozen buffer for a track, if any.
+     */
+    getFrozenBuffer(trackId: string): AudioBuffer | null {
+        return this.frozenBuffers.get(trackId) || null;
+    }
+
+    // =========================================================================
+    // OFFLINE RENDERING — renderProject / encodeAudio
+    // =========================================================================
+
     async renderProject(tracks: Track[], options: { bars: number, bpm: number, sampleRate: number, sourceId: string }): Promise<AudioBuffer> {
         const lengthInSeconds = (options.bars * 4 * 60) / options.bpm;
         const offlineCtx = new OfflineAudioContext(2, options.sampleRate * lengthInSeconds, options.sampleRate);
@@ -4263,6 +4527,7 @@ class AudioEngine {
 
         interface OfflineTrackNodes {
             input: GainNode;
+            pdcDelay: DelayNode;
             preSendTap: GainNode;
             gain: GainNode;
             panner: StereoPannerNode;
@@ -4286,6 +4551,9 @@ class AudioEngine {
             const input = offlineCtx.createGain();
             input.gain.value = 1;
 
+            const pdcDelay = offlineCtx.createDelay(5.0);
+            pdcDelay.delayTime.value = 0;
+
             const preSendTap = offlineCtx.createGain();
             preSendTap.gain.value = 1;
 
@@ -4295,7 +4563,9 @@ class AudioEngine {
             const reverb = offlineCtx.createConvolver();
             reverb.buffer = this.getDefaultReverbImpulse(offlineCtx);
 
-            input.connect(preSendTap);
+            // Chain: input → pdcDelay → preSendTap → gain → panner → master
+            input.connect(pdcDelay);
+            pdcDelay.connect(preSendTap);
             preSendTap.connect(gain);
             gain.connect(panner);
             panner.connect(masterGain);
@@ -4306,6 +4576,7 @@ class AudioEngine {
 
             trackNodes.set(track.id, {
                 input,
+                pdcDelay,
                 preSendTap,
                 gain,
                 panner,
@@ -4315,6 +4586,32 @@ class AudioEngine {
                 outputTargetGroupId: null
             });
         });
+
+        // Apply Plugin Delay Compensation to the offline graph
+        let maxLatencyMs = 0;
+        const trackLatencies = new Map<string, number>();
+        tracks.forEach(track => {
+            let latency = 0;
+            if (track.devices) {
+                track.devices.forEach(device => {
+                    latency += (device.latencyMs || 0);
+                });
+            }
+            trackLatencies.set(track.id, latency);
+            if (latency > maxLatencyMs) maxLatencyMs = latency;
+        });
+
+        if (maxLatencyMs > 0) {
+            tracks.forEach(track => {
+                const nodes = trackNodes.get(track.id);
+                if (!nodes) return;
+                const trackLatency = trackLatencies.get(track.id) || 0;
+                const compensationMs = maxLatencyMs - trackLatency;
+                if (compensationMs > 0) {
+                    nodes.pdcDelay.delayTime.value = compensationMs / 1000;
+                }
+            });
+        }
 
         tracks.forEach((track) => {
             const nodes = trackNodes.get(track.id);

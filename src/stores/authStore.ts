@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import type { Profile } from '../types/supabase';
 import { supabase } from '../lib/supabase';
+import { resolveTier } from '@hollowbits/core';
 
 /* ─── State Shape ────────────────────────────────────────────────── */
 
@@ -35,7 +36,10 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
       console.warn('[authStore] Profile fetch failed:', error.message);
       return null;
     }
-    return data;
+    return {
+      ...data,
+      tier: data.tier === null ? null : resolveTier(data.tier),
+    };
   } catch (err) {
     console.warn('[authStore] Profile fetch exception:', err);
     return null;

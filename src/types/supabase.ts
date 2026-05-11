@@ -23,6 +23,10 @@ export type Database = {
           tier: string
           updated_at: string
           user_id: string
+          provider_subscription_id: string | null
+          provider_plan_id: string | null
+          payment_provider: string | null
+          cancel_at_period_end: boolean
         }
         Insert: {
           created_at?: string
@@ -32,6 +36,10 @@ export type Database = {
           tier: string
           updated_at?: string
           user_id: string
+          provider_subscription_id?: string | null
+          provider_plan_id?: string | null
+          payment_provider?: string | null
+          cancel_at_period_end?: boolean
         }
         Update: {
           created_at?: string
@@ -41,6 +49,40 @@ export type Database = {
           tier?: string
           updated_at?: string
           user_id?: string
+          provider_subscription_id?: string | null
+          provider_plan_id?: string | null
+          payment_provider?: string | null
+          cancel_at_period_end?: boolean
+        }
+        Relationships: []
+      }
+      usage_tracking: {
+        Row: {
+          id: string
+          user_id: string
+          metric: string
+          value: number
+          period_start: string
+          period_end: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          metric: string
+          value?: number
+          period_start?: string
+          period_end?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          metric?: string
+          value?: number
+          period_start?: string
+          period_end?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -158,6 +200,277 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "projects_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_assets: {
+        Row: {
+          bucket: string
+          created_at: string
+          duration_seconds: number | null
+          format: string | null
+          hash: string | null
+          id: string
+          license_state: string
+          metadata: Json
+          owner_id: string
+          path: string
+          project_id: string | null
+          sample_rate: number | null
+          size_bytes: number
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          bucket: string
+          created_at?: string
+          duration_seconds?: number | null
+          format?: string | null
+          hash?: string | null
+          id?: string
+          license_state?: string
+          metadata?: Json
+          owner_id: string
+          path: string
+          project_id?: string | null
+          sample_rate?: number | null
+          size_bytes?: number
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          duration_seconds?: number | null
+          format?: string | null
+          hash?: string | null
+          id?: string
+          license_state?: string
+          metadata?: Json
+          owner_id?: string
+          path?: string
+          project_id?: string | null
+          sample_rate?: number | null
+          size_bytes?: number
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_assets_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_assets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_assets_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_snapshots: {
+        Row: {
+          created_at: string
+          created_by: string
+          data: Json
+          id: string
+          label: string | null
+          project_id: string
+          schema_version: string
+          size_bytes: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          data: Json
+          id?: string
+          label?: string | null
+          project_id: string
+          schema_version?: string
+          size_bytes?: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          data?: Json
+          id?: string
+          label?: string | null
+          project_id?: string
+          schema_version?: string
+          size_bytes?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_snapshots_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_snapshots_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_snapshots_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      render_jobs: {
+        Row: {
+          bit_depth: number
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          format: string
+          id: string
+          input: Json
+          kind: string
+          output_asset_id: string | null
+          project_id: string
+          requested_by: string
+          sample_rate: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          bit_depth?: number
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          format?: string
+          id?: string
+          input?: Json
+          kind?: string
+          output_asset_id?: string | null
+          project_id: string
+          requested_by: string
+          sample_rate?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          bit_depth?: number
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          format?: string
+          id?: string
+          input?: Json
+          kind?: string
+          output_asset_id?: string | null
+          project_id?: string
+          requested_by?: string
+          sample_rate?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_jobs_output_asset_id_fkey"
+            columns: ["output_asset_id"]
+            isOneToOne: false
+            referencedRelation: "project_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "render_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "render_jobs_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "render_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_events: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json
+          metric: string
+          period_start: string
+          quantity: number
+          tier_at_event: string
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json
+          metric: string
+          period_start?: string
+          quantity?: number
+          tier_at_event?: string
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json
+          metric?: string
+          period_start?: string
+          quantity?: number
+          tier_at_event?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_events_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -482,13 +795,15 @@ export const Constants = {
 
 /* ── Convenience types derived from the generated schema ────────── */
 
+export type Tier = 'free' | 'pro' | 'studio';
+
 export type Profile = {
   id: string;
   username: string | null;
   full_name: string | null;
   avatar_url: string | null;
   updated_at: string | null;
-  tier: string | null;
+  tier: Tier | null;
 };
 
 export type Project = {
