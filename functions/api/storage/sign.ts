@@ -55,11 +55,11 @@ const BUCKET_SIZE_LIMITS: Record<string, number> = {
 };
 
 const BUCKET_CONTENT_TYPES: Record<string, string[]> = {
-  "project-audio": ["audio/wav", "audio/x-wav", "audio/flac", "audio/mpeg"],
-  "project-stems": ["audio/wav", "audio/x-wav", "audio/flac", "audio/mpeg"],
-  "project-exports": ["audio/wav", "audio/x-wav", "audio/aiff", "audio/flac", "audio/mpeg", "application/zip"],
-  "asset-library": ["audio/wav", "audio/x-wav", "audio/flac", "audio/mpeg", "application/zip"],
-  "user-avatars": ["image/png", "image/jpeg", "image/webp"],
+  "project-audio": ["audio/wav", "audio/x-wav", "audio/flac", "audio/mpeg", "audio/ogg", "audio/aiff", "audio/x-aiff", "audio/mp4", "audio/webm"],
+  "project-stems": ["audio/wav", "audio/x-wav", "audio/flac", "audio/mpeg", "audio/ogg", "audio/aiff", "audio/x-aiff"],
+  "project-exports": ["audio/wav", "audio/x-wav", "audio/flac", "audio/mpeg", "audio/ogg", "audio/aiff", "audio/x-aiff", "application/zip"],
+  "asset-library": ["audio/wav", "audio/x-wav", "audio/flac", "audio/mpeg", "audio/ogg", "audio/aiff", "audio/x-aiff", "audio/mp4", "audio/webm", "application/zip"],
+  "user-avatars": ["image/png", "image/jpeg", "image/webp", "image/gif"],
 };
 
 const EDITOR_ROLES = new Set(["owner", "admin", "editor"]);
