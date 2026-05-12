@@ -630,6 +630,7 @@ export type Database = {
           p_bpm?: number
           p_is_public?: boolean
           p_name: string
+          p_data?: Json
           p_sample_rate?: number
           p_workspace_id: string
         }
@@ -650,6 +651,7 @@ export type Database = {
         Returns: {
           access_level: string
           bpm: number
+          data: Json | null
           name: string
           project_id: string
           sample_rate: number
