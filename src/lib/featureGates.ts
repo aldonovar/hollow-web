@@ -1,8 +1,11 @@
 import {
   formatLimit,
+  formatUsageMetric,
   getFlags,
+  getFeatureUpgradeTarget,
   getLimits,
   getRequiredTierName,
+  getUsageLimitForMetric,
   hasFeature,
   isWithinQuota,
   meetsMinimumTier,
@@ -13,9 +16,12 @@ export type { FeatureFlags, FeatureGate, Tier, TierLimits } from '@hollowbits/co
 
 export {
   formatLimit,
+  formatUsageMetric,
   getFlags,
+  getFeatureUpgradeTarget,
   getLimits,
   getRequiredTierName,
+  getUsageLimitForMetric,
   hasFeature,
   isWithinQuota,
   meetsMinimumTier,

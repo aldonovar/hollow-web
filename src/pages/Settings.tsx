@@ -7,7 +7,8 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 import { usePageMotion } from '../components/usePageMotion';
-import { formatCountLimit, formatStorageLimit, getTierLimits, resolveTier } from '@hollowbits/core';
+import { formatCountLimit, formatStorageLimit, formatUsageMetric, getTierLimits, resolveTier } from '@hollowbits/core';
+import { projectOsService, type UsageSummary } from '../daw/services/projectOsService';
 import './Settings.css';
 
 type FeedbackStatus = 'idle' | 'saving' | 'success' | 'error';
@@ -28,6 +29,7 @@ export function Settings() {
   /* ─── License & Sessions state ──────────────────────────────── */
   const [sessions, setSessions] = useState<any[]>([]);
   const [license, setLicense] = useState<any>(null);
+  const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
   const [loadingExtra, setLoadingExtra] = useState(true);
 
   /* ─── Password state ────────────────────────────────────────── */
@@ -120,6 +122,12 @@ export function Settings() {
           .eq('user_id', user.id)
           .single();
         if (!licenseError && licenseData) setLicense(licenseData);
+
+        const usageData = await projectOsService.getUsageSummary().catch((error) => {
+          console.warn('[Settings] Project OS usage failed:', error);
+          return null;
+        });
+        if (usageData) setUsageSummary(usageData);
       } catch (err) {
         console.error('[Settings] Error fetching extra settings data:', err);
       } finally {
@@ -548,9 +556,26 @@ export function Settings() {
                 storage: formatStorageLimit(tierLimits.storageBytes),
                 collab: tierLimits.maxCollaborators,
                 ai: formatCountLimit(tierLimits.aiRequestsPerMonth, '/mes'),
+                render: tierLimits.renderMinutesPerMonth === 0
+                  ? 'No incluido'
+                  : formatCountLimit(tierLimits.renderMinutesPerMonth, ' min/mes'),
+                snapshots: tierLimits.snapshotRetentionDays === 0
+                  ? 'Solo local'
+                  : tierLimits.snapshotRetentionDays === -1
+                    ? 'Ilimitado'
+                    : `${tierLimits.snapshotRetentionDays} días`,
                 samples: tierLimits.sampleDownloadsPerMonth === 0
                   ? '-'
                   : formatCountLimit(tierLimits.sampleDownloadsPerMonth, '/mes'),
+              };
+
+              const measuredUsage = usageSummary || {
+                storage_bytes: 0,
+                ai_action: 0,
+                render_minutes: 0,
+                sample_claim: 0,
+                collaborator_seat: 0,
+                snapshot: 0,
               };
 
               return (
@@ -613,9 +638,11 @@ export function Settings() {
                   {/* Quotas grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
                     {[
-                      { label: 'Almacenamiento', value: currentLimits.storage, icon: '💾' },
+                      { label: 'Storage cloud', value: `${formatUsageMetric('storage_bytes', measuredUsage.storage_bytes)} / ${currentLimits.storage}`, icon: '💾' },
                       { label: 'Colaboradores RT', value: `${currentLimits.collab} usuarios`, icon: '👥' },
-                      { label: 'Requests IA', value: currentLimits.ai, icon: '🤖' },
+                      { label: 'Requests IA', value: `${formatUsageMetric('ai_action', measuredUsage.ai_action)} / ${currentLimits.ai}`, icon: '🤖' },
+                      { label: 'Render cloud', value: `${formatUsageMetric('render_minutes', measuredUsage.render_minutes)} / ${currentLimits.render}`, icon: '☁️' },
+                      { label: 'Snapshots cloud', value: `${formatUsageMetric('snapshot', measuredUsage.snapshot)} / ${currentLimits.snapshots}`, icon: '🕘' },
                       { label: 'Samples/mes', value: currentLimits.samples, icon: '🎵' },
                     ].map(q => (
                       <div key={q.label} style={{
