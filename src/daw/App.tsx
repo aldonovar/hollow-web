@@ -23,6 +23,13 @@ import { engineAdapter, type EngineDiagnostics } from './services/engineAdapter'
 import { midiService, MidiDevice } from './services/MidiService';
 import { platformService } from './services/platformService';
 import { assetDb } from './services/db';
+import { audioResourceManager } from './services/storage/audioResourceManager';
+import {
+    collectProjectAudioSourceRefs,
+    getProjectAudioAssetRef,
+    loadProjectAudioAssets,
+    mergeProjectAudioAssetRefs
+} from './services/storage/projectAudioAssetService';
 import {
     createTrack,
     removeTrackRoutingReferences,
@@ -215,7 +222,8 @@ const normalizeLoopMode = (transport: Partial<TransportState>): LoopMode => {
 
 interface ImportAudioSource {
     name: string;
-    arrayBuffer: ArrayBuffer;
+    arrayBuffer?: ArrayBuffer;
+    readArrayBuffer?: () => Promise<ArrayBuffer>;
     persistBlob?: Blob;
 }
 
@@ -330,13 +338,7 @@ const App: React.FC = () => {
     const initialCollabSnapshot = useMemo(() => loadCollabSessionSnapshot(), []);
 
     // Auth session (used for session indicator widget in sidebar)
-    const { user, profile, session, signOut: authSignOut, initialize: authInitialize } = useAuthStore();
-
-    useEffect(() => {
-        // Initialize auth store inside DAW — handles hash token SSO from cross-domain redirect
-        const unsubscribe = authInitialize();
-        return () => unsubscribe();
-    }, [authInitialize]);
+    const { user, profile, session, signOut: authSignOut } = useAuthStore();
 
     // --- STATE ---
     const [projectName, setProjectName] = useState("Sin Título");
@@ -377,7 +379,7 @@ const App: React.FC = () => {
     const [isRenamingProject, setIsRenamingProject] = useState(false);
     const [renameValue, setRenameValue] = useState("");
     const [showProjectBrowser, setShowProjectBrowser] = useState(false);
-    const [cloudProjects, setCloudProjects] = useState<Array<{ id: string; name: string; updated_at: string; data: any }>>([]);
+    const [cloudProjects, setCloudProjects] = useState<Array<{ id: string; name: string; updated_at: string; workspace_id?: string; data: any }>>([]);
     const [loadingCloudProjects, setLoadingCloudProjects] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
     const [recoverySnapshot, setRecoverySnapshot] = useState<ProjectAutosaveSnapshot | null>(null);
@@ -571,6 +573,8 @@ const App: React.FC = () => {
     });
     const recordingJournalEntriesRef = useRef<RecordingJournalEntry[]>(recordingJournalEntries);
     const latestTracksRef = useRef<Track[]>(tracks);
+    const projectAssetRefsRef = useRef<unknown[]>([]);
+    const projectWorkspaceIdRef = useRef<string | undefined>(undefined);
     const trackSyncQueuedRef = useRef(false);
     const trackSyncFrameRef = useRef<number | null>(null);
     const boundaryTransitionInFlightRef = useRef(false);
@@ -1244,7 +1248,8 @@ const App: React.FC = () => {
                         if (sharedSession.data) {
                             const integrityReport = await hydrateProjectData(sharedSession.data as unknown as ProjectData, sharedSession.name, {
                                 source: 'open-project',
-                                rememberReport: true
+                                rememberReport: true,
+                                projectId: sharedSession.project_id
                             });
                             if (integrityReport.issueCount > 0) {
                                 console.warn('Project integrity repaired during open.', integrityReport);
@@ -1275,7 +1280,9 @@ const App: React.FC = () => {
                         if (data.data && Object.keys(data.data).length > 0) {
                             const integrityReport = await hydrateProjectData(data.data as unknown as ProjectData, data.name, {
                                 source: 'open-project',
-                                rememberReport: true
+                                rememberReport: true,
+                                projectId: data.id,
+                                workspaceId: data.workspace_id
                             });
                             if (integrityReport.issueCount > 0) {
                                 console.warn('Project integrity repaired during open.', integrityReport);
@@ -3604,6 +3611,10 @@ const App: React.FC = () => {
                 notationOverrides: workspace.notationOverrides.map((override) => ({ ...override })),
                 confidenceRegions: workspace.confidenceRegions.map((region) => ({ ...region }))
             })),
+            assetRefs: projectAssetRefsRef.current.length > 0
+                ? [...projectAssetRefsRef.current]
+                : undefined,
+            workspaceId: projectWorkspaceIdRef.current,
             createdAt: Date.now(),
             lastModified: Date.now()
         };
@@ -3613,10 +3624,17 @@ const App: React.FC = () => {
     const hydrateProjectData = useCallback(async (
         projectCandidate: ProjectData,
         preferredName?: string,
-        options?: { source?: string; rememberReport?: boolean }
+        options?: { source?: string; rememberReport?: boolean; projectId?: string; workspaceId?: string }
     ): Promise<ProjectIntegrityReport> => {
         const integrityResult = repairProjectData(projectCandidate, { source: options?.source || 'hydrate-project' });
         const projectData = integrityResult.project;
+        const projectId = options?.projectId;
+        const workspaceId = options?.workspaceId || projectData.workspaceId;
+
+        projectAssetRefsRef.current = Array.isArray(projectData.assetRefs)
+            ? [...projectData.assetRefs]
+            : [];
+        projectWorkspaceIdRef.current = workspaceId;
 
         if (options?.rememberReport !== false) {
             rememberProjectIntegrityReport(integrityResult.report);
@@ -3630,14 +3648,32 @@ const App: React.FC = () => {
         const rehydratedTracks = await Promise.all(projectData.tracks.map(async (track: Track) => {
             const rehydratedClips = await Promise.all(track.clips.map(async (clip: Clip) => {
                 if (track.type === TrackType.AUDIO && clip.sourceId) {
-                    const blob = await assetDb.getFile(clip.sourceId);
-                    if (blob) {
+                    try {
+                        const assetRef = projectId
+                            ? getProjectAudioAssetRef(projectAssetRefsRef.current, clip.sourceId, projectId, workspaceId)
+                            : undefined;
+                        let blob = await assetDb.getFile(clip.sourceId);
+
+                        if (!blob && projectId) {
+                            setLoadingMessage(`Descargando audio: ${clip.name}`);
+                            blob = await audioResourceManager.getAudioBuffer(projectId, clip.sourceId, assetRef?.path);
+                            const cachedSourceId = await assetDb.saveFile(blob);
+                            if (cachedSourceId !== clip.sourceId) {
+                                throw new Error('La fuente cloud no coincide con la huella guardada en el proyecto.');
+                            }
+                        }
+
+                        if (!blob) {
+                            return { ...clip, isOffline: true, buffer: undefined };
+                        }
+
                         const arrayBuffer = await blob.arrayBuffer();
                         const buffer = await engineAdapter.decodeAudioData(arrayBuffer);
                         return { ...clip, buffer, isOffline: false };
+                    } catch (error) {
+                        console.warn(`No se pudo restaurar la fuente de audio ${clip.name}.`, error);
+                        return { ...clip, isOffline: true, buffer: undefined };
                     }
-
-                    return { ...clip, isOffline: true, buffer: undefined };
                 }
 
                 return clip;
@@ -3809,6 +3845,19 @@ const App: React.FC = () => {
         const intervalId = window.setInterval(async () => {
             if (projectCommandCount <= lastCloudSaveCommandRef.current) return;
             try {
+                const hasPendingAudio = collectProjectAudioSourceRefs(latestTracksRef.current).some(({ sourceId }) => (
+                    !getProjectAudioAssetRef(
+                        projectAssetRefsRef.current,
+                        sourceId,
+                        collabSessionId,
+                        projectWorkspaceIdRef.current
+                    )
+                ));
+                if (hasPendingAudio) {
+                    console.info('[CloudAutoSave] Omitted until imported audio is explicitly synced.');
+                    return;
+                }
+
                 const clockSnapshot = getTransportClockSnapshot();
                 const snapshot = createProjectDataSnapshot({
                     ...transport,
@@ -3820,11 +3869,12 @@ const App: React.FC = () => {
                 }, projectName);
                 const integrityResult = repairProjectData(snapshot, { source: 'cloud-autosave' });
 
-                await supabase.from('projects').update({
+                const { error } = await supabase.from('projects').update({
                     data: integrityResult.project as any,
                     name: projectName,
                     updated_at: new Date().toISOString()
                 }).eq('id', collabSessionId);
+                if (error) throw error;
 
                 lastCloudSaveCommandRef.current = projectCommandCount;
             } catch (err) {
@@ -3858,6 +3908,9 @@ const App: React.FC = () => {
             scaleType: 'minor'
         }));
         setCollabSessionId(null);
+        projectAssetRefsRef.current = [];
+        projectWorkspaceIdRef.current = undefined;
+        lastCloudSaveCommandRef.current = 0;
         window.history.pushState({}, '', window.location.pathname);
         setActiveModal(null);
         engineAdapter.stop(true);
@@ -3901,7 +3954,7 @@ const App: React.FC = () => {
                 const wsIds = memberships.map(m => m.workspace_id);
                 const { data: projects } = await supabase
                     .from('projects')
-                    .select('id, name, updated_at, data')
+                    .select('id, name, updated_at, workspace_id, data')
                     .in('workspace_id', wsIds)
                     .order('updated_at', { ascending: false });
                 if (projects) setCloudProjects(projects);
@@ -3914,7 +3967,7 @@ const App: React.FC = () => {
     }, [user]);
 
     // Load a specific cloud project from the browser panel
-    const handleLoadCloudProject = useCallback(async (project: { id: string; name: string; data: any }) => {
+    const handleLoadCloudProject = useCallback(async (project: { id: string; name: string; workspace_id?: string; data: any }) => {
         setShowProjectBrowser(false);
         setLoadingProject(true);
         setLoadingMessage('Cargando proyecto...');
@@ -3924,7 +3977,9 @@ const App: React.FC = () => {
             if (project.data && Object.keys(project.data).length > 0) {
                 const integrityReport = await hydrateProjectData(project.data as unknown as ProjectData, project.name, {
                     source: 'open-project',
-                    rememberReport: true
+                    rememberReport: true,
+                    projectId: project.id,
+                    workspaceId: project.workspace_id
                 });
                 if (integrityReport.issueCount > 0) {
                     console.warn('Project integrity repaired during open.', integrityReport);
@@ -4011,121 +4066,194 @@ const App: React.FC = () => {
         }, 50);
     }, [transport, projectName, createProjectDataSnapshot]);
 
+    const syncProjectAudioToCloud = useCallback(async (projectId: string, workspaceId?: string) => {
+        projectWorkspaceIdRef.current = workspaceId;
+
+        const sourceRefs = collectProjectAudioSourceRefs(latestTracksRef.current);
+        const pendingRefs = sourceRefs.filter(({ sourceId }) => {
+            const existing = getProjectAudioAssetRef(
+                projectAssetRefsRef.current,
+                sourceId,
+                projectId,
+                workspaceId
+            );
+            return !existing;
+        });
+
+        if (pendingRefs.length === 0) return;
+
+        setLoadingMessage(`Sincronizando ${pendingRefs.length} archivo${pendingRefs.length === 1 ? '' : 's'} de audio...`);
+        const availableAssets = await loadProjectAudioAssets(
+            latestTracksRef.current,
+            async (sourceId) => (await assetDb.getFile(sourceId)) || null
+        );
+        const pendingAssets = new Map(
+            pendingRefs.map(({ sourceId }) => {
+                const asset = availableAssets.get(sourceId);
+                if (!asset) {
+                    throw new Error(`No se encontró la fuente local ${sourceId}.`);
+                }
+                return [sourceId, asset] as const;
+            })
+        );
+
+        const committedRefs = await audioResourceManager.commitProjectAudio(
+            projectId,
+            workspaceId,
+            pendingAssets
+        );
+        projectAssetRefsRef.current = mergeProjectAudioAssetRefs(
+            projectAssetRefsRef.current,
+            committedRefs
+        );
+    }, []);
+
     const handleSaveProject = useCallback(async () => {
         if (isReadOnly) {
             alert("No tienes permisos para guardar cambios en este proyecto.");
             return;
         }
-        
+
         setLoadingProject(true);
         setLoadingMessage("Guardando metadatos...");
 
-        setTimeout(async () => {
-            try {
-                if (transport.isPlaying) {
-                    engineAdapter.pause();
-                    setTransport((prev: TransportState) => ({ ...prev, isPlaying: false }));
-                    isPlayingRef.current = false;
-                    pauseResumeArmedRef.current = false;
-                }
-                const clockSnapshot = getTransportClockSnapshot();
-                const projectMetadata = createProjectDataSnapshot({
-                    ...transport,
-                    isPlaying: false,
-                    isRecording: false,
-                    currentBar: clockSnapshot.currentBar,
-                    currentBeat: clockSnapshot.currentBeat,
-                    currentSixteenth: clockSnapshot.currentSixteenth
-                }, projectName);
-                const integrityResult = repairProjectData(projectMetadata, { source: 'save-project' });
-                rememberProjectIntegrityReport(integrityResult.report);
-                const jsonString = JSON.stringify(integrityResult.project, null, 2);
+        const buildSaveResult = () => {
+            const clockSnapshot = getTransportClockSnapshot();
+            const projectMetadata = createProjectDataSnapshot({
+                ...transport,
+                isPlaying: false,
+                isRecording: false,
+                currentBar: clockSnapshot.currentBar,
+                currentBeat: clockSnapshot.currentBeat,
+                currentSixteenth: clockSnapshot.currentSixteenth
+            }, projectName);
+            const result = repairProjectData(projectMetadata, { source: 'save-project' });
+            rememberProjectIntegrityReport(result.report);
+            return result;
+        };
 
-                if (collabSessionId) {
-                    setLoadingMessage("Guardando en la nube...");
-                    try {
-                        const { error } = await supabase.from('projects').update({
-                            data: integrityResult.project as any,
-                            name: projectName,
-                            updated_at: new Date().toISOString()
-                        }).eq('id', collabSessionId);
-                        
-                        if (error) throw error;
-                    } catch (e) {
-                        console.error('Error saving to cloud:', e);
-                        alert("Error al guardar en la nube.");
-                    }
-                } else if (user) {
-                    setLoadingMessage("Creando proyecto en la nube...");
-                    try {
-                        const { data: memberships, error: wsError } = await supabase
-                            .from('workspace_members')
-                            .select('workspace_id')
-                            .eq('user_id', user.id)
-                            .limit(1);
-                        
-                        if (wsError || !memberships || memberships.length === 0) throw new Error("Workspace no encontrado");
-                        
-                        const workspaceId = memberships[0].workspace_id;
-                        const { data: newProjectId, error: createError } = await supabase.rpc('create_project_with_limit', {
-                            p_name: projectName,
-                            p_workspace_id: workspaceId,
-                            p_bpm: 120,
-                            p_sample_rate: 44100,
-                            p_is_public: false,
-                            p_data: integrityResult.project as any
-                        });
-                        
-                        if (createError) {
-                            if (createError.message.includes('limit reached')) {
-                                alert('Has alcanzado el límite de proyectos para la capa gratuita. Por favor actualiza tu plan o elimina un proyecto.');
-                            } else {
-                                throw createError;
-                            }
-                            // Don't fallback to local, just stop
-                            setLoadingProject(false);
-                            setLoadingMessage("");
-                            return;
-                        }
-                        
-                        if (!newProjectId) throw new Error("No se devolvió ID del proyecto");
-                        
-                        setCollabSessionId(newProjectId as string);
-                        window.history.pushState({}, '', `${window.location.pathname}?project=${newProjectId}`);
-                    } catch (e) {
-                        console.error('Error creating cloud project:', e);
-                        alert("Error al crear el proyecto en la nube. Se descargará localmente como respaldo.");
-                        const result = await platformService.saveProject(jsonString, projectName);
-                        if (result.success && result.filePath) {
-                            setProjectName(result.filePath);
-                        }
-                    }
-                } else {
-                    setLoadingMessage("Escribiendo disco...");
-                    // FIX: Update Project Name from Save Result
-                    const result = await platformService.saveProject(jsonString, projectName);
-                    if (result.success && result.filePath) {
-                        setProjectName(result.filePath);
-                    }
-                }
-                
-                // Fallback result for integrity report (using success always if cloud or fallback done without throw)
-                if (integrityResult.report.issueCount > 0) {
-                    console.warn('Project integrity repaired during save.', integrityResult.report);
-                    alert(summarizeProjectIntegrityReport(integrityResult.report, 'Proyecto guardado'));
-                }
+        let finalIntegrityResult: ReturnType<typeof repairProjectData> | null = null;
 
-            } catch (e) {
-                console.error("Failed to save project", e);
-                alert("Error al guardar.");
-            } finally {
-                setLoadingProject(false);
-                setLoadingMessage("");
-                setActiveModal(null);
-                setShowFileMenu(false);
+        try {
+            if (transport.isPlaying) {
+                engineAdapter.pause();
+                setTransport((prev: TransportState) => ({ ...prev, isPlaying: false }));
+                isPlayingRef.current = false;
+                pauseResumeArmedRef.current = false;
             }
-        }, 20);
-    }, [createProjectDataSnapshot, projectName, rememberProjectIntegrityReport, transport, isReadOnly]);
+
+            if (collabSessionId) {
+                await syncProjectAudioToCloud(collabSessionId, projectWorkspaceIdRef.current);
+                finalIntegrityResult = buildSaveResult();
+                setLoadingMessage("Guardando proyecto en la nube...");
+                const { error } = await supabase.from('projects').update({
+                    data: finalIntegrityResult.project as any,
+                    name: projectName,
+                    updated_at: new Date().toISOString()
+                }).eq('id', collabSessionId);
+                if (error) throw error;
+                lastCloudSaveCommandRef.current = projectCommandCount;
+            } else if (user) {
+                setLoadingMessage("Creando proyecto en la nube...");
+                const { data: memberships, error: wsError } = await supabase
+                    .from('workspace_members')
+                    .select('workspace_id')
+                    .eq('user_id', user.id)
+                    .limit(1);
+
+                if (wsError || !memberships || memberships.length === 0) {
+                    throw wsError || new Error("Workspace no encontrado");
+                }
+
+                const workspaceId = memberships[0].workspace_id;
+                projectWorkspaceIdRef.current = workspaceId;
+                const provisionalResult = buildSaveResult();
+                const { data: newProjectId, error: createError } = await supabase.rpc('create_project_with_limit', {
+                    p_name: projectName,
+                    p_workspace_id: workspaceId,
+                    p_bpm: transport.bpm,
+                    p_sample_rate: audioSettings.sampleRate,
+                    p_is_public: false,
+                    p_data: provisionalResult.project as any
+                });
+
+                if (createError?.message.includes('limit reached')) {
+                    alert('Has alcanzado el límite de proyectos para la capa gratuita. Por favor actualiza tu plan o elimina un proyecto.');
+                    return;
+                }
+                if (createError) throw createError;
+                if (typeof newProjectId !== 'string' || newProjectId.length === 0) {
+                    throw new Error("No se devolvió un ID de proyecto válido");
+                }
+
+                await syncProjectAudioToCloud(newProjectId, workspaceId);
+                finalIntegrityResult = buildSaveResult();
+                setLoadingMessage("Confirmando proyecto en la nube...");
+                const { error: finalizeError } = await supabase.from('projects').update({
+                    data: finalIntegrityResult.project as any,
+                    name: projectName,
+                    updated_at: new Date().toISOString()
+                }).eq('id', newProjectId);
+                if (finalizeError) throw finalizeError;
+
+                setCollabSessionId(newProjectId);
+                lastCloudSaveCommandRef.current = projectCommandCount;
+                const nextUrl = new URL(window.location.href);
+                nextUrl.search = '';
+                nextUrl.searchParams.set('project', newProjectId);
+                window.history.pushState({}, '', `${nextUrl.pathname}${nextUrl.search}`);
+            } else {
+                finalIntegrityResult = buildSaveResult();
+                setLoadingMessage("Escribiendo disco...");
+                const result = await platformService.saveProject(
+                    JSON.stringify(finalIntegrityResult.project, null, 2),
+                    projectName
+                );
+                if (!result.success) throw new Error('No se pudo guardar el proyecto local.');
+                if (result.filePath) setProjectName(result.filePath);
+            }
+
+            if (finalIntegrityResult && finalIntegrityResult.report.issueCount > 0) {
+                console.warn('Project integrity repaired during save.', finalIntegrityResult.report);
+                alert(summarizeProjectIntegrityReport(finalIntegrityResult.report, 'Proyecto guardado'));
+            }
+        } catch (error) {
+            console.error("Failed to save project", error);
+            if (collabSessionId || user) {
+                try {
+                    const backup = buildSaveResult();
+                    const result = await platformService.saveProject(
+                        JSON.stringify(backup.project, null, 2),
+                        projectName
+                    );
+                    alert(result.success
+                        ? "No se pudo confirmar el guardado cloud. Se descargó el proyecto .esp; el audio permanece en el almacenamiento local de este navegador y sigue pendiente de sincronización."
+                        : "No se pudo guardar en la nube ni crear el respaldo local.");
+                } catch (backupError) {
+                    console.error('Local backup after cloud failure also failed.', backupError);
+                    alert("No se pudo guardar en la nube ni crear el respaldo local.");
+                }
+            } else {
+                alert("No se pudo guardar el proyecto.");
+            }
+        } finally {
+            setLoadingProject(false);
+            setLoadingMessage("");
+            setActiveModal(null);
+            setShowFileMenu(false);
+        }
+    }, [
+        audioSettings.sampleRate,
+        collabSessionId,
+        createProjectDataSnapshot,
+        isReadOnly,
+        projectCommandCount,
+        projectName,
+        rememberProjectIntegrityReport,
+        syncProjectAudioToCloud,
+        transport,
+        user
+    ]);
 
     const assignClipToSessionSlot = useCallback((track: Track, sceneIndex: number, clip: Clip): Track => {
         const safeSceneIndex = Math.max(0, Math.min(7, sceneIndex));
@@ -4183,6 +4311,9 @@ const App: React.FC = () => {
 
     const importAudioSources = useCallback(async (sources: ImportAudioSource[]) => {
         if (sources.length === 0) return;
+        if (isReadOnly) {
+            throw new Error('Este proyecto está en modo visor y no permite importar audio.');
+        }
 
         const importStamp = Date.now();
 
@@ -4193,6 +4324,7 @@ const App: React.FC = () => {
         });
 
         const importedTracks: Array<Track | null> = new Array(sources.length).fill(null);
+        const importErrors: string[] = [];
         const totalTrackCountAfterImport = tracks.length + sources.length;
         let nextIndex = 0;
 
@@ -4203,18 +4335,17 @@ const App: React.FC = () => {
             setImportProgress((prev) => prev ? { ...prev, currentFile: source.name } : prev);
 
             try {
-                console.log("Processing source:", source.name, source.arrayBuffer);
-                const arrayBuffer = source.arrayBuffer.slice(0);
+                const sourceBuffer = source.arrayBuffer || await source.readArrayBuffer?.();
+                if (!sourceBuffer) {
+                    throw new Error('No se pudo leer el archivo seleccionado.');
+                }
+                console.log("Processing source:", source.name);
+                const arrayBuffer = sourceBuffer.slice(0);
                 const audioBuffer = await engineAdapter.decodeAudioData(arrayBuffer);
                 console.log("Decoded successfully!");
 
-                let sourceId: string | undefined;
-                try {
-                    const blobToPersist = source.persistBlob || new Blob([source.arrayBuffer], { type: 'application/octet-stream' });
-                    sourceId = await assetDb.saveFile(blobToPersist);
-                } catch (persistError) {
-                    console.warn(`Asset cache unavailable for ${source.name}`, persistError);
-                }
+                const blobToPersist = source.persistBlob || new Blob([sourceBuffer], { type: 'application/octet-stream' });
+                const sourceId = await assetDb.saveFile(blobToPersist);
 
                 const newTrack = createTrack({
                     id: `t-imp-${importStamp}-${index}`,
@@ -4229,6 +4360,7 @@ const App: React.FC = () => {
                 importedTracks[index] = newTrack;
             } catch (fileError) {
                 console.error(`Failed to import ${source.name}`, fileError);
+                importErrors.push(`${source.name}: ${fileError instanceof Error ? fileError.message : 'formato no compatible'}`);
                 importedTracks[index] = null;
             } finally {
                 setImportProgress((prev) => prev
@@ -4261,15 +4393,20 @@ const App: React.FC = () => {
 
         const validTracks = importedTracks.filter((track): track is Track => track !== null);
         if (validTracks.length === 0) {
-            throw new Error('No se pudo decodificar ningún archivo de audio.');
+            throw new Error(`No se pudo importar ningún archivo. ${importErrors.join(' | ')}`);
         }
 
         appendTracks(validTracks, { reason: 'import-audio-files', recolor: true });
+        const firstTrack = validTracks[0];
+        setSelectedTrackId(firstTrack.id);
+        setSelectedClipId(firstTrack.clips[0]?.id || null);
+        setMainView('arrange');
+        setBottomView('editor');
 
         if (validTracks.length < sources.length) {
-            alert('Algunos archivos no se pudieron importar, pero el resto se agregó correctamente.');
+            alert(`Se importaron ${validTracks.length} de ${sources.length} archivos. Fallos: ${importErrors.join(' | ')}`);
         }
-    }, [appendTracks, buildAudioClipFromBuffer, tracks.length, getProgressiveTrackColor]);
+    }, [appendTracks, buildAudioClipFromBuffer, tracks.length, getProgressiveTrackColor, isReadOnly]);
 
     const importLibraryEntryIntoDestination = useCallback(async (
         entry: ScannedFileEntry,
@@ -4287,12 +4424,7 @@ const App: React.FC = () => {
         }
 
         const decoded = await engineAdapter.decodeAudioData(fileData.data.slice(0));
-        let sourceId: string | undefined;
-        try {
-            sourceId = await assetDb.saveFile(new Blob([fileData.data], { type: 'application/octet-stream' }));
-        } catch (persistError) {
-            console.warn('Asset cache unavailable for library import', persistError);
-        }
+        const sourceId = await assetDb.saveFile(new Blob([fileData.data], { type: 'application/octet-stream' }));
 
         const destinationTrack = destination?.trackId
             ? tracks.find((track) => track.id === destination.trackId)
@@ -4544,6 +4676,11 @@ const App: React.FC = () => {
     }, [appendTrack, applyTrackMutation, assignClipToSessionSlot, cloneClipForDrop, importLibraryEntryIntoDestination, insertGeneratorIntoDestination, tracks]);
 
     const handleImportAudio = useCallback(async () => {
+        if (isReadOnly) {
+            alert('Este proyecto está en modo visor y no permite importar audio.');
+            return;
+        }
+
         if (platformService.isElectron) {
             try {
                 const files = await platformService.selectAudioFiles();
@@ -4564,7 +4701,7 @@ const App: React.FC = () => {
         }
 
         fileInputRef.current?.click();
-    }, [importAudioSources]);
+    }, [importAudioSources, isReadOnly]);
 
     const handleFileImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -4572,17 +4709,17 @@ const App: React.FC = () => {
 
         try {
             const fileArray = Array.from(files);
-            const sources: ImportAudioSource[] = await Promise.all(fileArray.map(async (file: File) => ({
+            const sources: ImportAudioSource[] = fileArray.map((file: File) => ({
                 name: file.name,
-                arrayBuffer: await file.arrayBuffer(),
+                readArrayBuffer: () => file.arrayBuffer(),
                 persistBlob: file
-            })));
+            }));
 
             await importAudioSources(sources);
 
         } catch (err) {
             console.error("Import failed", err);
-            alert("No se pudo importar el archivo de audio.");
+            alert(err instanceof Error ? err.message : "No se pudo importar el archivo de audio.");
         } finally {
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
@@ -5908,4 +6045,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
