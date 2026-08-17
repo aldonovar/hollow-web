@@ -19,6 +19,7 @@ import { MfaChallenge } from './pages/MfaChallenge';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
 import { DesktopAuthBridge } from './pages/DesktopAuthBridge';
+import { OAuthConsent } from './pages/OAuthConsent';
 import { readAuthNextFromSearch } from './lib/authFlow';
 import { useAuthStore } from './stores/authStore';
 
@@ -97,6 +98,7 @@ function App() {
       <ScrollToTop />
       <Routes>
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/oauth/consent" element={<OAuthConsent />} />
         {isPlayApp ? (
           /* =========================================
              RUTAS DE LA APLICACIÓN DAW (play. / console.)

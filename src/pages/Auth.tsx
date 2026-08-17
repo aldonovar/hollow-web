@@ -17,6 +17,10 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
   const navigate = useNavigate();
   const location = useLocation();
   const nextPath = useMemo(() => readAuthNextFromSearch(location.search), [location.search]);
+  const alternateAuthPath = useMemo(() => {
+    const params = new URLSearchParams({ next: nextPath });
+    return `${type === 'login' ? '/signup' : '/login'}?${params.toString()}`;
+  }, [nextPath, type]);
   const autoGoogleStarted = useRef(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -283,9 +287,9 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
 
         <div className="auth-card__footer">
           {type === 'login' ? (
-            <p>¿No tienes una cuenta? <Link to="/signup">Regístrate aquí</Link></p>
+            <p>¿No tienes una cuenta? <Link to={alternateAuthPath}>Regístrate aquí</Link></p>
           ) : (
-            <p>¿Ya tienes una cuenta? <Link to="/login">Inicia sesión</Link></p>
+            <p>¿Ya tienes una cuenta? <Link to={alternateAuthPath}>Inicia sesión</Link></p>
           )}
         </div>
       </div>

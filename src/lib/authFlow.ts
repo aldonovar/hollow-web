@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { sanitizeOAuthConsentNextPath } from './oauthConsent';
 
 export const CANONICAL_AUTH_ORIGIN = 'https://play.hollowbits.com';
 export const AUTH_CALLBACK_PATH = '/auth/callback';
@@ -37,6 +38,9 @@ export function sanitizeAuthNextPath(
   if (!rawNext || !rawNext.startsWith('/') || rawNext.startsWith('//') || rawNext.includes('\\')) {
     return safeFallback;
   }
+
+  const consentPath = sanitizeOAuthConsentNextPath(rawNext);
+  if (consentPath) return consentPath;
 
   try {
     const parsed = new URL(rawNext, 'https://dawfi.invalid');
