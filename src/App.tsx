@@ -13,11 +13,13 @@ import { Console } from './pages/Console';
 import { Roadmap } from './pages/Roadmap';
 import { Contact } from './pages/Contact';
 import { Auth } from './pages/Auth';
+import { AuthCallback } from './pages/AuthCallback';
 import { Settings } from './pages/Settings';
 import { MfaChallenge } from './pages/MfaChallenge';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
 import { DesktopAuthBridge } from './pages/DesktopAuthBridge';
+import { readAuthNextFromSearch } from './lib/authFlow';
 import { useAuthStore } from './stores/authStore';
 
 const DawApp = lazy(() => import('./daw/App'));
@@ -35,6 +37,8 @@ function ScrollToTop() {
 function GuestRoute({ children }: { children: React.ReactNode }) {
   const session = useAuthStore((s) => s.session);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const { search } = useLocation();
+  const nextPath = readAuthNextFromSearch(search);
 
   // While loading, show a minimal centered spinner instead of blank page
   if (isLoading) {
@@ -56,7 +60,7 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (session) return <Navigate to="/console" replace />;
+  if (session) return <Navigate to={nextPath} replace />;
   return <>{children}</>;
 }
 
@@ -92,6 +96,7 @@ function App() {
     <Router>
       <ScrollToTop />
       <Routes>
+        <Route path="/auth/callback" element={<AuthCallback />} />
         {isPlayApp ? (
           /* =========================================
              RUTAS DE LA APLICACIÓN DAW (play. / console.)

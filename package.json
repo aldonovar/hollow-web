@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test:audio-cloud": "node --test --experimental-strip-types src/daw/services/storage/audioAssetFormat.test.ts src/daw/services/storage/projectAudioAssetService.test.ts",
+    "test:auth-hardening": "node scripts/verify-auth-hardening.mjs",
     "test:contract": "node scripts/verify-ecosystem-contract.mjs",
     "preview:edge": "npm run build && wrangler pages dev dist",
     "preview:vite": "vite preview"

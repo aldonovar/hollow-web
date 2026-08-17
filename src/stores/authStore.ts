@@ -73,32 +73,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       }
     }, 5000);
 
-    /**
-     * Cross-domain token handler:
-     * When navigating from hollowbits.com → play.hollowbits.com, tokens are
-     * passed in the URL hash as #access_token=...&refresh_token=...
-     * We consume them here and call setSession() before the standard hydration.
-     */
-    const hash = window.location.hash;
-    const hashHasTokens = hash.includes('access_token=') && hash.includes('refresh_token=');
-
     const hydrateSession = async () => {
-      if (hashHasTokens) {
-        try {
-          const params = new URLSearchParams(hash.substring(1));
-          const accessToken = params.get('access_token') || '';
-          const refreshToken = params.get('refresh_token') || '';
-          // Clean the hash from URL immediately
-          window.history.replaceState(null, '', window.location.pathname + window.location.search);
-          if (accessToken.length > 30 && refreshToken.length > 10) {
-            const { data, error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-            if (data.session && !error) return data.session;
-          }
-        } catch (err) {
-          console.warn('[authStore] Hash token exchange failed:', err);
-        }
-      }
-      // Standard hydration from ssoStorage (localStorage primary)
+      // OAuth callbacks are exchanged explicitly by /auth/callback. Session
+      // hydration only reads the current origin's Supabase-managed storage.
       const { data: { session } } = await supabase.auth.getSession();
       return session;
     };

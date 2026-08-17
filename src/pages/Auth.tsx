@@ -1,7 +1,13 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Mail, ArrowRight, AlertCircle, Lock, User, AtSign } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import {
+  beginGoogleSignIn,
+  buildAuthCallbackUrl,
+  getAuthErrorMessage,
+  readAuthNextFromSearch,
+} from '../lib/authFlow';
 import { useAuthStore } from '../stores/authStore';
 import './Auth.css';
 
@@ -9,6 +15,9 @@ type AuthStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export function Auth({ type }: { type: 'login' | 'signup' }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const nextPath = useMemo(() => readAuthNextFromSearch(location.search), [location.search]);
+  const autoGoogleStarted = useRef(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   // Campos extra para signup
@@ -40,7 +49,7 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
               full_name: fullName,
               username: username
             },
-            emailRedirectTo: `${window.location.origin}/console`,
+            emailRedirectTo: buildAuthCallbackUrl(nextPath),
           }
         });
 
@@ -56,7 +65,7 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
             session: data.session,
             isLoading: false,
           });
-          navigate('/console', { replace: true });
+          navigate(nextPath, { replace: true });
         } else {
           setStatus('success');
         }
@@ -90,7 +99,7 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
             session: data.session,
             isLoading: false,
           });
-          navigate('/console', { replace: true });
+          navigate(nextPath, { replace: true });
         } else {
           setStatus('error');
           setErrorMessage('No se pudo establecer sesión. Intenta de nuevo.');
@@ -102,30 +111,23 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = useCallback(async () => {
     setStatus('loading');
     setErrorMessage(null);
     try {
-      const callbackUrl = `${window.location.origin}/console`;
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: callbackUrl,
-          queryParams: {
-            prompt: 'select_account',
-          },
-        }
-      });
-
-      if (error) {
-        setStatus('error');
-        setErrorMessage(error.message);
-      }
-    } catch (err: any) {
+      await beginGoogleSignIn(nextPath);
+    } catch (err: unknown) {
       setStatus('error');
-      setErrorMessage(err.message || 'Error inesperado al conectar con Google.');
+      setErrorMessage(getAuthErrorMessage(err));
     }
-  };
+  }, [nextPath]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('oauth') !== 'google' || autoGoogleStarted.current) return;
+    autoGoogleStarted.current = true;
+    void handleGoogleLogin();
+  }, [handleGoogleLogin, location.search]);
 
   if (status === 'success' && type === 'signup') {
     return (
