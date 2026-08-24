@@ -453,6 +453,154 @@ body,
     min-height: 0;
   }
 
+  .daw-bottom-panel > :first-child {
+    min-height: 44px;
+    align-items: stretch !important;
+  }
+
+  .daw-bottom-panel > :first-child button,
+  .daw-bottom-panel .group.relative.select-none > div:first-child button,
+  .daw-bottom-panel .group.relative.select-none > div:first-child [role="button"] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .daw-bottom-panel .group.relative.select-none {
+    min-width: 320px !important;
+  }
+
+  .daw-bottom-panel .group.relative.select-none > div:first-child {
+    height: 44px !important;
+    min-height: 44px;
+  }
+
+  .daw-status-bar {
+    height: 44px !important;
+    min-height: 44px;
+  }
+
+  .daw-status-bar button {
+    min-height: 44px;
+  }
+
+  .daw-arrange-timeline button[title^="Snap:"],
+  .daw-arrange-timeline button:has(> svg[class*="lucide-grid"]) {
+    height: 44px !important;
+    min-height: 44px;
+    margin-top: -10px;
+    margin-bottom: -10px;
+  }
+
+  .daw-arrange-timeline button[title^="Snap:"] {
+    width: 44px !important;
+    min-width: 44px;
+  }
+
+  .daw-arrange-timeline button:not([class*="opacity-0"]),
+  .daw-take-panel button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .daw-track-delete-action {
+    width: 44px !important;
+    min-width: 44px;
+    height: 44px !important;
+    min-height: 44px;
+    margin-top: -12px;
+    margin-right: -6px;
+    opacity: 1 !important;
+  }
+
+  .daw-arrange-timeline div:has(> div > button[title^="Punch "]) {
+    height: 44px !important;
+    min-height: 44px;
+    flex-direction: row !important;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    touch-action: pan-x;
+  }
+
+  .daw-arrange-timeline div:has(> div > button[title^="Punch "])::-webkit-scrollbar {
+    display: none;
+  }
+
+  .daw-arrange-timeline div:has(> div > button[title^="Punch "]) > div:not(:last-child) {
+    flex: 0 0 148px;
+    width: 148px;
+    height: 44px !important;
+    min-height: 44px;
+    margin-bottom: 0 !important;
+  }
+
+  .daw-arrange-timeline div:has(> div > button[title^="Punch "]) > div:not(:last-child) button {
+    min-width: 44px;
+    min-height: 44px;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .daw-arrange-timeline div:has(> div > button[title^="Punch "]) > div:last-child {
+    flex: 0 0 auto;
+    width: max-content;
+    height: 44px !important;
+    min-height: 44px;
+    grid-template-columns: repeat(4, 44px) !important;
+  }
+
+  .daw-arrange-timeline div:has(> div > button[title^="Punch "]) > div:last-child > button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .daw-primary-view > .flex-1:has(button[title^="Lanzar escena "]) {
+    height: 100% !important;
+    max-height: 100%;
+    min-height: 0;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    touch-action: pan-x pan-y;
+  }
+
+  .daw-primary-view > .flex-1:has(button[title^="Lanzar escena "]) > div:last-child > div:first-child {
+    width: 96px !important;
+  }
+
+  .daw-primary-view > .flex-1:has(button[title^="Lanzar escena "]) div:has(> select) {
+    min-height: 44px;
+  }
+
+  .daw-primary-view > .flex-1:has(button[title^="Lanzar escena "]) select,
+  .daw-primary-view > .flex-1:has(button[title^="Lanzar escena "]) button[title="Detener todos los clips"],
+  .daw-primary-view > .flex-1:has(button[title^="Lanzar escena "]) button[title^="Lanzar escena "] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .daw-primary-view > .flex-1:has(button[title^="Lanzar escena "]) div:has(> button[title="Scene Recording"]) {
+    grid-template-columns: repeat(2, 44px) !important;
+  }
+
+  .daw-primary-view > .flex-1:has(button[title^="Lanzar escena "]) div:has(> button[title="Scene Recording"]) > button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px !important;
+    min-height: 44px;
+  }
+
+  .daw-browser-drawer button,
+  .daw-browser-drawer input,
+  .daw-ai-drawer-portal > div button,
+  .daw-ai-drawer-portal > div input,
+  .daw-ai-drawer-portal > div textarea {
+    min-height: 44px;
+  }
+
   .daw-tool-rail {
     overflow-x: hidden;
     overflow-y: auto;
@@ -562,6 +710,7 @@ body,
     width: min(100%, 420px) !important;
     max-width: 100%;
     height: auto !important;
+    z-index: 80 !important;
     border-right: 1px solid #36373c !important;
     border-left: 0 !important;
     background: #15161a !important;
@@ -589,6 +738,12 @@ body,
     border-radius: 4px !important;
     background: #18191d !important;
     box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55) !important;
+  }
+
+  .daw-file-menu button,
+  .daw-session-popover button {
+    width: 100% !important;
+    min-width: 100%;
   }
 
   .daw-import-progress {
@@ -646,8 +801,8 @@ body,
 
   .daw-status-bar {
     width: 100%;
-    height: 40px !important;
-    min-height: 40px;
+    height: 44px !important;
+    min-height: 44px;
     padding-right: 8px !important;
     padding-left: 8px !important;
     gap: 8px;
@@ -740,8 +895,43 @@ body,
   }
 
   .daw-status-bar {
-    height: 28px !important;
-    min-height: 28px;
+    height: 44px !important;
+    min-height: 44px;
+  }
+
+  .daw-ai-drawer-portal > div {
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: min(420px, 100%) !important;
+    height: auto !important;
+    z-index: 80 !important;
+    overflow: hidden;
+  }
+
+  .daw-browser-drawer {
+    z-index: 80 !important;
+  }
+
+  .daw-file-menu,
+  .daw-session-popover {
+    position: fixed !important;
+    top: calc(96px + env(safe-area-inset-top, 0px)) !important;
+    right: auto !important;
+    bottom: calc(44px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 58px !important;
+    width: min(420px, calc(100vw - 74px)) !important;
+    max-height: none;
+    overflow-y: auto;
+    border-radius: 4px !important;
+    background: #18191d !important;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55) !important;
+  }
+
+  .daw-file-menu button,
+  .daw-session-popover button {
+    width: 100% !important;
+    min-width: 100%;
   }
 
   .daw-take-panel {
@@ -759,4 +949,23 @@ body,
     right: min(220px, 34vw) !important;
     bottom: 0 !important;
   }
+}
+
+.daw-product-switcher{color-scheme:dark;overscroll-behavior-x:contain}
+.daw-product-switcher::-webkit-scrollbar{display:none}
+.daw-product-switcher__link{display:flex;height:40px;align-items:center;border:1px solid transparent;border-radius:2px;padding:0 12px;
+  color:#8f9197;text-decoration:none;font-size:10px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;white-space:nowrap;transition:background .14s ease,border-color .14s ease,color .14s ease}
+.daw-product-switcher__link:hover{border-color:#3b3c42;background:#202126;color:#e3e4e6}
+.daw-product-switcher__link[aria-current="page"]{border-color:#4a4b51;background:#28292e;color:#fff}
+
+@media(max-width:640px){
+  .daw-product-switcher{height:56px!important;min-height:56px!important;padding-right:max(8px,env(safe-area-inset-right,0px))!important;padding-left:max(8px,env(safe-area-inset-left,0px))!important}
+  .daw-product-switcher>a:first-child span{display:none}
+  .daw-product-switcher__link{height:44px;padding:0 10px}
+  .daw-product-switcher button{height:44px;min-height:44px}
+}
+
+@media(max-height:500px) and (orientation:landscape){
+  .daw-product-switcher{height:48px!important;min-height:48px!important}
+  .daw-product-switcher__link,.daw-product-switcher button{height:40px;min-height:40px}
 }

@@ -42,10 +42,6 @@ export default defineConfig({
           if (id.includes('gsap') || id.includes('lenis')) {
             return 'vendor-animation'
           }
-          // ── AI / GenAI SDK ──
-          if (id.includes('@google/genai')) {
-            return 'vendor-ai'
-          }
         },
       },
     },

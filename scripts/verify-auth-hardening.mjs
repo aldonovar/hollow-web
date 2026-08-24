@@ -105,8 +105,11 @@ assert(!oauthConsentPage.includes('console.log'), 'Consent must not log OAuth re
 assert(desktopBridge.includes('buildSafeDawfiDesktopCallbackFromSearch'), 'The Desktop bridge must validate the HTTPS callback before opening the app.');
 assert(desktopBridge.includes('window.history.replaceState'), 'The Desktop bridge must remove code and state from browser history immediately.');
 assert(desktopBridge.includes('window.location.assign'), 'The Desktop bridge must deliver the one-time code to the registered app protocol.');
-assert(desktopBridge.includes('window.close()'), 'The Desktop bridge must attempt to close the now-unnecessary browser tab.');
-assert(desktopBridge.includes('Esta pestaña ya no es necesaria'), 'The Desktop bridge must tell the user that the browser tab can be closed.');
+assert(desktopBridge.includes('Esta página no puede confirmar por sí sola'), 'The Desktop bridge must not claim delivery without an app acknowledgement.');
+assert(desktopBridge.includes('Cuando DAW-fi esté visible y muestre tu cuenta'), 'The Desktop bridge must explain when it is safe to close the browser tab.');
+assert(desktopBridge.includes('Reintentar abrir DAW-fi'), 'The Desktop bridge must expose a clear manual protocol retry.');
+assert(!desktopBridge.includes('window.close()'), 'The Desktop bridge must not auto-close without a delivery acknowledgement.');
+assert(!desktopBridge.includes('Sesión enviada a DAW-fi'), 'The Desktop bridge still makes an unverified delivery claim.');
 assert(oauthConsentContract.includes('buildSafeDawfiDesktopCallbackFromSearch'), 'The HTTPS bridge query must use the strict desktop callback validator.');
 assert(!desktopBridge.includes('href='), 'Desktop bridge must not render a handoff link.');
 assert(!desktopBridge.includes('console.'), 'Desktop bridge must not log OAuth request or response data.');

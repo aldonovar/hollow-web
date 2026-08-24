@@ -62,7 +62,7 @@ test('Piano Cinema bounds long-project ribbon work and exposes keyboard transpor
   assert.ok(markerCount > 0);
   assert.ok(markerCount <= 48);
   assert.match(markup, /role="slider"/);
-  assert.match(markup, /aria-label="Posición del transporte de Falling Notes"/);
+  assert.match(markup, /aria-label="Posición del transporte de Keys-fi"/);
   assert.match(markup, /aria-valuemax="32000"/);
   assert.match(markup, /motion-reduce:transition-none/);
 });

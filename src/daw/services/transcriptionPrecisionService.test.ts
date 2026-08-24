@@ -65,7 +65,7 @@ const analyze = (events: ToneEvent[], durationSeconds = 1.4) => {
 
 const startSeconds = (note: { start: number }) => note.start * SECONDS_PER_16TH;
 
-test('Falling Notes preserves anti-phase stereo content', () => {
+test('Score-fi and Keys-fi preserve anti-phase stereo content', () => {
   const left = renderTones([{ midi: 69, start: 0, end: 0.5 }], 0.5);
   const right = Float32Array.from(left, (sample) => -sample);
   const mono = buildPolaritySafeMono([left, right]);
@@ -73,7 +73,7 @@ test('Falling Notes preserves anti-phase stereo content', () => {
   assert.ok(peak > 0.2);
 });
 
-test('Falling Notes refines chord onsets in narrow pitch bands', () => {
+test('Score-fi and Keys-fi refine chord onsets in narrow pitch bands', () => {
   const pitches = [60, 64, 67];
   const signal = renderTones(pitches.map((midi) => ({ midi, start: 0.24, end: 0.9 })), 1.1);
   const refined = pitches.map((midi) => refineEnvelopeBounds(
@@ -90,7 +90,7 @@ test('Falling Notes refines chord onsets in narrow pitch bands', () => {
   assert.ok(Math.max(...onsets) - Math.min(...onsets) <= 0.02);
 });
 
-test('Falling Notes does not jump a quiet note to its louder retrigger', () => {
+test('Score-fi and Keys-fi do not jump a quiet note to its louder retrigger', () => {
   const signal = renderTones([
     { midi: 60, start: 0.35, end: 0.48, amplitude: 0.12 },
     { midi: 60, start: 0.5, end: 0.8, amplitude: 0.65 },
@@ -108,7 +108,7 @@ test('Falling Notes does not jump a quiet note to its louder retrigger', () => {
   assert.ok(bounds.endSec < 0.5, JSON.stringify(bounds));
 });
 
-test('Falling Notes reuses narrow-band kernels within its postprocess budget', () => {
+test('Score-fi and Keys-fi reuse narrow-band kernels within the postprocess budget', () => {
   const signal = renderTones([
     { midi: 33, start: 0.1, end: 1.9, amplitude: 0.25 },
   ], 2);
@@ -119,7 +119,7 @@ test('Falling Notes reuses narrow-band kernels within its postprocess budget', (
   assert.ok(performance.now() - startedAt < 600);
 });
 
-test('Falling Notes web executes the real worker engine and retains open octave voicings', () => {
+test('Score-fi and Keys-fi execute the real worker engine and retain open octave voicings', () => {
   const expectedStart = 0.22;
   const result = analyze([
     { midi: 48, start: expectedStart, end: 0.98, amplitude: 0.24 },
@@ -135,7 +135,7 @@ test('Falling Notes web executes the real worker engine and retains open octave 
   assert.ok(Math.abs(startSeconds(upper) - expectedStart) <= 0.1, JSON.stringify(result.notes));
 });
 
-test('Falling Notes keeps sub-bin pitch math and an adaptive Synthesia viewport', () => {
+test('Score-fi and Keys-fi keep sub-bin pitch math and an adaptive performance viewport', () => {
   const spectrum = new Float32Array(64);
   spectrum[20] = 4;
   spectrum[21] = 10;

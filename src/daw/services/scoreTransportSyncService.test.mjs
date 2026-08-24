@@ -22,6 +22,7 @@ const {
   buildScoreTransportFrame,
   getScoreClipTransportTransform,
   globalTimeline16thToScoreSource16th,
+  normalizeScoreNotesToAudibleClipWindow,
   scoreSource16thToGlobalTimeline16th,
   timeline16thToBarTime,
 } = bundledModule.exports;
@@ -121,4 +122,77 @@ test('score transport never activates notes outside the clip or at a half-open e
   assert.deepEqual(atNoteEnd.activeNoteIndexes, []);
   assert.equal(after.globalPlayhead16th, 48);
   assert.deepEqual(after.activeNoteIndexes, []);
+});
+
+test('score transport drops notes outside a trimmed clip and clips crossings into local time', () => {
+  const notes = [
+    { pitch: 40, start: 0, duration: 8, velocity: 80 },
+    { pitch: 41, start: 6, duration: 4, velocity: 81 },
+    { pitch: 42, start: 12, duration: 4, velocity: 82 },
+    { pitch: 43, start: 22, duration: 4, velocity: 83 },
+    { pitch: 44, start: 24, duration: 2, velocity: 84 },
+  ];
+  const normalized = normalizeScoreNotesToAudibleClipWindow(notes, audioContext({
+    clipLengthBars: 1,
+    clipOffsetBars: 0.5,
+    playbackRate: 1,
+  }));
+
+  assert.deepEqual(normalized, [
+    { pitch: 41, start: 0, duration: 2, velocity: 81 },
+    { pitch: 42, start: 4, duration: 4, velocity: 82 },
+    { pitch: 43, start: 14, duration: 2, velocity: 83 },
+  ]);
+});
+
+test('score transport translates source notes at fast and slow playback rates', () => {
+  const fast = normalizeScoreNotesToAudibleClipWindow([
+    { pitch: 60, start: 12, duration: 3, velocity: 90 },
+    { pitch: 64, start: 24, duration: 6, velocity: 91 },
+    { pitch: 67, start: 57, duration: 9, velocity: 92 },
+    { pitch: 72, start: 60, duration: 2, velocity: 93 },
+  ], audioContext({
+    clipLengthBars: 2,
+    clipOffsetBars: 0.5,
+    playbackRate: 1.5,
+  }));
+  const slow = normalizeScoreNotesToAudibleClipWindow([
+    { pitch: 55, start: 10, duration: 2, velocity: 88 },
+  ], audioContext({
+    clipLengthBars: 1,
+    clipOffsetBars: 1,
+    playbackRate: 0.5,
+  }));
+
+  assert.deepEqual(fast, [
+    { pitch: 60, start: 0, duration: 2, velocity: 90 },
+    { pitch: 64, start: 8, duration: 4, velocity: 91 },
+    { pitch: 67, start: 30, duration: 2, velocity: 92 },
+  ]);
+  assert.deepEqual(slow, [
+    { pitch: 55, start: 4, duration: 4, velocity: 88 },
+  ]);
+});
+
+test('score transport keeps normalized drafts clip-local for transport, seek and commit clamping', () => {
+  const context = audioContext({
+    noteTimeDomain: 'clip-local',
+    clipStartBar: 3,
+    clipLengthBars: 1,
+    clipOffsetBars: 4,
+    playbackRate: 2,
+  });
+  const normalized = normalizeScoreNotesToAudibleClipWindow([
+    { pitch: 60, start: -2, duration: 4, velocity: 90 },
+    { pitch: 64, start: 14, duration: 4, velocity: 91 },
+    { pitch: 67, start: 16, duration: 2, velocity: 92 },
+  ], context);
+
+  assert.deepEqual(normalized, [
+    { pitch: 60, start: 0, duration: 2, velocity: 90 },
+    { pitch: 64, start: 14, duration: 2, velocity: 91 },
+  ]);
+  assert.equal(globalTimeline16thToScoreSource16th(32, context), 0);
+  assert.equal(globalTimeline16thToScoreSource16th(40, context), 8);
+  assert.equal(scoreSource16thToGlobalTimeline16th(8, context), 40);
 });

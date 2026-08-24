@@ -25,6 +25,30 @@ import { useAuthStore } from './stores/authStore';
 
 const DawApp = lazy(() => import('./daw/App'));
 
+type DawProductMode = 'studio' | 'score' | 'keys';
+
+const PRODUCT_ROUTE_META: Record<DawProductMode, { title: string; loadingLabel: string }> = {
+  studio: { title: 'DAW-fi Studio | Hollow Bits', loadingLabel: 'CARGANDO DAW-FI STUDIO...' },
+  score: { title: 'Score-fi | Hollow Bits', loadingLabel: 'CARGANDO SCORE-FI...' },
+  keys: { title: 'Keys-fi | Hollow Bits', loadingLabel: 'CARGANDO KEYS-FI...' },
+};
+
+function DawProductRoute({ mode }: { mode: DawProductMode }) {
+  const meta = PRODUCT_ROUTE_META[mode];
+
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = meta.title;
+    return () => { document.title = previousTitle; };
+  }, [meta.title]);
+
+  return (
+    <Suspense fallback={<div className="daw-product-loading" role="status" aria-live="polite">{meta.loadingLabel}</div>}>
+      <DawApp surfaceMode={mode} />
+    </Suspense>
+  );
+}
+
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); }, [pathname]);
@@ -128,12 +152,10 @@ function App() {
             />
             <Route
               path="/engine"
-              element={
-                <Suspense fallback={<div style={{ background:'#06080a', minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontFamily:'monospace', fontSize:'13px' }}>CARGANDO MOTOR AUDIO...</div>}>
-                  <DawApp />
-                </Suspense>
-              }
+              element={<DawProductRoute mode="studio" />}
             />
+            <Route path="/score" element={<DawProductRoute mode="score" />} />
+            <Route path="/keys" element={<DawProductRoute mode="keys" />} />
             <Route path="*" element={<Navigate to="/console" replace />} />
           </>
         ) : (
@@ -173,12 +195,10 @@ function App() {
             
             <Route
               path="/engine"
-              element={
-                <Suspense fallback={<div style={{ background:'#06080a', minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontFamily:'monospace', fontSize:'13px' }}>CARGANDO MOTOR AUDIO...</div>}>
-                  <DawApp />
-                </Suspense>
-              }
+              element={<DawProductRoute mode="studio" />}
             />
+            <Route path="/score" element={<DawProductRoute mode="score" />} />
+            <Route path="/keys" element={<DawProductRoute mode="keys" />} />
           </>
         )}
       </Routes>

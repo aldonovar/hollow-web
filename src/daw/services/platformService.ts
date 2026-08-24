@@ -1,6 +1,16 @@
 
-import { DesktopWindowState, DirectoryScanRequest, FileData, ScannedFileEntry } from '../types';
-import { desktopRuntimeService } from './desktopRuntimeService';
+import type { DesktopWindowState, DirectoryScanRequest, FileData, ScannedFileEntry } from '../types.ts';
+import { desktopRuntimeService } from './desktopRuntimeService.ts';
+
+export interface ProjectBlobFile {
+  blob: Blob;
+  filename: string;
+}
+
+export interface ProjectFileSaveResult {
+  success: boolean;
+  filePath?: string;
+}
 
 class PlatformService {
   public isDesktop: boolean;
@@ -46,6 +56,25 @@ class PlatformService {
 
     console.warn("Failed to convert IPC data to ArrayBuffer. Type is:", typeof data);
     return null;
+  }
+
+  private projectFileName(name: string): string {
+    const safeName = name.replace(/[^a-z0-9\s-_]/gi, '').trim() || 'untitled';
+    return `${safeName}.esp`;
+  }
+
+  private downloadProjectBlob(blob: Blob, fileName: string): ProjectFileSaveResult {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.rel = 'noopener';
+    anchor.style.display = 'none';
+    document.body?.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    return { success: true, filePath: fileName.replace(/\.esp$/i, '') };
   }
 
   constructor() {
@@ -288,47 +317,70 @@ class PlatformService {
     return [];
   }
 
-  public async saveProject(data: string, name: string): Promise<{ success: boolean; filePath?: string }> {
-    const safeName = name.replace(/[^a-z0-9\s-_]/gi, '').trim() || "untitled";
-    const fileName = `${safeName}.esp`;
+  public async saveProject(data: string, name: string): Promise<ProjectFileSaveResult> {
+    const fileName = this.projectFileName(name);
 
     const host = desktopRuntimeService.api;
     if (host) {
       return await host.saveProject(data, fileName);
-    } else {
-      // Web Fallback
-      const blob = new Blob([data], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-      return { success: true, filePath: fileName.replace('.esp', '') }; // Web always assumes success
     }
+
+    return this.downloadProjectBlob(new Blob([data], { type: 'application/json' }), fileName);
   }
 
-  // Updated to return Text for manual parsing
-  public async openProjectFile(): Promise<{ text: string, filename: string } | null> {
+  public async saveProjectBlob(blob: Blob, name: string): Promise<ProjectFileSaveResult> {
+    const fileName = this.projectFileName(name);
     const host = desktopRuntimeService.api;
+    if (host?.saveProjectBinary) {
+      return await host.saveProjectBinary(await blob.arrayBuffer(), fileName);
+    }
+    if (host && blob.type === 'application/json') {
+      return await host.saveProject(await blob.text(), fileName);
+    }
+
+    // Browser download is also the safe fallback for a host that has not yet
+    // exposed a binary project bridge; the ZIP bytes are never coerced to text.
+    return this.downloadProjectBlob(blob, fileName);
+  }
+
+  public async openProjectBlob(): Promise<ProjectBlobFile | null> {
+    const host = desktopRuntimeService.api;
+    if (host?.openProjectBinary) {
+      try {
+        const result = await host.openProjectBinary();
+        if (!result) return null;
+        const data = this.toArrayBuffer(result.data);
+        if (!data) throw new Error('El bridge devolvió un payload binario inválido.');
+        return {
+          blob: new Blob([data], { type: result.mimeType || 'application/octet-stream' }),
+          filename: result.filename,
+        };
+      } catch (error) {
+        console.error('Desktop binary project open failed', error);
+        return null;
+      }
+    }
     if (host) {
       try {
-        return await host.openProject();
+        const legacy = await host.openProject();
+        return legacy
+          ? { blob: new Blob([legacy.text], { type: 'application/json' }), filename: legacy.filename }
+          : null;
       } catch (error) {
-        console.error("Desktop open project failed", error);
+        console.error('Desktop legacy project open failed', error);
         return null;
       }
     }
 
-    // Web Fallback
     return new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.esp';
+      input.accept = '.esp,application/zip,application/json';
       let resolved = false;
 
       input.onchange = async (event: Event) => {
         resolved = true;
+        window.removeEventListener('focus', onFocusBack);
         const target = event.target as HTMLInputElement;
         const file = target.files?.[0];
         if (!file) {
@@ -337,11 +389,10 @@ class PlatformService {
         }
 
         try {
-          const text = await file.text();
-          resolve({ text, filename: file.name });
+          resolve({ blob: file, filename: file.name });
         } catch (err) {
-          console.error("Error reading project file", err);
-          alert("Error de lectura de disco.");
+          console.error('Error reading project file', err);
+          alert('Error de lectura de disco.');
           resolve(null);
         }
       };
@@ -361,6 +412,13 @@ class PlatformService {
 
       input.click();
     });
+  }
+
+  /** Legacy text API retained for old JSON-only callers. */
+  public async openProjectFile(): Promise<{ text: string; filename: string } | null> {
+    const result = await this.openProjectBlob();
+    if (!result) return null;
+    return { text: await result.blob.text(), filename: result.filename };
   }
 }
 

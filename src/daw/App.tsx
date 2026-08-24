@@ -8,7 +8,7 @@ import Mixer from './components/Mixer';
 import Editor, { type EditorTransportView } from './components/Editor';
 import Browser from './components/Browser';
 import TakeLanesPanel from './components/TakeLanesPanel';
-import type { PianoScoreMidiCommitPayload } from './components/PianoScoreWorkspace';
+import type { PianoScoreMidiCommitPayload, PianoScoreSurfaceMode } from './components/PianoScoreWorkspace';
 import AppLogo from './components/AppLogo';
 import SessionView from './components/SessionView';
 import Modal from './components/Modal';
@@ -33,8 +33,14 @@ import {
     collectProjectAudioSourceRefs,
     getProjectAudioAssetRef,
     loadProjectAudioAssets,
-    mergeProjectAudioAssetRefs
+    mergeProjectAudioAssetRefs,
+    resolveProjectAudioBlob
 } from './services/storage/projectAudioAssetService';
+import {
+    createPortableProjectBundle,
+    readPortableProjectBundle
+} from './services/storage/portableProjectBundleService';
+import { validateAndCachePortableProjectAudioAssets } from './services/storage/portableProjectAssetCacheService';
 import {
     createTrack,
     removeTrackRoutingReferences,
@@ -273,6 +279,11 @@ interface RecordingSessionMeta {
 }
 
 type ToolPanel = 'browser' | 'ai' | 'scanner' | null;
+export type DawSurfaceMode = 'studio' | 'score' | 'keys';
+
+interface DawAppProps {
+    surfaceMode?: DawSurfaceMode;
+}
 
 const AUDIO_SETTINGS_STORAGE_KEY = 'hollowbits.audio-settings.v1';
 const AUDIO_SETTINGS_STORAGE_KEY_LEGACY = 'ethereal.audio-settings.v1';
@@ -343,8 +354,11 @@ const toPersistentClip = (clip: Clip): Clip => {
     return persistentClip;
 };
 
-const App: React.FC = () => {
+const App: React.FC<DawAppProps> = ({ surfaceMode = 'studio' }) => {
     const initialCollabSnapshot = useMemo(() => loadCollabSessionSnapshot(), []);
+    const isStandaloneProduct = surfaceMode !== 'studio';
+    const scoreSurfaceMode: PianoScoreSurfaceMode = surfaceMode === 'studio' ? 'combined' : surfaceMode;
+    const activeProductName = surfaceMode === 'score' ? 'Score-fi' : surfaceMode === 'keys' ? 'Keys-fi' : 'DAW-fi Studio';
 
     // Auth session (used for session indicator widget in sidebar)
     const { user, profile, session, signOut: authSignOut } = useAuthStore();
@@ -376,9 +390,9 @@ const App: React.FC = () => {
     const [collabCommandJournal, setCollabCommandJournal] = useState<CollabCommandRecord[]>(() => initialCollabSnapshot.commandJournal);
 
     // Side Panels
-    const [activeToolPanel, setActiveToolPanel] = useState<ToolPanel>(null);
+    const [activeToolPanel, setActiveToolPanel] = useState<ToolPanel>(() => isStandaloneProduct ? 'scanner' : null);
     const [hasLoadedAISidebar, setHasLoadedAISidebar] = useState(false);
-    const [hasLoadedNoteScanner, setHasLoadedNoteScanner] = useState(false);
+    const [hasLoadedNoteScanner, setHasLoadedNoteScanner] = useState(isStandaloneProduct);
     const [hasLoadedExportModal, setHasLoadedExportModal] = useState(false);
 
     // Menus & Modals
@@ -584,6 +598,8 @@ const App: React.FC = () => {
     const latestTracksRef = useRef<Track[]>(tracks);
     const projectAssetRefsRef = useRef<unknown[]>([]);
     const projectWorkspaceIdRef = useRef<string | undefined>(undefined);
+    const syncProjectAudioToCloudRef = useRef<((projectId: string, workspaceId?: string) => Promise<void>) | null>(null);
+    const projectAudioSyncPromiseRef = useRef<{ projectId: string; promise: Promise<void> } | null>(null);
     const trackSyncQueuedRef = useRef(false);
     const trackSyncFrameRef = useRef<number | null>(null);
     const boundaryTransitionInFlightRef = useRef(false);
@@ -3630,6 +3646,14 @@ const App: React.FC = () => {
         return repairProjectData(snapshot, { source: 'snapshot-save' }).project;
     }, [audioSettings, buildPersistedTracks, projectName, scoreWorkspaces, tracks]);
 
+    const createPortableProjectFile = useCallback(async (projectData: ProjectData): Promise<Blob> => {
+        const audioAssets = await loadProjectAudioAssets(
+            projectData.tracks,
+            async (sourceId) => (await assetDb.getFile(sourceId)) || null
+        );
+        return createPortableProjectBundle(projectData, audioAssets);
+    }, []);
+
     const hydrateProjectData = useCallback(async (
         projectCandidate: ProjectData,
         preferredName?: string,
@@ -3654,39 +3678,58 @@ const App: React.FC = () => {
         pauseResumeArmedRef.current = false;
         setLoadingMessage('Relacionando Archivos...');
 
-        const rehydratedTracks = await Promise.all(projectData.tracks.map(async (track: Track) => {
-            const rehydratedClips = await Promise.all(track.clips.map(async (clip: Clip) => {
-                if (track.type === TrackType.AUDIO && clip.sourceId) {
-                    try {
-                        const assetRef = projectId
-                            ? getProjectAudioAssetRef(projectAssetRefsRef.current, clip.sourceId, projectId, workspaceId)
-                            : undefined;
-                        let blob = await assetDb.getFile(clip.sourceId);
-
-                        if (!blob && projectId) {
-                            setLoadingMessage(`Descargando audio: ${clip.name}`);
-                            blob = await audioResourceManager.getAudioBuffer(projectId, clip.sourceId, assetRef?.path);
-                            const cachedSourceId = await assetDb.saveFile(blob);
-                            if (cachedSourceId !== clip.sourceId) {
-                                throw new Error('La fuente cloud no coincide con la huella guardada en el proyecto.');
-                            }
-                        }
-
-                        if (!blob) {
-                            return { ...clip, isOffline: true, buffer: undefined };
-                        }
-
-                        const arrayBuffer = await blob.arrayBuffer();
-                        const buffer = await engineAdapter.decodeAudioData(arrayBuffer);
-                        return { ...clip, buffer, isOffline: false };
-                    } catch (error) {
-                        console.warn(`No se pudo restaurar la fuente de audio ${clip.name}.`, error);
-                        return { ...clip, isOffline: true, buffer: undefined };
-                    }
+        // Restore one source at a time. A parallel Promise.all here multiplies
+        // Blob, ArrayBuffer and decoded AudioBuffer pressure on mobile browsers.
+        const hydratedAudioBuffers = new Map<string, AudioBuffer | null>();
+        const rehydratedTracks: Track[] = [];
+        for (const track of projectData.tracks) {
+            const rehydratedClips: Clip[] = [];
+            for (const clip of track.clips) {
+                if (track.type !== TrackType.AUDIO || !clip.sourceId) {
+                    rehydratedClips.push(clip);
+                    continue;
                 }
 
-                return clip;
-            }));
+                if (hydratedAudioBuffers.has(clip.sourceId)) {
+                    const sharedBuffer = hydratedAudioBuffers.get(clip.sourceId) || undefined;
+                    rehydratedClips.push({ ...clip, buffer: sharedBuffer, isOffline: !sharedBuffer });
+                    continue;
+                }
+
+                try {
+                    setLoadingMessage(`Restaurando audio: ${clip.name}`);
+                    const cachedBlob = await assetDb.getFile(clip.sourceId);
+                    if (!cachedBlob && projectId) {
+                        setLoadingMessage(`Descargando audio: ${clip.name}`);
+                    }
+                    const blob = await resolveProjectAudioBlob({
+                        assetRefs: projectAssetRefsRef.current,
+                        sourceId: clip.sourceId,
+                        projectId,
+                        workspaceId,
+                        getLocalBlob: async () => cachedBlob,
+                        downloadCloudBlob: (cloudProjectId, sourceId, assetPath) => (
+                            audioResourceManager.getAudioBuffer(cloudProjectId, sourceId, assetPath)
+                        ),
+                        cacheCloudBlob: (cloudBlob) => assetDb.saveFile(cloudBlob)
+                    });
+                    if (!blob) {
+                        hydratedAudioBuffers.set(clip.sourceId, null);
+                        rehydratedClips.push({ ...clip, isOffline: true, buffer: undefined });
+                        continue;
+                    }
+
+                    setLoadingMessage(`Decodificando audio: ${clip.name}`);
+                    const arrayBuffer = await blob.arrayBuffer();
+                    const buffer = await engineAdapter.decodeAudioData(arrayBuffer);
+                    hydratedAudioBuffers.set(clip.sourceId, buffer);
+                    rehydratedClips.push({ ...clip, buffer, isOffline: false });
+                } catch (error) {
+                    console.warn(`No se pudo restaurar la fuente de audio ${clip.name}.`, error);
+                    hydratedAudioBuffers.set(clip.sourceId, null);
+                    rehydratedClips.push({ ...clip, isOffline: true, buffer: undefined });
+                }
+            }
 
             const clipById = new Map(rehydratedClips.map((clip) => [clip.id, clip]));
             const sourceSessionClips = Array.isArray(track.sessionClips) ? track.sessionClips : [];
@@ -3697,12 +3740,12 @@ const App: React.FC = () => {
                 isQueued: false
             }));
 
-            return withTrackRuntimeDefaults({
+            rehydratedTracks.push(withTrackRuntimeDefaults({
                 ...track,
                 clips: rehydratedClips,
                 sessionClips: normalizedSessionClips
-            });
-        }));
+            }));
+        }
 
         replaceTracks(rehydratedTracks, { recolor: true });
 
@@ -3863,8 +3906,10 @@ const App: React.FC = () => {
                     )
                 ));
                 if (hasPendingAudio) {
-                    console.info('[CloudAutoSave] Omitted until imported audio is explicitly synced.');
-                    return;
+                    const syncAudio = syncProjectAudioToCloudRef.current;
+                    if (!syncAudio) return;
+                    console.info('[CloudAutoSave] Syncing pending project audio before metadata.');
+                    await syncAudio(collabSessionId, projectWorkspaceIdRef.current);
                 }
 
                 const clockSnapshot = getTransportClockSnapshot();
@@ -4010,17 +4055,27 @@ const App: React.FC = () => {
             setLoadingProject(true);
             setLoadingMessage("Leyendo proyecto...");
 
-            const result = await platformService.openProjectFile();
+            const result = await platformService.openProjectBlob();
             if (!result) {
                 setLoadingProject(false);
                 setLoadingMessage("");
                 return; // User cancelled
             }
 
-            const { text, filename } = result;
-            const projectData: ProjectData = JSON.parse(text);
+            const { blob, filename } = result;
+            const bundle = await readPortableProjectBundle(blob);
+            if (bundle.audioAssets.size > 0) {
+                setLoadingMessage(`Validando y guardando ${bundle.audioAssets.size} fuente${bundle.audioAssets.size === 1 ? '' : 's'} de audio...`);
+                await validateAndCachePortableProjectAudioAssets(
+                    bundle.audioAssets,
+                    (audioBlob, verifiedBytes) => assetDb.saveFile(audioBlob, verifiedBytes)
+                );
+            }
+
+            const projectData = bundle.projectData;
 
             const nameFromDisk = filename.replace(/\.esp$/i, '');
+            setCollabSessionId(null);
             const integrityReport = await hydrateProjectData(projectData, nameFromDisk || projectData.name, {
                 source: 'open-project',
                 rememberReport: true
@@ -4043,79 +4098,96 @@ const App: React.FC = () => {
     const handleDownloadProject = useCallback(async () => {
         setLoadingProject(true);
         setLoadingMessage("Preparando archivo local...");
-
-        setTimeout(async () => {
-            try {
-                if (transport.isPlaying) {
-                    engineAdapter.pause();
-                    setTransport((prev: TransportState) => ({ ...prev, isPlaying: false }));
-                    isPlayingRef.current = false;
-                    pauseResumeArmedRef.current = false;
-                }
-                const clockSnapshot = getTransportClockSnapshot();
-                const projectMetadata = createProjectDataSnapshot({
-                    ...transport,
-                    isPlaying: false,
-                    isRecording: false,
-                    currentBar: clockSnapshot.currentBar,
-                    currentBeat: clockSnapshot.currentBeat,
-                    currentSixteenth: clockSnapshot.currentSixteenth
-                }, projectName);
-                const integrityResult = repairProjectData(projectMetadata, { source: 'save-project' });
-                rememberProjectIntegrityReport(integrityResult.report);
-                const jsonString = JSON.stringify(integrityResult.project, null, 2);
-
-                await platformService.saveProject(jsonString, projectName);
-            } catch (err) {
-                console.error("Error al descargar proyecto:", err);
-                alert("Hubo un error al intentar descargar el proyecto.");
-            } finally {
-                setLoadingProject(false);
+        try {
+            if (transport.isPlaying) {
+                engineAdapter.pause();
+                setTransport((prev: TransportState) => ({ ...prev, isPlaying: false }));
+                isPlayingRef.current = false;
+                pauseResumeArmedRef.current = false;
             }
-        }, 50);
-    }, [transport, projectName, createProjectDataSnapshot]);
+            const clockSnapshot = getTransportClockSnapshot();
+            const projectMetadata = createProjectDataSnapshot({
+                ...transport,
+                isPlaying: false,
+                isRecording: false,
+                currentBar: clockSnapshot.currentBar,
+                currentBeat: clockSnapshot.currentBeat,
+                currentSixteenth: clockSnapshot.currentSixteenth
+            }, projectName);
+            const integrityResult = repairProjectData(projectMetadata, { source: 'save-project' });
+            rememberProjectIntegrityReport(integrityResult.report);
+            setLoadingMessage("Empaquetando audio original...");
+            const projectBlob = await createPortableProjectFile(integrityResult.project);
+            const result = await platformService.saveProjectBlob(projectBlob, projectName);
+            if (!result.success) throw new Error('No se pudo descargar el proyecto portable.');
+        } catch (err) {
+            console.error("Error al descargar proyecto:", err);
+            alert("No se pudo crear el proyecto portable. Verifica que todas sus fuentes de audio sigan disponibles.");
+        } finally {
+            setLoadingProject(false);
+            setLoadingMessage("");
+        }
+    }, [createPortableProjectFile, createProjectDataSnapshot, projectName, rememberProjectIntegrityReport, transport]);
 
     const syncProjectAudioToCloud = useCallback(async (projectId: string, workspaceId?: string) => {
-        projectWorkspaceIdRef.current = workspaceId;
+        const activeSync = projectAudioSyncPromiseRef.current;
+        if (activeSync) {
+            if (activeSync.projectId === projectId) return activeSync.promise;
+            await activeSync.promise;
+        }
 
-        const sourceRefs = collectProjectAudioSourceRefs(latestTracksRef.current);
-        const pendingRefs = sourceRefs.filter(({ sourceId }) => {
-            const existing = getProjectAudioAssetRef(
-                projectAssetRefsRef.current,
-                sourceId,
-                projectId,
-                workspaceId
+        const syncPromise = (async () => {
+            projectWorkspaceIdRef.current = workspaceId;
+
+            const sourceRefs = collectProjectAudioSourceRefs(latestTracksRef.current);
+            const pendingRefs = sourceRefs.filter(({ sourceId }) => {
+                const existing = getProjectAudioAssetRef(
+                    projectAssetRefsRef.current,
+                    sourceId,
+                    projectId,
+                    workspaceId
+                );
+                return !existing;
+            });
+
+            if (pendingRefs.length === 0) return;
+
+            setLoadingMessage(`Sincronizando ${pendingRefs.length} archivo${pendingRefs.length === 1 ? '' : 's'} de audio...`);
+            const availableAssets = await loadProjectAudioAssets(
+                latestTracksRef.current,
+                async (sourceId) => (await assetDb.getFile(sourceId)) || null
             );
-            return !existing;
-        });
+            const pendingAssets = new Map(
+                pendingRefs.map(({ sourceId }) => {
+                    const asset = availableAssets.get(sourceId);
+                    if (!asset) {
+                        throw new Error(`No se encontró la fuente local ${sourceId}.`);
+                    }
+                    return [sourceId, asset] as const;
+                })
+            );
 
-        if (pendingRefs.length === 0) return;
+            const committedRefs = await audioResourceManager.commitProjectAudio(
+                projectId,
+                workspaceId,
+                pendingAssets
+            );
+            projectAssetRefsRef.current = mergeProjectAudioAssetRefs(
+                projectAssetRefsRef.current,
+                committedRefs
+            );
+        })();
 
-        setLoadingMessage(`Sincronizando ${pendingRefs.length} archivo${pendingRefs.length === 1 ? '' : 's'} de audio...`);
-        const availableAssets = await loadProjectAudioAssets(
-            latestTracksRef.current,
-            async (sourceId) => (await assetDb.getFile(sourceId)) || null
-        );
-        const pendingAssets = new Map(
-            pendingRefs.map(({ sourceId }) => {
-                const asset = availableAssets.get(sourceId);
-                if (!asset) {
-                    throw new Error(`No se encontró la fuente local ${sourceId}.`);
-                }
-                return [sourceId, asset] as const;
-            })
-        );
-
-        const committedRefs = await audioResourceManager.commitProjectAudio(
-            projectId,
-            workspaceId,
-            pendingAssets
-        );
-        projectAssetRefsRef.current = mergeProjectAudioAssetRefs(
-            projectAssetRefsRef.current,
-            committedRefs
-        );
+        projectAudioSyncPromiseRef.current = { projectId, promise: syncPromise };
+        try {
+            await syncPromise;
+        } finally {
+            if (projectAudioSyncPromiseRef.current?.promise === syncPromise) {
+                projectAudioSyncPromiseRef.current = null;
+            }
+        }
     }, []);
+    syncProjectAudioToCloudRef.current = syncProjectAudioToCloud;
 
     const handleSaveProject = useCallback(async () => {
         if (isReadOnly) {
@@ -4187,8 +4259,7 @@ const App: React.FC = () => {
                 });
 
                 if (createError?.message.includes('limit reached')) {
-                    alert('Has alcanzado el límite de proyectos para la capa gratuita. Por favor actualiza tu plan o elimina un proyecto.');
-                    return;
+                    throw new Error('Has alcanzado el límite de proyectos disponible en tu plan.');
                 }
                 if (createError) throw createError;
                 if (typeof newProjectId !== 'string' || newProjectId.length === 0) {
@@ -4213,11 +4284,9 @@ const App: React.FC = () => {
                 window.history.pushState({}, '', `${nextUrl.pathname}${nextUrl.search}`);
             } else {
                 finalIntegrityResult = buildSaveResult();
-                setLoadingMessage("Escribiendo disco...");
-                const result = await platformService.saveProject(
-                    JSON.stringify(finalIntegrityResult.project, null, 2),
-                    projectName
-                );
+                setLoadingMessage("Empaquetando proyecto y audio...");
+                const projectBlob = await createPortableProjectFile(finalIntegrityResult.project);
+                const result = await platformService.saveProjectBlob(projectBlob, projectName);
                 if (!result.success) throw new Error('No se pudo guardar el proyecto local.');
                 if (result.filePath) setProjectName(result.filePath);
             }
@@ -4231,12 +4300,11 @@ const App: React.FC = () => {
             if (collabSessionId || user) {
                 try {
                     const backup = buildSaveResult();
-                    const result = await platformService.saveProject(
-                        JSON.stringify(backup.project, null, 2),
-                        projectName
-                    );
+                    setLoadingMessage("Creando respaldo portable con audio...");
+                    const backupBlob = await createPortableProjectFile(backup.project);
+                    const result = await platformService.saveProjectBlob(backupBlob, projectName);
                     alert(result.success
-                        ? "No se pudo confirmar el guardado cloud. Se descargó el proyecto .esp; el audio permanece en el almacenamiento local de este navegador y sigue pendiente de sincronización."
+                        ? "No se pudo confirmar el guardado cloud. Se descargó un proyecto .esp portable con sus fuentes de audio originales incluidas."
                         : "No se pudo guardar en la nube ni crear el respaldo local.");
                 } catch (backupError) {
                     console.error('Local backup after cloud failure also failed.', backupError);
@@ -4254,6 +4322,7 @@ const App: React.FC = () => {
     }, [
         audioSettings.sampleRate,
         collabSessionId,
+        createPortableProjectFile,
         createProjectDataSnapshot,
         isReadOnly,
         projectCommandCount,
@@ -4363,7 +4432,7 @@ const App: React.FC = () => {
                 let sourceId: string | undefined;
                 try {
                     const blobToPersist = source.persistBlob || new Blob([sourceBuffer], { type: 'application/octet-stream' });
-                    sourceId = await assetDb.saveFile(blobToPersist);
+                    sourceId = await assetDb.saveFile(blobToPersist, sourceBuffer);
                 } catch (persistError) {
                     console.warn(`Asset cache unavailable for ${source.name}`, persistError);
                 }
@@ -4449,7 +4518,10 @@ const App: React.FC = () => {
         }
 
         const decoded = await engineAdapter.decodeAudioData(fileData.data.slice(0));
-        const sourceId = await assetDb.saveFile(new Blob([fileData.data], { type: 'application/octet-stream' }));
+        const sourceId = await assetDb.saveFile(
+            new Blob([fileData.data], { type: 'application/octet-stream' }),
+            fileData.data
+        );
 
         const destinationTrack = destination?.trackId
             ? tracks.find((track) => track.id === destination.trackId)
@@ -5062,7 +5134,14 @@ const App: React.FC = () => {
             }
         }
     }, [sessionHealthSnapshot]);
-    const isScannerImmersive = showNoteScanner;
+    const isScannerImmersive = isStandaloneProduct || showNoteScanner;
+    const handleCloseScoreSurface = useCallback(() => {
+        if (isStandaloneProduct) {
+            window.location.assign('/console');
+            return;
+        }
+        closeAllToolPanels();
+    }, [closeAllToolPanels, isStandaloneProduct]);
     const selectedTrack = tracks.find((track) => track.id === selectedTrackId) || null;
     const selectedAudioTrack = selectedTrack?.type === TrackType.AUDIO ? selectedTrack : null;
     const selectedTrackPunchRange = useMemo(() => (
@@ -5279,8 +5358,34 @@ const App: React.FC = () => {
                 engineStats={engineStats}
             />
 
+            <nav
+                className="daw-product-switcher flex h-12 min-h-12 items-center gap-2 overflow-x-auto border-b border-[#303236] bg-[#18191d] px-2 text-gray-300 [scrollbar-width:none] sm:px-3"
+                aria-label={`Navegacion de ${activeProductName}`}
+            >
+                    <a href="/console" className="flex h-10 shrink-0 items-center gap-2 border-r border-white/10 pr-3 text-white no-underline" aria-label="Volver al Hub">
+                        <AppLogo size={18} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.16em]">{activeProductName}</span>
+                    </a>
+                    <div className="flex min-w-max items-center gap-1" aria-label="Productos Hollow Bits">
+                        <a href={`/engine${window.location.search}`} className="daw-product-switcher__link" aria-current={surfaceMode === 'studio' ? 'page' : undefined}>DAW-fi Studio</a>
+                        <a href={`/score${window.location.search}`} className="daw-product-switcher__link" aria-current={surfaceMode === 'score' ? 'page' : undefined}>Score-fi</a>
+                        <a href={`/keys${window.location.search}`} className="daw-product-switcher__link" aria-current={surfaceMode === 'keys' ? 'page' : undefined}>Keys-fi</a>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleImportAudio}
+                        className="ml-auto flex h-10 min-w-max shrink-0 items-center gap-2 rounded-sm border border-white/15 bg-[#202126] px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-gray-200 hover:border-white/30 hover:bg-[#292a2f]"
+                    >
+                        <FolderInput size={15} />
+                        Importar audio
+                    </button>
+            </nav>
+
+            <input type="file" ref={fileInputRef} className="hidden" multiple accept={AUDIO_IMPORT_ACCEPT} onChange={handleFileImport} />
+
             <div className={`daw-workspace-shell flex-1 min-h-0 min-w-0 overflow-hidden flex relative transition-[transform,opacity,filter] duration-500 ease-[cubic-bezier(0.22,0.84,0.26,1)] ${showSettings ? 'blur-[1px] scale-[0.995] pointer-events-none select-none brightness-90' : ''}`}>
 
+                {!isStandaloneProduct && (
                 <div className="daw-tool-rail w-[50px] bg-[#1a1a1a] border-r border-daw-border flex flex-col items-center py-3 gap-3 z-[100] shrink-0 relative shadow-xl" aria-label="Herramientas del estudio">
                     {/* ... Sidebar Icons (unchanged) ... */}
                     <div className="relative group" ref={fileMenuRef}>
@@ -5314,7 +5419,7 @@ const App: React.FC = () => {
                     <div className="flex flex-col gap-2 w-full items-center">
                         <SidebarItem icon={Search} label="Navegador de Archivos" active={showBrowser} onClick={() => toggleToolPanel('browser')} />
                         <SidebarItem icon={Sparkles} label="Generador AI" active={showAI} onClick={() => toggleToolPanel('ai')} color="text-daw-cyan" />
-                        <SidebarItem icon={Piano} label="Piano Score" active={showNoteScanner} onClick={() => toggleToolPanel('scanner')} color="text-daw-violet" />
+                        <SidebarItem icon={Piano} label="Score + Keys" active={showNoteScanner} onClick={() => toggleToolPanel('scanner')} color="text-daw-violet" />
                     </div>
                     <div className="daw-tool-separator w-6 h-px bg-white/5 my-1"></div>
                     <div className="flex flex-col gap-2 w-full items-center">
@@ -5441,9 +5546,8 @@ const App: React.FC = () => {
                     </div>
                     {/* ─────────────────────────────────────────────────────────── */}
 
-                    <input type="file" ref={fileInputRef} className="hidden" multiple accept={AUDIO_IMPORT_ACCEPT} onChange={handleFileImport} />
-                    {/* Project Input removed in favor of platformService */}
                 </div>
+                )}
 
 
                 {!isScannerImmersive && hasLoadedAISidebar && (
@@ -5482,12 +5586,14 @@ const App: React.FC = () => {
                                 <React.Suspense fallback={<div className="h-full w-full bg-[#0a0a0d]" />}>
                                     <PianoScoreWorkspace
                                         isOpen={showNoteScanner}
+                                        surfaceMode={scoreSurfaceMode}
                                         tracks={tracks}
                                         transport={transport}
                                         selectedTrackId={selectedTrackId}
                                         selectedClipId={selectedClipId}
                                         scoreWorkspaces={scoreWorkspaces}
-                                        onClose={closeAllToolPanels}
+                                        onClose={handleCloseScoreSurface}
+                                        onImportSource={handleImportAudio}
                                         onScoreWorkspacesChange={setScoreWorkspaces}
                                         onCreateMidiTrackFromScore={handleCreateMidiTrackFromScan}
                                         onUpdateMidiClip={handleUpdateMidiClipFromScore}
@@ -5845,14 +5951,14 @@ const App: React.FC = () => {
                     </div>
                 </div>
             )}
-            <Modal isOpen={activeModal === 'recovery'} onClose={handleDiscardRecoverySnapshot} title="RecuperaciÃ³n automÃ¡tica">
+            <Modal isOpen={activeModal === 'recovery'} onClose={handleDiscardRecoverySnapshot} title="Recuperación automática">
                 <div className="flex flex-col gap-4">
                     <p className="text-xs text-gray-300 leading-relaxed">
-                        Detectamos un cierre inesperado en la sesiÃ³n anterior. Puedes restaurar el Ãºltimo autosave para continuar donde te quedaste.
+                        Detectamos un cierre inesperado en la sesión anterior. Puedes restaurar el último autosave para continuar donde te quedaste.
                     </p>
                     {recoverySnapshot && (
                         <div className="rounded-sm border border-white/10 bg-white/[0.03] p-3">
-                            <div className="text-[10px] uppercase tracking-wider text-gray-500">Ãšltimo autosave</div>
+                            <div className="text-[10px] uppercase tracking-wider text-gray-500">Último autosave</div>
                             <div className="mt-2 text-xs text-gray-200 font-semibold">{recoverySnapshot.projectName}</div>
                             <div className="mt-1 text-[10px] text-gray-500 font-mono">{new Date(recoverySnapshot.timestamp).toLocaleString()}</div>
                             <div className="mt-1 text-[10px] text-daw-cyan">{recoverySnapshot.reason}</div>
@@ -5914,7 +6020,7 @@ const App: React.FC = () => {
                                         {entry.failureReason || lastPhase?.message || 'Sin detalle adicional.'}
                                     </div>
                                     <div className="mt-2 text-[10px] text-gray-500 font-mono">
-                                        Phase: {lastPhase?.phase || 'unknown'}{typeof lastPhase?.barTime === 'number' ? ` Â· bar ${lastPhase.barTime.toFixed(3)}` : ''}
+                                        Phase: {lastPhase?.phase || 'unknown'}{typeof lastPhase?.barTime === 'number' ? ` · bar ${lastPhase.barTime.toFixed(3)}` : ''}
                                     </div>
                                 </div>
                             );
@@ -5997,11 +6103,11 @@ const App: React.FC = () => {
                                             <span className={route.active ? 'text-emerald-300' : 'text-gray-500'}>
                                                 {route.active ? 'Active' : 'Idle'}
                                             </span>
-                                            <span className="text-gray-500">Â·</span>
+                                            <span className="text-gray-500">·</span>
                                             <span className="text-gray-300">{route.mode}</span>
                                             {route.pendingFinalize && (
                                                 <>
-                                                    <span className="text-gray-500">Â·</span>
+                                                    <span className="text-gray-500">·</span>
                                                     <span className="text-amber-200">Pending Finalize</span>
                                                 </>
                                             )}
@@ -6033,7 +6139,7 @@ const App: React.FC = () => {
                     </div>
                 </div>
             </Modal>
-            <Modal isOpen={activeModal === 'new-project-confirm'} onClose={() => setActiveModal(null)} title="Nuevo Proyecto"><div className="flex flex-col gap-6"><div className="flex items-start gap-4 text-white"><div className="p-3 bg-daw-ruby/20 rounded-full shrink-0"><AlertTriangle className="text-daw-ruby" size={24} /></div><div><h3 className="font-bold text-lg mb-1">Ã‚Â¿Deseas guardar los cambios?</h3><p className="text-gray-400 text-xs leading-relaxed">Si continúas sin guardar, perderás todo el trabajo actual para abrir un espacio de trabajo limpio.</p></div></div><div className="flex flex-col gap-2"><button onClick={async () => { await handleSaveProject(); resetProjectToEmpty(); }} className="w-full flex items-center justify-between px-4 py-3 bg-white text-black rounded-sm font-bold text-xs hover:bg-gray-200 transition-all group"><div className="flex items-center gap-3"><Save size={16} /><span>GUARDAR Y CREAR NUEVO</span></div></button><button onClick={resetProjectToEmpty} className="w-full flex items-center gap-3 px-4 py-3 bg-[#222] text-daw-ruby border border-daw-ruby/30 rounded-sm font-bold text-xs hover:bg-daw-ruby hover:text-white transition-all"><Trash2 size={16} /><span>CONTINUAR SIN GUARDAR</span></button><button onClick={() => setActiveModal(null)} className="w-full py-2 text-gray-500 hover:text-white text-[10px] font-bold uppercase tracking-widest mt-2">CANCELAR</button></div></div></Modal>
+            <Modal isOpen={activeModal === 'new-project-confirm'} onClose={() => setActiveModal(null)} title="Nuevo Proyecto"><div className="flex flex-col gap-6"><div className="flex items-start gap-4 text-white"><div className="p-3 bg-daw-ruby/20 rounded-full shrink-0"><AlertTriangle className="text-daw-ruby" size={24} /></div><div><h3 className="font-bold text-lg mb-1">¿Deseas guardar los cambios?</h3><p className="text-gray-400 text-xs leading-relaxed">Si continúas sin guardar, perderás todo el trabajo actual para abrir un espacio de trabajo limpio.</p></div></div><div className="flex flex-col gap-2"><button onClick={async () => { await handleSaveProject(); resetProjectToEmpty(); }} className="w-full flex items-center justify-between px-4 py-3 bg-white text-black rounded-sm font-bold text-xs hover:bg-gray-200 transition-all group"><div className="flex items-center gap-3"><Save size={16} /><span>GUARDAR Y CREAR NUEVO</span></div></button><button onClick={resetProjectToEmpty} className="w-full flex items-center gap-3 px-4 py-3 bg-[#222] text-daw-ruby border border-daw-ruby/30 rounded-sm font-bold text-xs hover:bg-daw-ruby hover:text-white transition-all"><Trash2 size={16} /><span>CONTINUAR SIN GUARDAR</span></button><button onClick={() => setActiveModal(null)} className="w-full py-2 text-gray-500 hover:text-white text-[10px] font-bold uppercase tracking-widest mt-2">CANCELAR</button></div></div></Modal>
 
             <Modal isOpen={activeModal === 'project-os'} onClose={() => setActiveModal(null)} title="Project OS">
                 <ProjectOsPanel

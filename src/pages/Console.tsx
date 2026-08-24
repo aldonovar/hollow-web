@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { usePageMotion } from '../components/usePageMotion';
-import { Plus, FolderOpen, Settings, Play, MoreVertical, Trash2, Copy, Pencil, Upload, Cloud, CloudOff, X, Check, Users, UserPlus } from 'lucide-react';
+import { Plus, FolderOpen, Settings, Play, MoreVertical, Trash2, Copy, Pencil, Upload, Cloud, CloudOff, X, Check, Users, UserPlus, Music2, Piano } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
   CANONICAL_AUTH_ORIGIN,
@@ -14,6 +14,36 @@ import type { Project } from '../types/supabase';
 import { NotificationsMenu } from '../components/NotificationsMenu';
 import { CreateTeamModal } from '../components/CreateTeamModal';
 import { InviteUserModal } from '../components/InviteUserModal';
+
+const PRODUCT_SURFACES = [
+  {
+    id: 'studio',
+    name: 'DAW-fi Studio',
+    path: '/engine',
+    eyebrow: 'Producción completa',
+    description: 'Arreglo, grabación, mezcla, edición y colaboración en un solo estudio.',
+    action: 'Abrir Studio',
+    icon: Play,
+  },
+  {
+    id: 'score',
+    name: 'Score-fi',
+    path: '/score',
+    eyebrow: 'Notación musical',
+    description: 'Partitura independiente y sincronizada para MIDI o transcripciones desde audio.',
+    action: 'Abrir Score-fi',
+    icon: Music2,
+  },
+  {
+    id: 'keys',
+    name: 'Keys-fi',
+    path: '/keys',
+    eyebrow: 'Interpretación visual',
+    description: 'Guía de teclado precisa, editable y sincronizada con el transporte del proyecto.',
+    action: 'Abrir Keys-fi',
+    icon: Piano,
+  },
+] as const;
 
 export function Console() {
   const pageRef = usePageMotion();
@@ -116,10 +146,10 @@ export function Console() {
     }
   }, [contextMenuId]);
 
-  const handleOpenDaw = (e?: React.MouseEvent, projectId?: string) => {
+  const handleOpenProduct = (productPath: string, e?: React.MouseEvent, projectId?: string) => {
     if (e) e.preventDefault();
 
-    let urlSuffix = '/engine';
+    let urlSuffix = productPath;
     if (projectId) {
       urlSuffix += `?project=${projectId}`;
     }
@@ -133,6 +163,10 @@ export function Console() {
     }
 
     window.location.assign(buildCanonicalLoginUrl(urlSuffix));
+  };
+
+  const handleOpenDaw = (e?: React.MouseEvent, projectId?: string) => {
+    handleOpenProduct('/engine', e, projectId);
   };
 
   const createProject = async () => {
@@ -375,7 +409,7 @@ export function Console() {
 
       <section className="dashboard" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px', width: '100%' }}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+        <div className="console-dashboard__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             {avatarUrl ? (
               <img src={avatarUrl} alt={displayName} style={{
@@ -408,7 +442,7 @@ export function Console() {
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div className="console-dashboard__actions" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <NotificationsMenu />
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -436,7 +470,7 @@ export function Console() {
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--purple)'; e.currentTarget.style.background = 'rgba(168,85,247,0.1)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
             >
-              <Play size={16} /> Abrir Motor DAW
+              <Play size={16} /> Abrir DAW-fi Studio
             </a>
             <button
               onClick={createProject}
@@ -475,6 +509,39 @@ export function Console() {
             </button>
           </div>
         </div>
+
+        <section className="console-products" aria-labelledby="console-products-title">
+          <div className="console-products__heading">
+            <div>
+              <span className="console-products__eyebrow">Hollow Bits Suite</span>
+              <h2 id="console-products-title">Elige tu espacio de trabajo</h2>
+            </div>
+            <p>Un proyecto, tres herramientas enfocadas y el mismo motor musical.</p>
+          </div>
+          <div className="console-products__grid">
+            {PRODUCT_SURFACES.map((product) => {
+              const ProductIcon = product.icon;
+              return (
+                <a
+                  key={product.id}
+                  href={`https://play.hollowbits.com${product.path}`}
+                  onClick={(event) => handleOpenProduct(product.path, event)}
+                  className="console-product-card"
+                  data-product={product.id}
+                  aria-label={`${product.action}: ${product.description}`}
+                >
+                  <div className="console-product-card__topline">
+                    <span className="console-product-card__icon" aria-hidden="true"><ProductIcon size={18} /></span>
+                    <span>{product.eyebrow}</span>
+                  </div>
+                  <h3>{product.name}</h3>
+                  <p>{product.description}</p>
+                  <span className="console-product-card__action">{product.action} <span aria-hidden="true">→</span></span>
+                </a>
+              );
+            })}
+          </div>
+        </section>
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '24px', borderBottom: '1px solid var(--border)', marginBottom: '32px' }}>

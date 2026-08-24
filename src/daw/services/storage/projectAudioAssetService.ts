@@ -94,6 +94,43 @@ export function getProjectAudioAssetRef(
   return undefined;
 }
 
+export function hasDeclaredProjectAudioAssetRefs(assetRefs: unknown[] | null | undefined): boolean {
+  return Array.isArray(assetRefs)
+    && assetRefs.some((candidate) => isRecord(candidate) && candidate.bucket === 'project-audio');
+}
+
+export interface ResolveProjectAudioBlobInput {
+  assetRefs: unknown[] | null | undefined;
+  sourceId: string;
+  projectId?: string;
+  workspaceId?: string;
+  getLocalBlob: (sourceId: string) => Promise<Blob | null>;
+  downloadCloudBlob: (projectId: string, sourceId: string, assetPath?: string) => Promise<Blob>;
+  cacheCloudBlob: (blob: Blob) => Promise<string>;
+}
+
+export async function resolveProjectAudioBlob(input: ResolveProjectAudioBlobInput): Promise<Blob | null> {
+  const localBlob = await input.getLocalBlob(input.sourceId);
+  if (localBlob || !input.projectId) return localBlob;
+
+  const assetRef = getProjectAudioAssetRef(
+    input.assetRefs,
+    input.sourceId,
+    input.projectId,
+    input.workspaceId,
+  );
+  if (hasDeclaredProjectAudioAssetRefs(input.assetRefs) && !assetRef) {
+    throw new Error('El manifiesto contiene referencias cloud incompatibles con este clip o proyecto.');
+  }
+
+  const cloudBlob = await input.downloadCloudBlob(input.projectId, input.sourceId, assetRef?.path);
+  const cachedSourceId = await input.cacheCloudBlob(cloudBlob);
+  if (cachedSourceId !== input.sourceId) {
+    throw new Error('La fuente cloud no coincide con la huella guardada en el proyecto.');
+  }
+  return cloudBlob;
+}
+
 function isSelfConsistentProjectAudioAssetRef(value: unknown): value is AssetRef {
   if (!isRecord(value) || typeof value.hash !== 'string' || typeof value.projectId !== 'string') {
     return false;

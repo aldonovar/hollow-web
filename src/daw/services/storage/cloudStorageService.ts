@@ -1,9 +1,11 @@
 import { supabase } from '../../../lib/supabase';
 import {
   AUDIO_ASSET_EXTENSIONS,
-  resolveAudioAssetFormat,
+  resolveCloudAudioUploadFormat,
   type AudioAssetExtension,
 } from './audioAssetFormat';
+
+export { MAX_CLOUD_AUDIO_OBJECT_BYTES } from './audioAssetFormat';
 
 /**
  * Service to manage cloud storage operations for audio files in Supabase.
@@ -45,10 +47,7 @@ class CloudStorageService {
   }
 
   public async uploadAudioToCloud(projectId: string, fileId: string, data: Blob, fileName?: string): Promise<string> {
-    const { extension, contentType } = resolveAudioAssetFormat(data, fileName);
-    if (extension === 'bin') {
-      throw new Error('Unsupported audio format: the original file type could not be identified.');
-    }
+    const { extension, contentType } = resolveCloudAudioUploadFormat(data, fileName);
     const filePath = await this.buildScopedAudioPath(projectId, fileId, extension);
     
     const { data: uploadData, error } = await supabase.storage

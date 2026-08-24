@@ -31,6 +31,7 @@ interface PianoLaneNote extends Note {
 type DragMode = 'move' | 'trim-duration';
 
 interface DragState {
+    pointerId: number;
     noteIndex: number;
     mode: DragMode;
     originPointerY: number;
@@ -236,7 +237,8 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
         if (!dragState) return;
 
         const handlePointerMove = (event: PointerEvent) => {
-            if (!svgRef.current || !dragState) return;
+            if (!svgRef.current || !dragState || event.pointerId !== dragState.pointerId) return;
+            event.preventDefault();
             const rect = svgRef.current.getBoundingClientRect();
             const viewScaleY = mainHeight / rect.height;
             const viewScaleX = keyboard.width / rect.width;
@@ -265,15 +267,21 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
             });
         };
 
-        const handlePointerUp = () => {
+        const handlePointerEnd = (event: PointerEvent) => {
+            if (event.pointerId !== dragState.pointerId) return;
+            if (svgRef.current?.hasPointerCapture?.(event.pointerId)) {
+                svgRef.current.releasePointerCapture(event.pointerId);
+            }
             setDragState(null);
         };
 
         window.addEventListener('pointermove', handlePointerMove);
-        window.addEventListener('pointerup', handlePointerUp);
+        window.addEventListener('pointerup', handlePointerEnd);
+        window.addEventListener('pointercancel', handlePointerEnd);
         return () => {
             window.removeEventListener('pointermove', handlePointerMove);
-            window.removeEventListener('pointerup', handlePointerUp);
+            window.removeEventListener('pointerup', handlePointerEnd);
+            window.removeEventListener('pointercancel', handlePointerEnd);
         };
     }, [displayPitchShift, dragState, keyboard.keyFrames, keyboard.width, keyboardTop, mainHeight, notes, onUpdateNote, pixelsPer16th, total16ths]);
 
@@ -303,10 +311,10 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
         >
             <div className="flex h-10 shrink-0 items-center justify-between border-b border-[#303236] bg-[#1b1c1e] px-3">
                 <div className="min-w-0">
-                    <div className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-[#d7d8da]">Falling Notes</div>
-                    <div className="mt-0.5 truncate text-[8px] font-semibold uppercase tracking-[0.14em] text-[#777a80]">Piano Cinema</div>
+                    <div className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-[#d7d8da]">Keys-fi</div>
+                    <div className="mt-0.5 truncate text-[8px] font-semibold uppercase tracking-[0.14em] text-[#777a80]">Visualizador de interpretación</div>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <span className="hidden rounded-sm border border-[#34363a] bg-[#202124] px-2 py-1 text-[8px] font-semibold tabular-nums text-[#a2a5aa] sm:inline-flex">
                         {bpm.toFixed(0)} BPM
                     </span>
@@ -327,14 +335,14 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
             <div className="shrink-0 border-b border-[#303236] bg-[#18191b] px-3 py-2">
                 <svg
                     data-piano-cinema-ribbon="true"
-                    className="h-8 w-full cursor-pointer rounded-sm outline-none ring-[#8e86d8] focus-visible:ring-1 motion-reduce:transition-none"
+                    className="h-11 w-full cursor-pointer rounded-sm outline-none ring-[#8e86d8] focus-visible:ring-1 motion-reduce:transition-none md:h-8"
                     viewBox={`0 0 ${keyboard.width} ${headerHeight}`}
                     preserveAspectRatio="none"
                     onClick={handleSeekRibbonClick}
                     onKeyDown={handleSeekRibbonKeyDown}
                     role="slider"
                     tabIndex={0}
-                    aria-label="Posición del transporte de Falling Notes"
+                    aria-label="Posición del transporte de Keys-fi"
                     aria-valuemin={0}
                     aria-valuemax={Math.max(16, total16ths)}
                     aria-valuenow={clamp(playhead16th, 0, Math.max(16, total16ths))}
@@ -376,13 +384,16 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
                 <svg
                     ref={svgRef}
                     data-piano-cinema-stage="true"
-                    className="block h-full w-full rounded-sm bg-[#111214]"
+                    className="block h-full w-full touch-none rounded-sm bg-[#111214]"
                     viewBox={`0 0 ${keyboard.width} ${mainHeight}`}
                     preserveAspectRatio="none"
                     role="group"
                     aria-labelledby={`${stageTitleId} ${stageDescriptionId}`}
+                    onLostPointerCapture={(event) => {
+                        setDragState((current) => current?.pointerId === event.pointerId ? null : current);
+                    }}
                 >
-                    <title id={stageTitleId}>Visualizador Falling Notes</title>
+                    <title id={stageTitleId}>Visualizador de interpretación Keys-fi</title>
                     <desc id={stageDescriptionId}>Notas musicales descienden hacia un teclado sincronizado con el transporte. Las notas se pueden seleccionar, mover y redimensionar.</desc>
                     <rect x={0} y={0} width={keyboard.width} height={mainHeight} fill="#111214" />
 
@@ -456,8 +467,11 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
                                             onSelectNoteKey?.(note.noteKey);
                                         }}
                                         onPointerDown={(event) => {
+                                            event.preventDefault();
+                                            svgRef.current?.setPointerCapture?.(event.pointerId);
                                             onSelectNoteKey?.(note.noteKey);
                                             setDragState({
+                                                pointerId: event.pointerId,
                                                 noteIndex: note.index,
                                                 mode: 'move',
                                                 originPointerY: ((event.clientY - event.currentTarget.getBoundingClientRect().top) + (event.currentTarget.getBoundingClientRect().top - svgRef.current!.getBoundingClientRect().top)) * (mainHeight / svgRef.current!.getBoundingClientRect().height),
@@ -490,9 +504,12 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
                                         className="cursor-ns-resize"
                                         aria-hidden="true"
                                         onPointerDown={(event) => {
+                                            event.preventDefault();
                                             event.stopPropagation();
+                                            svgRef.current?.setPointerCapture?.(event.pointerId);
                                             onSelectNoteKey?.(note.noteKey);
                                             setDragState({
+                                                pointerId: event.pointerId,
                                                 noteIndex: note.index,
                                                 mode: 'trim-duration',
                                                 originPointerY: ((event.clientY - event.currentTarget.getBoundingClientRect().top) + (event.currentTarget.getBoundingClientRect().top - svgRef.current!.getBoundingClientRect().top)) * (mainHeight / svgRef.current!.getBoundingClientRect().height),
@@ -587,7 +604,7 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
                 )}
             </div>
 
-            <div className="flex min-h-10 shrink-0 items-center justify-between gap-4 border-t border-[#303236] bg-[#1b1c1e] px-3 py-2 text-xs text-[#c7c8ca]">
+            <div className="flex min-h-10 shrink-0 flex-col items-stretch gap-2 border-t border-[#303236] bg-[#1b1c1e] px-3 py-2 text-xs text-[#c7c8ca] sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                 <div className="flex min-w-0 items-center gap-3">
                     <span className="rounded-sm border border-[#3a3c40] bg-[#202124] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.12em] text-[#8d9095]">
                         Nota
@@ -604,8 +621,8 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
                     )}
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-2">
+                <div className="flex min-h-11 items-center gap-3 sm:min-h-0">
+                    <label className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
                         <span className="text-[8px] font-bold uppercase tracking-[0.12em] text-[#777a80]">Velocity</span>
                         <input
                             type="range"
@@ -623,7 +640,7 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
                                     velocity: normalizeMidiVelocity(Number(event.target.value))
                                 });
                             }}
-                            className="accent-[#8e86d8]"
+                            className="min-w-0 flex-1 accent-[#8e86d8] sm:w-24 sm:flex-none"
                         />
                     </label>
                 </div>

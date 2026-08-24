@@ -17,6 +17,12 @@ export interface MidiMessage {
 
 type MidiCallback = (msg: MidiMessage) => void;
 
+export function isExpectedMidiAccessDenial(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const name = Reflect.get(error, 'name');
+  return name === 'NotAllowedError' || name === 'SecurityError';
+}
+
 class MidiService {
   private listeners: Set<(devices: MidiDevice[]) => void> = new Set();
   private messageListeners: Set<MidiCallback> = new Set();
@@ -38,6 +44,10 @@ class MidiService {
 
       this.updateDevices();
     } catch (err) {
+      if (isExpectedMidiAccessDenial(err)) {
+        console.info('[midi] Web MIDI access was not granted; continuing without external MIDI input.');
+        return;
+      }
       console.error("MIDI Access Failed", err);
     }
   }
