@@ -400,7 +400,7 @@ const Transport: React.FC<TransportProps> = React.memo(({
     }, [transportVisualActive]);
 
     const handleGlobalReset = () => { setBpm(124); setMasterTranspose(0); };
-    const buttonClass = "w-9 h-7 flex items-center justify-center rounded-[2px] border border-transparent transition-all";
+    const buttonClass = "daw-transport-action w-9 h-7 flex items-center justify-center rounded-[2px] border border-transparent transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-daw-cyan/70 motion-reduce:transition-none";
     const inactiveClass = "bg-[#2d2d2d] text-gray-400 hover:bg-[#3d3d3d] hover:text-gray-200";
     const engineIsPlaying = audioEngine.getIsPlaying();
     const hasResumeOffset = audioEngine.getCurrentTime() > 0.0001;
@@ -409,7 +409,9 @@ const Transport: React.FC<TransportProps> = React.memo(({
         currentBeat: transport.currentBeat,
         currentSixteenth: transport.currentSixteenth
     };
-    const isPaused = !transport.isPlaying && !engineIsPlaying && hasResumeOffset;
+    const isPlaybackActive = transport.isPlaying;
+    const isPaused = !transport.isPlaying && !transport.isRecording && !engineIsPlaying && hasResumeOffset;
+    const isStopped = !transport.isPlaying && !transport.isRecording && !engineIsPlaying && !hasResumeOffset;
     const isLoopEnabled = transport.loopMode !== 'off';
     const loopBadge = transport.loopMode === 'once' ? '1' : transport.loopMode === 'infinite' ? '∞' : '';
     const loopTitle = transport.loopMode === 'off'
@@ -575,13 +577,13 @@ const Transport: React.FC<TransportProps> = React.memo(({
 
     return (
         <div
-            className="relative h-[50px] bg-[#11131a]/92 backdrop-blur-md border-b border-white/10 flex items-center px-4 justify-between select-none z-50 text-daw-text font-sans transition-[background-color,border-color] duration-500"
+            className="daw-transport relative h-[50px] bg-[#11131a]/92 backdrop-blur-md border-b border-white/10 flex items-center px-4 justify-between select-none z-50 text-daw-text font-sans transition-[background-color,border-color] duration-500"
             style={{ WebkitAppRegion: isDesktop ? 'drag' : 'no-drag' } as AppRegionStyle}
             onDoubleClick={handleTransportDoubleClick}
         >
-            <div className="flex items-center gap-6" style={{ WebkitAppRegion: 'no-drag' } as AppRegionStyle} data-no-window-toggle="true">
+            <div className="daw-transport-primary flex items-center gap-6" style={{ WebkitAppRegion: 'no-drag' } as AppRegionStyle} data-no-window-toggle="true">
                 {/* BRANDING */}
-                <div className="flex items-center gap-2 select-none group cursor-pointer mr-4">
+                <div className="daw-transport-brand flex items-center gap-2 select-none group cursor-pointer mr-4">
                     <div className="relative w-8 h-8 flex items-center justify-center logo-breath-shell">
                         <span className={`pointer-events-none absolute -inset-[6px] rounded-full logo-breathing-aura ${logoBreathing ? `logo-breathing-aura-active ${useFastBreath ? 'logo-breathing-aura-fast' : ''}` : ''}`} />
                         <div className={`relative z-10 w-8 h-8 flex items-center justify-center logo-breathing-core ${logoBreathing ? `logo-breathing-active ${useFastBreath ? 'logo-breathing-fast' : ''}` : ''}`}>
@@ -606,7 +608,7 @@ const Transport: React.FC<TransportProps> = React.memo(({
                 </div>
 
                 {/* CONTROLS GROUP 1: Pitch & BPM */}
-                <div className="flex items-center gap-4 border-r border-daw-border pr-4 h-8">
+                <div className="daw-transport-context flex items-center gap-4 border-r border-daw-border pr-4 h-8">
 
                     {/* PITCH KNOB */}
                     <div className="flex items-center gap-2" title="Master Pitch (Varispeed: también afecta tempo)">
@@ -652,11 +654,15 @@ const Transport: React.FC<TransportProps> = React.memo(({
                 </div>
 
                 {/* CONTROLS GROUP 2: Transport Buttons */}
-                <div className="flex items-center gap-1 bg-[#1a1a1a] p-1 rounded-sm border border-[#2d2d2d]">
+                <div className="daw-transport-controls flex items-center gap-1 bg-[#1a1a1a] p-1 rounded-sm border border-[#2d2d2d]" role="group" aria-label="Controles de transporte">
                     <button
+                        type="button"
                         onClick={onLoopToggle}
                         className={`${buttonClass} ${isLoopEnabled ? 'bg-daw-violet text-white shadow-[0_0_10px_rgba(168,85,247,0.5)] relative' : `${inactiveClass} relative`}`}
                         title={loopTitle}
+                        aria-label={loopTitle}
+                        aria-pressed={isLoopEnabled}
+                        data-transport-action="loop"
                     >
                         <Repeat size={12} />
                         {loopBadge && (
@@ -667,41 +673,76 @@ const Transport: React.FC<TransportProps> = React.memo(({
                     </button>
                     <div className="w-px h-4 bg-[#333] mx-1"></div>
 
-                    <button onClick={onSkipStart} className={`${buttonClass} ${inactiveClass}`} title="Ir al Inicio"><SkipBack size={12} fill="currentColor" /></button>
-                    <button onClick={onStop} className={`${buttonClass} ${inactiveClass}`} title="Detener"><Square size={10} fill="currentColor" /></button>
+                    <button
+                        type="button"
+                        onClick={onSkipStart}
+                        className={`${buttonClass} ${inactiveClass}`}
+                        title="Volver al inicio"
+                        aria-label="Volver al inicio"
+                        data-transport-action="rewind"
+                    >
+                        <SkipBack size={12} fill="currentColor" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onStop}
+                        className={`${buttonClass} ${isStopped ? 'bg-gray-200 text-[#171717] shadow-[0_0_8px_rgba(229,231,235,0.28)]' : inactiveClass}`}
+                        title="Detener y volver al inicio"
+                        aria-label="Detener y volver al inicio"
+                        aria-pressed={isStopped}
+                        data-transport-action="stop"
+                    >
+                        <Square size={10} fill="currentColor" />
+                    </button>
 
                     <button
+                        type="button"
                         onClick={onPlay}
-                        className={`${buttonClass} ${transport.isPlaying && !transport.isRecording ? 'bg-green-600 text-white shadow-[0_0_10px_rgba(22,163,74,0.5)]' : 'bg-[#2d2d2d] text-green-500 hover:text-green-400'}`}
+                        className={`${buttonClass} ${isPlaybackActive ? 'bg-green-600 text-white shadow-[0_0_10px_rgba(22,163,74,0.5)]' : 'bg-[#2d2d2d] text-green-500 hover:text-green-400'}`}
                         title="Reproducir"
+                        aria-label="Reproducir"
+                        aria-pressed={isPlaybackActive}
+                        data-transport-action="play"
                     >
                         <Play size={12} fill="currentColor" />
                     </button>
 
                     <button
+                        type="button"
                         onClick={onPause}
                         className={`${buttonClass} ${isPaused ? 'bg-yellow-600 text-white shadow-[0_0_10px_rgba(202,138,4,0.5)]' : inactiveClass}`}
                         title="Pausar"
+                        aria-label="Pausar"
+                        aria-pressed={isPaused}
+                        data-transport-action="pause"
                     >
                         <Pause size={12} fill="currentColor" />
                     </button>
 
-                    <button onClick={onSkipEnd} className={`${buttonClass} ${inactiveClass}`} title="Ir al Final"><SkipForward size={12} fill="currentColor" /></button>
+                    <button type="button" onClick={onSkipEnd} className={`${buttonClass} ${inactiveClass}`} title="Ir al final" aria-label="Ir al final" data-transport-action="skip-end"><SkipForward size={12} fill="currentColor" /></button>
 
                     <div className="w-px h-4 bg-[#333] mx-1"></div>
                     <button
+                        type="button"
                         onClick={onRecordToggle}
                         className={`${buttonClass} ${transport.isRecording ? 'bg-daw-ruby text-white animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.5)]' : 'bg-[#2d2d2d] text-daw-ruby hover:text-red-400'}`}
                         title="Grabar"
+                        aria-label="Grabar"
+                        aria-pressed={transport.isRecording}
+                        data-transport-action="record"
                     >
                         <Circle size={10} fill="currentColor" />
                     </button>
 
                     <div className="relative ml-1" ref={punchPanelRef}>
                         <button
+                            type="button"
                             onClick={() => setShowPunchPanel((prev) => !prev)}
                             className={`${buttonClass} ${punchRange.enabled ? 'bg-daw-violet text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]' : inactiveClass}`}
                             title="Panel Punch In/Out"
+                            aria-label="Abrir panel Punch In/Out"
+                            aria-expanded={showPunchPanel}
+                            data-transport-action="punch"
                         >
                             P
                         </button>
@@ -789,13 +830,13 @@ const Transport: React.FC<TransportProps> = React.memo(({
             </div>
 
             {/* CENTER: VISUALIZER */}
-            <div className="flex-1 max-w-[400px] h-[32px] mx-4 bg-[#050505] border border-gray-800 relative rounded-[2px] overflow-hidden opacity-80">
+            <div className="daw-transport-visualizer flex-1 max-w-[400px] h-[32px] mx-4 bg-[#050505] border border-gray-800 relative rounded-[2px] overflow-hidden opacity-80" aria-hidden="true">
                 <canvas ref={canvasRef} className="w-full h-full" />
             </div>
 
             {/* RIGHT: SYSTEM & EXPORT */}
-            <div className="flex items-center gap-4 border-l border-daw-border pl-4 h-8" style={{ WebkitAppRegion: 'no-drag' } as AppRegionStyle} data-no-window-toggle="true">
-                <div className="flex flex-col items-end justify-center">
+            <div className="daw-transport-utilities flex items-center gap-4 border-l border-daw-border pl-4 h-8" style={{ WebkitAppRegion: 'no-drag' } as AppRegionStyle} data-no-window-toggle="true">
+                <div className="daw-transport-cpu flex flex-col items-end justify-center">
                     <div className="w-12 h-1.5 bg-[#111] border border-gray-700 rounded-[1px] overflow-hidden">
                         <div className="h-full bg-gray-400" style={{ width: `${Math.min(100, cpuLoad)}%`, backgroundColor: cpuLoad > 50 ? '#f43f5e' : '#a855f7' }}></div>
                     </div>
@@ -805,11 +846,11 @@ const Transport: React.FC<TransportProps> = React.memo(({
                     </div>
                 </div>
 
-                <div className="h-6 w-px bg-[#333]"></div>
+                <div className="daw-transport-utility-divider h-6 w-px bg-[#333]"></div>
 
                 <div className="flex items-center gap-2">
-                    <button onClick={handleGlobalReset} className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-white" title="Resetear Transporte"><RotateCcw size={14} /></button>
-                    <button onClick={onExport} className="flex items-center gap-2 text-gray-300 hover:text-white transition-all px-3 py-1.5 bg-gradient-to-r from-[#2d2d2d] to-[#222] hover:from-daw-violet/20 hover:to-daw-ruby/20 rounded-[2px] border border-daw-border hover:border-daw-violet shadow-sm">
+                    <button onClick={handleGlobalReset} className="daw-transport-utility-action w-6 h-6 flex items-center justify-center text-gray-500 hover:text-white" title="Resetear Transporte" aria-label="Resetear tempo y tono"><RotateCcw size={14} /></button>
+                    <button onClick={onExport} className="daw-transport-export daw-transport-utility-action flex items-center gap-2 text-gray-300 hover:text-white transition-all px-3 py-1.5 bg-gradient-to-r from-[#2d2d2d] to-[#222] hover:from-daw-violet/20 hover:to-daw-ruby/20 rounded-[2px] border border-daw-border hover:border-daw-violet shadow-sm" aria-label="Exportar audio">
                         <Download size={12} />
                         <span className="text-[10px] font-bold uppercase tracking-wider">Exportar</span>
                     </button>

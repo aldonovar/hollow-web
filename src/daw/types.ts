@@ -613,6 +613,15 @@ export interface DesktopHostAPI {
   scanDirectoryFiles?: (request: DirectoryScanRequest) => Promise<ScannedFileEntry[]>;
   saveProject: (data: string, filename: string) => Promise<{ success: boolean; filePath?: string }>;
   openProject: () => Promise<{ text: string; filename: string } | null>;
+  saveProjectBinary?: (
+    data: ArrayBuffer,
+    filename: string
+  ) => Promise<{ success: boolean; filePath?: string }>;
+  openProjectBinary?: () => Promise<{
+    data: ArrayBuffer;
+    filename: string;
+    mimeType?: string;
+  } | null>;
   transcodeAudio?: (request: AudioTranscodeRequest) => Promise<AudioTranscodeResult>;
   onBenchmarkStart?: (callback: (config: LiveCaptureRunConfig) => void) => (() => void);
   publishBenchmarkArtifact?: (

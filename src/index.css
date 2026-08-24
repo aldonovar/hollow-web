@@ -97,7 +97,7 @@ input,select,textarea{font:inherit;color:inherit}
 .site-footer__bottom{width:var(--w);margin:0 auto;padding:1.2rem 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-3);font-family:var(--fm);letter-spacing:.04em}
 
 /* HERO */
-.hero{min-height:calc(100vh - 5.5rem);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:3rem 0;position:relative}
+.hero{min-height:calc(100vh - 5.5rem);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:3rem 0;position:relative;overflow:hidden}
 .hero__badge{display:inline-flex;align-items:center;gap:.5rem;padding:.4rem .85rem;border-radius:var(--r);
   border:1px solid var(--border);background:var(--bg-elevated);font-family:var(--fm);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text-2);margin-bottom:2rem}
 .hero__badge-dot{width:5px;height:5px;border-radius:50%;background:var(--lilac);box-shadow:0 0 6px rgba(182,168,255,.35);animation:pulse 2s ease infinite}
@@ -261,3 +261,34 @@ input,select,textarea{font:inherit;color:inherit}
 }
 @media(prefers-reduced-motion:reduce){*{animation-duration:0s!important;transition-duration:0s!important}}
 
+/* Product hub — restrained studio surfaces, shared project domain. */
+.daw-product-loading{min-height:100dvh;display:grid;place-items:center;background:#101114;color:#d9dadd;
+  font-family:var(--fm);font-size:.72rem;font-weight:700;letter-spacing:.16em}
+.console-products{margin:0 0 2rem;border-top:1px solid rgba(255,255,255,.12);border-bottom:1px solid rgba(255,255,255,.12);padding:1.35rem 0}
+.console-products__heading{display:flex;align-items:end;justify-content:space-between;gap:2rem;margin-bottom:1rem}
+.console-products__heading h2{margin:.25rem 0 0;font-family:var(--fd);font-size:clamp(1.25rem,2vw,1.7rem);font-weight:650;letter-spacing:-.02em}
+.console-products__heading p{max-width:420px;color:var(--text-2);font-size:.84rem;line-height:1.6;text-align:right}
+.console-products__eyebrow{font-family:var(--fm);font-size:.62rem;font-weight:700;letter-spacing:.17em;text-transform:uppercase;color:#9b9da3}
+.console-products__grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.console-product-card{min-height:210px;display:flex;flex-direction:column;border:1px solid #303136;border-radius:2px;background:#151619;
+  padding:1.25rem;color:#f1f1f2;text-decoration:none;transition:border-color .16s ease,background .16s ease,transform .16s ease}
+.console-product-card:hover,.console-product-card:focus-visible{border-color:#606168;background:#1a1b1f;transform:translateY(-1px);color:#fff}
+.console-product-card__topline{display:flex;align-items:center;gap:.65rem;color:#8c8e94;font-family:var(--fm);font-size:.6rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
+.console-product-card__icon{width:32px;height:32px;display:grid;place-items:center;border:1px solid #38393e;border-radius:2px;background:#202125;color:#c9c9cd}
+.console-product-card[data-product="score"] .console-product-card__icon{color:#c1bce2}
+.console-product-card[data-product="keys"] .console-product-card__icon{color:#bfcbd0}
+.console-product-card h3{margin:1.15rem 0 .45rem;font-family:var(--fd);font-size:1.25rem;font-weight:650;letter-spacing:-.015em}
+.console-product-card p{margin:0;color:#96989e;font-size:.82rem;line-height:1.6}
+.console-product-card__action{margin-top:auto;padding-top:1.15rem;color:#d7d8db;font-family:var(--fm);font-size:.64rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+
+@media(max-width:900px){
+  .console-dashboard__header{align-items:flex-start!important;flex-direction:column!important;gap:1rem}
+  .console-dashboard__actions{width:100%;overflow-x:auto;padding-bottom:.25rem;scrollbar-width:thin}
+  .console-products__grid{grid-template-columns:1fr}
+  .console-product-card{min-height:176px}
+}
+@media(max-width:600px){
+  .console-products__heading{align-items:flex-start;flex-direction:column;gap:.5rem}
+  .console-products__heading p{text-align:left}
+  .console-product-card{min-height:164px;padding:1rem}
+}

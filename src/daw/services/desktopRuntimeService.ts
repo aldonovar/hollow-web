@@ -1,4 +1,4 @@
-import { DesktopHostAPI } from '../types';
+import type { DesktopHostAPI } from '../types.ts';
 
 type RuntimeKind = 'web' | 'electron' | 'native-windows';
 

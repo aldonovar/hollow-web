@@ -4,9 +4,11 @@ import type { Track } from '../../types.ts';
 import {
   collectProjectAudioSourceRefs,
   getProjectAudioAssetRef,
+  hasDeclaredProjectAudioAssetRefs,
   isProjectAudioAssetRef,
   loadProjectAudioAssets,
   mergeProjectAudioAssetRefs,
+  resolveProjectAudioBlob,
 } from './projectAudioAssetService.ts';
 
 const PROJECT_ID = 'project-123';
@@ -127,6 +129,8 @@ test('finds the newest valid ref and ignores malformed manifest entries', () => 
     newestRef,
   );
   assert.equal(getProjectAudioAssetRef(refs, 'missing-source', PROJECT_ID), undefined);
+  assert.equal(hasDeclaredProjectAudioAssetRefs(refs), true);
+  assert.equal(hasDeclaredProjectAudioAssetRefs([{ ...oldRef, bucket: 'project-exports' }]), false);
 });
 
 test('merges valid refs by project and source, with uploaded entries taking precedence', () => {
@@ -157,5 +161,58 @@ test('refuses an invalid newly-uploaded ref instead of publishing a broken manif
   assert.throws(
     () => mergeProjectAudioAssetRefs([], [projectAudioRef({ path: `${PROJECT_ID}/other.wav` })]),
     /Invalid project audio asset reference/,
+  );
+});
+
+test('never downloads through a malformed modern project-audio ref', async () => {
+  let downloadCount = 0;
+  await assert.rejects(
+    resolveProjectAudioBlob({
+      assetRefs: [projectAudioRef({ projectId: 'project-other' })],
+      sourceId: 'source-a',
+      projectId: PROJECT_ID,
+      workspaceId: WORKSPACE_ID,
+      getLocalBlob: async () => null,
+      downloadCloudBlob: async () => {
+        downloadCount += 1;
+        return new Blob(['wrong']);
+      },
+      cacheCloudBlob: async () => 'source-a',
+    }),
+    /referencias cloud incompatibles/,
+  );
+  assert.equal(downloadCount, 0);
+});
+
+test('downloads an exact ref and rejects bytes whose cached hash differs', async () => {
+  const valid = projectAudioRef();
+  let requestedPath = '';
+  const blob = new Blob(['audio'], { type: 'audio/wav' });
+  const resolved = await resolveProjectAudioBlob({
+    assetRefs: [valid],
+    sourceId: 'source-a',
+    projectId: PROJECT_ID,
+    workspaceId: WORKSPACE_ID,
+    getLocalBlob: async () => null,
+    downloadCloudBlob: async (_project, _source, path) => {
+      requestedPath = path || '';
+      return blob;
+    },
+    cacheCloudBlob: async () => 'source-a',
+  });
+  assert.equal(resolved, blob);
+  assert.equal(requestedPath, valid.path);
+
+  await assert.rejects(
+    resolveProjectAudioBlob({
+      assetRefs: [valid],
+      sourceId: 'source-a',
+      projectId: PROJECT_ID,
+      workspaceId: WORKSPACE_ID,
+      getLocalBlob: async () => null,
+      downloadCloudBlob: async () => blob,
+      cacheCloudBlob: async () => 'different-hash',
+    }),
+    /huella guardada/,
   );
 });

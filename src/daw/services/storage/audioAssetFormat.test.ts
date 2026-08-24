@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resolveAudioAssetFormat } from './audioAssetFormat.ts';
+import {
+  MAX_CLOUD_AUDIO_OBJECT_BYTES,
+  resolveAudioAssetFormat,
+  resolveCloudAudioUploadFormat,
+} from './audioAssetFormat.ts';
 
 test('preserves common browser audio formats instead of relabelling them as FLAC', () => {
   assert.deepEqual(
@@ -13,11 +17,25 @@ test('preserves common browser audio formats instead of relabelling them as FLAC
   );
   assert.deepEqual(
     resolveAudioAssetFormat(new Blob(['opus'], { type: 'audio/opus' }), 'take.opus'),
-    { extension: 'opus', contentType: 'audio/opus' },
+    { extension: 'opus', contentType: 'audio/ogg' },
   );
   assert.deepEqual(
     resolveAudioAssetFormat(new Blob(['aac'], { type: 'audio/aac' }), 'take.aac'),
     { extension: 'aac', contentType: 'audio/aac' },
+  );
+});
+
+test('preflights the real bucket size and MIME policy before cloud upload', () => {
+  assert.throws(
+    () => resolveCloudAudioUploadFormat(
+      { size: MAX_CLOUD_AUDIO_OBJECT_BYTES + 1, type: 'audio/wav' } as Blob,
+      'large.wav',
+    ),
+    /100 MiB/,
+  );
+  assert.throws(
+    () => resolveCloudAudioUploadFormat({ size: 8, type: 'audio/aac' } as Blob, 'raw.aac'),
+    /todavía no admite/,
   );
 });
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Loader2, Music2, Pause, Play, RefreshCcw, RotateCcw, Square, Wand2, X } from 'lucide-react';
 import {
     Clip,
@@ -16,7 +16,13 @@ import {
     normalizeClipNotes
 } from '../services/pianoScoreConversionService';
 import { pianoTranscriptionService } from '../services/pianoTranscriptionService';
-import { buildScoreTransportFrame, timeline16thToBarTime } from '../services/scoreTransportSyncService';
+import {
+    buildScoreTransportFrame,
+    normalizeScoreNotesToAudibleClipWindow,
+    scoreSource16thToGlobalTimeline16th,
+    timeline16thToBarTime,
+    type ScoreClipTransportContext
+} from '../services/scoreTransportSyncService';
 import { getTransportClockSnapshot, subscribeTransportClock, type TransportClockSnapshot } from '../services/transportClockStore';
 import { midiService } from '../services/MidiService';
 import ScoreViewport from './ScoreViewport';
@@ -29,14 +35,18 @@ export interface PianoScoreMidiCommitPayload {
     sourceClipId: string;
 }
 
+export type PianoScoreSurfaceMode = 'combined' | 'score' | 'keys';
+
 interface PianoScoreWorkspaceProps {
     isOpen: boolean;
+    surfaceMode?: PianoScoreSurfaceMode;
     tracks: Track[];
     transport: TransportState;
     selectedTrackId: string | null;
     selectedClipId: string | null;
     scoreWorkspaces: ScoreWorkspaceState[];
     onClose: () => void;
+    onImportSource?: () => void | Promise<void>;
     onScoreWorkspacesChange: (workspaces: ScoreWorkspaceState[]) => void;
     onCreateMidiTrackFromScore: (
         payload: PianoScoreMidiCommitPayload,
@@ -74,20 +84,27 @@ const upsertWorkspace = (workspaces: ScoreWorkspaceState[], nextWorkspace: Score
     return workspaces.map((workspace, index) => index === existingIndex ? next : workspace);
 };
 
-const buttonBase = 'h-8 px-3 rounded-sm border text-[10px] font-bold uppercase tracking-wider transition-all disabled:cursor-not-allowed disabled:opacity-40 flex items-center gap-2';
+const buttonBase = 'h-11 md:h-8 px-3 rounded-sm border text-[10px] font-bold uppercase tracking-wider transition-all disabled:cursor-not-allowed disabled:opacity-40 flex shrink-0 items-center gap-2';
 const subtleButtonClass = `${buttonBase} border-white/15 bg-[#151824] text-gray-300 hover:text-white hover:border-white/30`;
 const secondaryAccentButtonClass = `${buttonBase} border-daw-violet/35 bg-daw-violet/10 text-daw-violet hover:bg-daw-violet/18 hover:text-violet-100`;
 const successButtonClass = `${buttonBase} border-emerald-400/35 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/18`;
 const dangerButtonClass = `${buttonBase} border-rose-400/35 bg-rose-500/10 text-rose-200 hover:bg-rose-500/18`;
 
+const isAbortError = (error: unknown): boolean => (
+    (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError')
+    || (error instanceof Error && /abort|cancel/i.test(`${error.name} ${error.message}`))
+);
+
 const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
     isOpen,
+    surfaceMode = 'combined',
     tracks,
     transport,
     selectedTrackId,
     selectedClipId,
     scoreWorkspaces,
     onClose,
+    onImportSource,
     onScoreWorkspacesChange,
     onCreateMidiTrackFromScore,
     onUpdateMidiClip,
@@ -98,14 +115,24 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
     onSeekToBarTime
 }) => {
     const rootRef = useRef<HTMLDivElement>(null);
+    const mobileTabsIdPrefix = useId().replace(/:/g, '');
+    const transcriptionAbortRef = useRef<AbortController | null>(null);
+    const transcriptionRequestIdRef = useRef(0);
     const [transportClock, setTransportClock] = useState<TransportClockSnapshot>(() => getTransportClockSnapshot());
     const [draftNotes, setDraftNotes] = useState<Note[] | null>(null);
+    const [transcriptionGridBpm, setTranscriptionGridBpm] = useState<number | null>(null);
     const [isScanning, setIsScanning] = useState(false);
     const [scanProgressMessage, setScanProgressMessage] = useState('');
     const [scanError, setScanError] = useState<string | null>(null);
     const [selectedNoteKey, setSelectedNoteKey] = useState<string | null>(null);
     const [livePitches, setLivePitches] = useState<number[]>([]);
     const [sustainActive, setSustainActive] = useState(false);
+    const [mobilePanel, setMobilePanel] = useState<'score' | 'keys'>('keys');
+    const isCombinedSurface = surfaceMode === 'combined';
+    const isScoreSurface = surfaceMode === 'score';
+    const isKeysSurface = surfaceMode === 'keys';
+    const productName = isScoreSurface ? 'Score-fi' : isKeysSurface ? 'Keys-fi' : 'Score + Keys';
+    const closeLabel = isCombinedSurface ? 'Cerrar Score + Keys' : `Volver al Hub desde ${productName}`;
 
     const sourceCandidates = useMemo<SourceCandidate[]>(() => tracks.flatMap((track) => {
         if (track.type !== TrackType.MIDI && track.type !== TrackType.AUDIO) return [];
@@ -134,7 +161,7 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
         return createDefaultScoreWorkspace(
             selectedTrack.id,
             selectedClip.id,
-            `Piano Score / ${selectedTrack.name}`,
+            `Score-fi / ${selectedTrack.name}`,
             selectedTrack.type === TrackType.AUDIO ? 'audio-derived' : 'midi'
         );
     }, [selectedClip, selectedTrack]);
@@ -149,16 +176,56 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
     useEffect(() => subscribeTransportClock(() => setTransportClock(getTransportClockSnapshot())), []);
 
     useEffect(() => {
+        transcriptionRequestIdRef.current += 1;
+        transcriptionAbortRef.current?.abort();
+        transcriptionAbortRef.current = null;
+        setIsScanning(false);
         setDraftNotes(null);
+        setTranscriptionGridBpm(null);
         setScanError(null);
         setScanProgressMessage('');
         setSelectedNoteKey(null);
     }, [currentWorkspace?.id]);
 
+    useEffect(() => {
+        if (isOpen) return;
+        transcriptionRequestIdRef.current += 1;
+        transcriptionAbortRef.current?.abort();
+        transcriptionAbortRef.current = null;
+        setIsScanning(false);
+    }, [isOpen]);
+
+    useEffect(() => () => {
+        transcriptionRequestIdRef.current += 1;
+        transcriptionAbortRef.current?.abort();
+        transcriptionAbortRef.current = null;
+    }, []);
+
     const sourceClipContext = useMemo(() => {
         if (!currentWorkspace) return null;
         return findClipById(tracks, currentWorkspace.source.trackId, currentWorkspace.source.clipId);
     }, [currentWorkspace, tracks]);
+
+    const scoreClipTransportContext = useMemo<ScoreClipTransportContext | undefined>(() => {
+        if (!sourceClipContext) return undefined;
+        const { clip, track } = sourceClipContext;
+        const sourceOriginalBpm = Math.max(1, clip.originalBpm ?? 120);
+        return {
+            sourceKind: track.type === TrackType.AUDIO ? 'audio' : 'midi',
+            noteTimeDomain: currentWorkspace?.source.kind === 'audio-derived' ? 'clip-local' : 'source-grid',
+            clipStartBar: clip.start,
+            clipLengthBars: clip.length,
+            clipOffsetBars: clip.offset,
+            playbackRate: clip.playbackRate,
+            sourceOriginalBpm,
+            noteGridBpm: transcriptionGridBpm ?? transport.bpm,
+            projectBpm: transport.bpm,
+            isWarped: clip.isWarped,
+            clipTransposeSemitones: clip.transpose,
+            trackTransposeSemitones: track.transpose,
+            masterTransposeSemitones: transport.masterTranspose
+        };
+    }, [currentWorkspace?.source.kind, sourceClipContext, transcriptionGridBpm, transport.bpm, transport.masterTranspose]);
 
     const derivedClipContext = useMemo(() => {
         if (!currentWorkspace || currentWorkspace.source.kind !== 'audio-derived') return null;
@@ -190,8 +257,15 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
     }, [currentWorkspace, transport.bpm, transport.timeSignature, workingNotes]);
 
     const transportFrame = useMemo(() => {
-        return buildScoreTransportFrame(workingNotes, transportClock, transport.timeSignature);
-    }, [transport.timeSignature, transportClock, workingNotes]);
+        return buildScoreTransportFrame(
+            workingNotes,
+            transportClock,
+            transport.timeSignature,
+            transport.bpm,
+            Date.now(),
+            scoreClipTransportContext
+        );
+    }, [scoreClipTransportContext, transport.bpm, transport.timeSignature, transportClock, workingNotes]);
 
     const setWorkspace = useCallback((updater: (workspace: ScoreWorkspaceState) => ScoreWorkspaceState) => {
         if (!currentWorkspace) return;
@@ -248,8 +322,15 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
 
     const commitEditableNotes = useCallback((nextNotes: Note[]) => {
         if (!currentWorkspace || !sourceClipContext) return;
+        const normalizedNextNotes = normalizeClipNotes(nextNotes);
+        const notesForClip = currentWorkspace.source.kind === 'audio-derived' && scoreClipTransportContext
+            ? normalizeScoreNotesToAudibleClipWindow(normalizedNextNotes, {
+                ...scoreClipTransportContext,
+                noteTimeDomain: 'clip-local'
+            })
+            : normalizedNextNotes;
         const payload: PianoScoreMidiCommitPayload = {
-            notes: normalizeClipNotes(nextNotes),
+            notes: notesForClip,
             clipName: currentWorkspace.source.kind === 'audio-derived'
                 ? `SCORE DRAFT - ${sourceClipContext.track.name}`
                 : sourceClipContext.clip.name,
@@ -268,7 +349,7 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
         }
 
         setDraftNotes(payload.notes);
-    }, [currentWorkspace, onUpdateMidiClip, sourceClipContext]);
+    }, [currentWorkspace, onUpdateMidiClip, scoreClipTransportContext, sourceClipContext]);
 
     const handleNoteUpdate = useCallback((noteIndex: number, nextNote: Note) => {
         const nextNotes = workingNotes.map((note, index) => index === noteIndex ? nextNote : note);
@@ -319,9 +400,33 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
     }, [selectedNoteKey, setWorkspace]);
 
     const handleSeekToTimeline16th = useCallback((timeline16th: number) => {
-        const barTime = timeline16thToBarTime(timeline16th, transport.timeSignature);
+        const globalTimeline16th = scoreClipTransportContext
+            ? scoreSource16thToGlobalTimeline16th(timeline16th, scoreClipTransportContext)
+            : timeline16th;
+        const barTime = timeline16thToBarTime(
+            globalTimeline16th,
+            scoreClipTransportContext ? [4, 4] : transport.timeSignature
+        );
         void onSeekToBarTime(barTime);
-    }, [onSeekToBarTime, transport.timeSignature]);
+    }, [onSeekToBarTime, scoreClipTransportContext, transport.timeSignature]);
+
+    const handleCancelTranscription = useCallback(() => {
+        if (!transcriptionAbortRef.current) return;
+        transcriptionRequestIdRef.current += 1;
+        transcriptionAbortRef.current.abort();
+        transcriptionAbortRef.current = null;
+        setIsScanning(false);
+        setScanError(null);
+        setScanProgressMessage('Transcripcion cancelada. Puedes volver a analizar cuando quieras.');
+    }, []);
+
+    const handleCloseWorkspace = useCallback(() => {
+        transcriptionRequestIdRef.current += 1;
+        transcriptionAbortRef.current?.abort();
+        transcriptionAbortRef.current = null;
+        setIsScanning(false);
+        onClose();
+    }, [onClose]);
 
     const handleRunTranscription = useCallback(async () => {
         if (!sourceClipContext || sourceClipContext.track.type !== TrackType.AUDIO || !sourceClipContext.clip.buffer) {
@@ -329,6 +434,11 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
             return;
         }
 
+        transcriptionAbortRef.current?.abort();
+        const controller = new AbortController();
+        const requestId = transcriptionRequestIdRef.current + 1;
+        transcriptionRequestIdRef.current = requestId;
+        transcriptionAbortRef.current = controller;
         setScanError(null);
         setIsScanning(true);
         setScanProgressMessage('Preparando transcripcion de piano...');
@@ -337,9 +447,22 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                 sourceClipContext.clip.buffer,
                 transport.bpm,
                 {},
-                (progress) => setScanProgressMessage(progress.message)
+                (progress) => {
+                    if (requestId !== transcriptionRequestIdRef.current || controller.signal.aborted) return;
+                    setScanProgressMessage(progress.message);
+                },
+                controller.signal
             );
-            setDraftNotes(result.notes);
+            if (requestId !== transcriptionRequestIdRef.current || controller.signal.aborted) return;
+            const clipLocalNotes = scoreClipTransportContext
+                ? normalizeScoreNotesToAudibleClipWindow(result.notes, {
+                    ...scoreClipTransportContext,
+                    noteTimeDomain: 'source-grid',
+                    noteGridBpm: transport.bpm
+                })
+                : result.notes;
+            setTranscriptionGridBpm(transport.bpm);
+            setDraftNotes(clipLocalNotes);
             setWorkspace((workspace) => ({
                 ...workspace,
                 mode: 'transcribe',
@@ -347,16 +470,31 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                 lastAverageConfidence: result.averageConfidence
             }));
         } catch (error) {
+            if (requestId !== transcriptionRequestIdRef.current) return;
+            if (controller.signal.aborted || isAbortError(error)) {
+                setScanError(null);
+                setScanProgressMessage('Transcripcion cancelada. Puedes volver a analizar cuando quieras.');
+                return;
+            }
             console.error('Piano transcription failed', error);
             setScanError(error instanceof Error ? error.message : 'No se pudo transcribir el clip.');
         } finally {
-            setIsScanning(false);
+            if (requestId === transcriptionRequestIdRef.current) {
+                transcriptionAbortRef.current = null;
+                setIsScanning(false);
+            }
         }
-    }, [setWorkspace, sourceClipContext, transport.bpm]);
+    }, [scoreClipTransportContext, setWorkspace, sourceClipContext, transport.bpm]);
 
     const handleCommitMidi = useCallback(() => {
         if (!currentWorkspace || !sourceClipContext) return;
-        const notesToCommit = draftNotes || workingNotes;
+        const pendingNotes = draftNotes || workingNotes;
+        const notesToCommit = currentWorkspace.source.kind === 'audio-derived' && scoreClipTransportContext
+            ? normalizeScoreNotesToAudibleClipWindow(pendingNotes, {
+                ...scoreClipTransportContext,
+                noteTimeDomain: 'clip-local'
+            })
+            : pendingNotes;
         if (notesToCommit.length === 0) {
             setScanError('No hay notas listas para convertir a partitura o MIDI.');
             return;
@@ -394,7 +532,7 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
             }
         }));
         setDraftNotes(null);
-    }, [currentWorkspace, draftNotes, onCreateMidiTrackFromScore, onUpdateMidiClip, setWorkspace, sourceClipContext, workingNotes]);
+    }, [currentWorkspace, draftNotes, onCreateMidiTrackFromScore, onUpdateMidiClip, scoreClipTransportContext, setWorkspace, sourceClipContext, workingNotes]);
 
     const handleSplitResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
         if (!rootRef.current || !currentWorkspace) return;
@@ -424,25 +562,29 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
 
     if (!currentWorkspace || !selectedTrack || !selectedClip) {
         return (
-            <div className="flex h-full w-full items-center justify-center bg-[#0b0d12] px-6 text-gray-300">
-                <div className="w-full max-w-2xl rounded-sm border border-white/10 bg-[#11131a] p-6 shadow-2xl">
+            <div className="flex h-full w-full items-center justify-center bg-[#0b0d12] px-3 text-gray-300 sm:px-6">
+                <div className="w-full max-w-2xl rounded-sm border border-white/10 bg-[#11131a] p-4 shadow-2xl sm:p-6">
                     <div className="flex items-start justify-between gap-4 border-b border-daw-border pb-4">
                         <div className="flex items-start gap-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-sm border border-daw-violet/30 bg-daw-violet/10 text-daw-violet">
                                 <Music2 size={18} />
                             </div>
                             <div>
-                                <div className="text-[10px] uppercase tracking-[0.22em] text-gray-500">Piano Score</div>
+                                <div className="text-[10px] uppercase tracking-[0.22em] text-gray-500">{productName}</div>
                                 <div className="mt-1 text-lg font-semibold text-white">Selecciona una fuente musical</div>
                                 <p className="mt-2 max-w-xl text-sm leading-6 text-gray-400">
-                                    El editor de partitura trabaja directo sobre clips MIDI y sobre drafts derivados desde audio de piano.
+                                    {isKeysSurface
+                                        ? 'El visualizador de interpretación convierte clips MIDI y audio de piano en una guía sincronizada y editable.'
+                                        : 'El editor de notación trabaja directo sobre clips MIDI y sobre borradores derivados desde audio de piano.'}
                                 </p>
                             </div>
                         </div>
                         <button
-                            onClick={onClose}
-                            className="flex h-8 w-8 items-center justify-center rounded-sm border border-white/10 bg-white/5 text-gray-400 hover:text-white hover:border-white/30"
-                            title="Cerrar Piano Score"
+                            type="button"
+                            onClick={handleCloseWorkspace}
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm border border-white/10 bg-white/5 text-gray-400 hover:border-white/30 hover:text-white md:h-8 md:w-8"
+                            title={closeLabel}
+                            aria-label={closeLabel}
                         >
                             <X size={14} />
                         </button>
@@ -453,7 +595,7 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                             <select
                                 value=""
                                 onChange={(event) => handleSourceChange(event.target.value)}
-                                className="h-10 min-w-[320px] flex-1 rounded-sm border border-white/10 bg-[#0b1018] px-3 text-sm text-gray-200 outline-none focus:border-daw-violet/50"
+                                className="h-11 min-w-0 w-full flex-1 rounded-sm border border-white/10 bg-[#0b1018] px-3 text-sm text-gray-200 outline-none focus:border-daw-violet/50 md:h-10 md:w-auto md:min-w-[320px]"
                             >
                                 <option value="" disabled>Elegir clip MIDI o audio de piano...</option>
                                 {sourceCandidates.map((candidate) => (
@@ -461,12 +603,21 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                                 ))}
                             </select>
                             <div className="rounded-sm border border-white/10 bg-[#131620] px-3 py-2 text-[11px] text-gray-400">
-                                Abre una fuente y el workspace se configura solo para partitura, transcripcion y correccion.
+                                Abre una fuente y {productName} configura la lectura, transcripción y corrección sin duplicar el proyecto.
                             </div>
                         </div>
                     ) : (
-                        <div className="mt-5 rounded-sm border border-dashed border-white/15 bg-[#0f1219] px-4 py-4 text-sm text-gray-500">
-                            No hay clips MIDI ni clips de audio listos para Piano Score todavia.
+                        <div className="mt-5 flex flex-col items-start gap-3 rounded-sm border border-dashed border-white/15 bg-[#0f1219] px-4 py-4 text-sm text-gray-500">
+                            <span>No hay clips MIDI ni clips de audio listos para {productName} todavía.</span>
+                            {onImportSource && (
+                                <button
+                                    type="button"
+                                    onClick={() => void onImportSource()}
+                                    className={subtleButtonClass}
+                                >
+                                    Importar audio
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -551,7 +702,7 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
 
     return (
         <div ref={rootRef} className="flex h-full w-full flex-col bg-[#0b0d12] text-white">
-            <div className="h-10 shrink-0 border-b border-daw-border bg-[#18181b] px-3">
+            <div className="h-12 shrink-0 border-b border-daw-border bg-[#18181b] px-3 md:h-10">
                 <div className="flex h-full items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                         <div className="flex min-w-0 items-center gap-2 rounded-sm bg-black/20 py-0.5 pr-3">
@@ -563,9 +714,9 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                                 {selectedTrack.name}
                             </span>
                         </div>
-                        <div className="h-4 w-px shrink-0 bg-daw-border" />
-                        <div className="min-w-0">
-                            <div className="text-[10px] uppercase tracking-[0.22em] text-gray-500">Piano Score</div>
+                        <div className="hidden h-4 w-px shrink-0 bg-daw-border sm:block" />
+                        <div className="hidden min-w-0 sm:block">
+                            <div className="text-[10px] uppercase tracking-[0.22em] text-gray-500">{productName}</div>
                             <div className="truncate text-[11px] text-gray-300">{selectedClip.name}</div>
                         </div>
                     </div>
@@ -580,9 +731,11 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                             </span>
                         )}
                         <button
-                            onClick={onClose}
-                            className="flex h-8 w-8 items-center justify-center rounded-sm border border-white/10 bg-white/5 text-gray-400 hover:text-white hover:border-white/30"
-                            title="Cerrar Piano Score"
+                            type="button"
+                            onClick={handleCloseWorkspace}
+                            className="flex h-11 w-11 items-center justify-center rounded-sm border border-white/10 bg-white/5 text-gray-400 hover:border-white/30 hover:text-white md:h-8 md:w-8"
+                            title={closeLabel}
+                            aria-label={closeLabel}
                         >
                             <X size={14} />
                         </button>
@@ -590,19 +743,49 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                 </div>
             </div>
 
-            <div className="shrink-0 border-b border-daw-border bg-[#11131a] px-4 py-2.5">
-                <div className="flex flex-wrap items-center gap-2">
+            <div className="shrink-0 border-b border-daw-border bg-[#11131a] px-2 py-2 md:px-4 md:py-2.5">
+                {isCombinedSurface && (
+                <div className="mb-2 grid grid-cols-2 gap-1 md:hidden" role="tablist" aria-label="Vistas de Score + Keys">
+                    <button
+                        type="button"
+                        id={`${mobileTabsIdPrefix}-score-tab`}
+                        role="tab"
+                        aria-selected={mobilePanel === 'score'}
+                        aria-controls={`${mobileTabsIdPrefix}-score-panel`}
+                        onClick={() => setMobilePanel('score')}
+                        className={`${buttonBase} justify-center ${mobilePanel === 'score' ? 'border-white/30 bg-white/10 text-white' : 'border-white/10 bg-[#151824] text-gray-400'}`}
+                    >
+                        Partitura
+                    </button>
+                    <button
+                        type="button"
+                        id={`${mobileTabsIdPrefix}-keys-tab`}
+                        role="tab"
+                        aria-selected={mobilePanel === 'keys'}
+                        aria-controls={`${mobileTabsIdPrefix}-keys-panel`}
+                        onClick={() => setMobilePanel('keys')}
+                        className={`${buttonBase} justify-center ${mobilePanel === 'keys' ? 'border-white/30 bg-white/10 text-white' : 'border-white/10 bg-[#151824] text-gray-400'}`}
+                    >
+                        Keys-fi
+                    </button>
+                </div>
+                )}
+
+                <div className="-mx-1 touch-pan-x overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]">
+                    <div className="flex min-w-max items-center gap-2 px-1">
                     <select
                         value={activeSourceId}
                         onChange={(event) => handleSourceChange(event.target.value)}
-                        className="h-9 min-w-[320px] rounded-sm border border-white/10 bg-[#0b1018] px-3 text-xs text-gray-200 outline-none focus:border-daw-violet/50"
+                        disabled={isScanning}
+                        aria-label={`Fuente musical de ${productName}`}
+                        className="h-11 w-[min(78vw,320px)] min-w-[240px] rounded-sm border border-white/10 bg-[#0b1018] px-3 text-xs text-gray-200 outline-none focus:border-daw-violet/50 disabled:cursor-not-allowed disabled:opacity-45 md:h-9 md:w-auto md:min-w-[320px]"
                     >
                         {sourceCandidates.map((candidate) => (
                             <option key={candidate.id} value={candidate.id}>{candidate.label}</option>
                         ))}
                     </select>
 
-                    <label className="flex h-8 items-center gap-2 rounded-sm border border-white/10 bg-[#151824] px-3 text-[10px] font-bold uppercase tracking-wider text-gray-300">
+                    <label className="flex h-11 shrink-0 items-center gap-2 rounded-sm border border-white/10 bg-[#151824] px-3 text-[10px] font-bold uppercase tracking-wider text-gray-300 md:h-8">
                         <input
                             type="checkbox"
                             checked={currentWorkspace.layout.followTransport}
@@ -612,29 +795,10 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                         Seguir transporte
                     </label>
 
-                    <div className={`rounded-sm border px-2 py-1 text-[9px] font-bold uppercase tracking-wider ${confidenceClass}`}>
-                        Confianza {confidenceLabel}
-                    </div>
-
-                    <div className="rounded-sm border border-white/10 bg-[#151824] px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">
-                        Destino MIDI {targetMidiLabel}
-                    </div>
-
-                    <button onClick={() => void onPlay()} className={subtleButtonClass}>
-                        <Play size={14} />
-                        Play
-                    </button>
-                    <button onClick={() => void onPause()} className={subtleButtonClass}>
-                        <Pause size={14} />
-                        Pause
-                    </button>
-                    <button onClick={() => void onStop()} className={subtleButtonClass}>
-                        <Square size={14} />
-                        Stop
-                    </button>
-
+                    <div className="hidden md:contents">
                     {showPrimaryAnalyze && (
                         <button
+                            type="button"
                             onClick={handleRunTranscription}
                             disabled={isScanning || !canTranscribe}
                             className={secondaryAccentButtonClass}
@@ -644,8 +808,34 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                         </button>
                     )}
 
+                    <button type="button" onClick={() => void onPlay()} className={subtleButtonClass}>
+                        <Play size={14} />
+                        Play
+                    </button>
+                    <button type="button" onClick={() => void onPause()} className={subtleButtonClass}>
+                        <Pause size={14} />
+                        Pause
+                    </button>
+                    <button type="button" onClick={() => void onStop()} className={subtleButtonClass}>
+                        <Square size={14} />
+                        Stop
+                    </button>
+
+                    {isScanning && (
+                        <button
+                            type="button"
+                            onClick={handleCancelTranscription}
+                            className={dangerButtonClass}
+                            aria-label="Cancelar transcripcion de piano"
+                        >
+                            <X size={14} />
+                            Cancelar analisis
+                        </button>
+                    )}
+
                     {showPrimaryCommit && (
                         <button
+                            type="button"
                             onClick={handleCommitMidi}
                             disabled={!hasWorkingNotes}
                             className={successButtonClass}
@@ -654,17 +844,91 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                         </button>
                     )}
 
-                    <button onClick={() => setDraftNotes(null)} className={subtleButtonClass}>
+                    <button type="button" onClick={() => setDraftNotes(null)} className={subtleButtonClass}>
                         <RefreshCcw size={14} />
                         Rebuild Score
                     </button>
-                    <button onClick={handleResetOverrides} className={dangerButtonClass}>
+                    <button type="button" onClick={handleResetOverrides} className={dangerButtonClass}>
+                        <RotateCcw size={14} />
+                        Reset Overrides
+                    </button>
+                    </div>
+
+                    <div className={`rounded-sm border px-2 py-1 text-[9px] font-bold uppercase tracking-wider ${confidenceClass}`}>
+                        Confianza detector {confidenceLabel}
+                    </div>
+
+                    <div className="rounded-sm border border-white/10 bg-[#151824] px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">
+                        Destino MIDI {targetMidiLabel}
+                    </div>
+                    </div>
+                </div>
+
+                <div
+                    className="mt-2 grid grid-cols-6 gap-1 md:hidden"
+                    role="group"
+                    aria-label={`Controles táctiles de ${productName}`}
+                    data-mobile-score-controls
+                >
+                    <button type="button" onClick={() => void onPlay()} className={`${subtleButtonClass} col-span-2 min-w-0 justify-center px-2`}>
+                        <Play size={14} />
+                        Play
+                    </button>
+                    <button type="button" onClick={() => void onPause()} className={`${subtleButtonClass} col-span-2 min-w-0 justify-center px-2`}>
+                        <Pause size={14} />
+                        Pause
+                    </button>
+                    <button type="button" onClick={() => void onStop()} className={`${subtleButtonClass} col-span-2 min-w-0 justify-center px-2`}>
+                        <Square size={14} />
+                        Stop
+                    </button>
+
+                    {showPrimaryAnalyze && (
+                        <button
+                            type="button"
+                            onClick={handleRunTranscription}
+                            disabled={isScanning || !canTranscribe}
+                            className={`${secondaryAccentButtonClass} col-span-6 w-full justify-center`}
+                        >
+                            {isScanning ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                            {isScanning ? 'Analizando...' : hasDerivedMidiTarget ? 'Reanalizar Piano' : 'Analizar Piano'}
+                        </button>
+                    )}
+
+                    {isScanning && (
+                        <button
+                            type="button"
+                            onClick={handleCancelTranscription}
+                            className={`${dangerButtonClass} col-span-6 w-full justify-center`}
+                            aria-label="Cancelar transcripcion de piano"
+                        >
+                            <X size={14} />
+                            Cancelar analisis
+                        </button>
+                    )}
+
+                    {showPrimaryCommit && (
+                        <button
+                            type="button"
+                            onClick={handleCommitMidi}
+                            disabled={!hasWorkingNotes}
+                            className={`${successButtonClass} col-span-6 w-full justify-center`}
+                        >
+                            Commit MIDI
+                        </button>
+                    )}
+
+                    <button type="button" onClick={() => setDraftNotes(null)} className={`${subtleButtonClass} col-span-3 min-w-0 justify-center px-2`}>
+                        <RefreshCcw size={14} />
+                        Rebuild Score
+                    </button>
+                    <button type="button" onClick={handleResetOverrides} className={`${dangerButtonClass} col-span-3 min-w-0 justify-center px-2`}>
                         <RotateCcw size={14} />
                         Reset Overrides
                     </button>
                 </div>
 
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                <div className="mt-1 flex touch-pan-x items-center gap-2 overflow-x-auto overscroll-x-contain pb-1 text-[11px] [scrollbar-width:thin] md:mt-2 md:flex-wrap">
                     <div className="rounded-sm border border-white/10 bg-[#151824] px-3 py-1.5 text-gray-300">
                         {workflowTitle}
                     </div>
@@ -700,11 +964,19 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                 </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-hidden p-3">
+            <div className="min-h-0 flex-1 overflow-hidden p-2 md:p-3">
                 <div
-                    className="grid h-full gap-2"
-                    style={{ gridTemplateRows: `${Math.round(splitRatio * 100)}% 12px minmax(220px, 1fr)` }}
+                    className={isCombinedSurface ? 'h-full gap-2 md:grid' : 'h-full'}
+                    style={isCombinedSurface ? { gridTemplateRows: `${Math.round(splitRatio * 100)}% 12px minmax(220px, 1fr)` } : undefined}
                 >
+                    {!isKeysSurface && (
+                    <div
+                        id={isCombinedSurface ? `${mobileTabsIdPrefix}-score-panel` : undefined}
+                        role={isCombinedSurface ? 'tabpanel' : 'region'}
+                        aria-labelledby={isCombinedSurface ? `${mobileTabsIdPrefix}-score-tab` : undefined}
+                        aria-label={isCombinedSurface ? undefined : 'Editor de notación Score-fi'}
+                        className={`${!isCombinedSurface || mobilePanel === 'score' ? 'block' : 'hidden'} h-full min-h-0 md:block`}
+                    >
                     <ScoreViewport
                         document={scoreDocument}
                         playhead16th={transportFrame.playhead16th}
@@ -718,14 +990,24 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                         onSelectNoteKey={setSelectedNoteKey}
                         onSeekToTimeline16th={handleSeekToTimeline16th}
                     />
+                    </div>
+                    )}
 
-                    <div
+                    {isCombinedSurface && <div
                         onPointerDown={handleSplitResizeStart}
-                        className="flex w-full cursor-row-resize items-center justify-center rounded-sm border border-white/10 bg-[#11131a]"
+                        className="hidden w-full cursor-row-resize items-center justify-center rounded-sm border border-white/10 bg-[#11131a] md:flex"
                     >
                         <div className="h-px w-16 bg-white/20" />
-                    </div>
+                    </div>}
 
+                    {!isScoreSurface && (
+                    <div
+                        id={isCombinedSurface ? `${mobileTabsIdPrefix}-keys-panel` : undefined}
+                        role={isCombinedSurface ? 'tabpanel' : 'region'}
+                        aria-labelledby={isCombinedSurface ? `${mobileTabsIdPrefix}-keys-tab` : undefined}
+                        aria-label={isCombinedSurface ? undefined : 'Visualizador de interpretación Keys-fi'}
+                        className={`${!isCombinedSurface || mobilePanel === 'keys' ? 'block' : 'hidden'} h-full min-h-0 md:block`}
+                    >
                     <PianoCinema
                         notes={workingNotes}
                         playhead16th={transportFrame.playhead16th}
@@ -736,6 +1018,7 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                         activeNoteIndexes={transportFrame.activeNoteIndexes}
                         livePitches={livePitches}
                         sustainActive={sustainActive}
+                        pitchShiftSemitones={transportFrame.audiblePitchShiftSemitones}
                         zoom={currentWorkspace.layout.zoom}
                         emptyTitle={emptyTitle}
                         emptyMessage={emptyMessage}
@@ -743,6 +1026,8 @@ const PianoScoreWorkspace: React.FC<PianoScoreWorkspaceProps> = ({
                         onSeekToTimeline16th={handleSeekToTimeline16th}
                         onUpdateNote={handleNoteUpdate}
                     />
+                    </div>
+                    )}
                 </div>
             </div>
         </div>

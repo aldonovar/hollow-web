@@ -1,6 +1,6 @@
 // ============================================================
 // Cloudflare Pages Function — Health Check Endpoint
-// Hollow Bits Edge API
+// DAW-fi Edge API
 // Route: /api/health (GET)
 // ============================================================
 // This establishes the architectural pattern for all future
@@ -23,8 +23,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   return new Response(
     JSON.stringify({
       status: "ok",
-      service: "Hollow Web Edge API",
-      message: "Hollow Web Edge API is operational",
+      service: "DAW-fi Web",
+      message: "DAW-fi Web is operational",
       timestamp: new Date().toISOString(),
       region: (context.request as any).cf?.colo ?? "unknown",
     }),
