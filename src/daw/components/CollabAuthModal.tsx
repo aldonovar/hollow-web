@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, Loader, X, AlertCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
+import { beginGoogleSignIn, getAuthErrorMessage } from '../../lib/authFlow';
 import { useAuthStore } from '../../stores/authStore';
 import '../../pages/Auth.css';
 
@@ -57,24 +58,11 @@ export const CollabAuthModal: React.FC<CollabAuthModalProps> = ({ onClose, onSuc
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const callbackUrl = `${window.location.origin}/engine`; // Regresar al DAW
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: callbackUrl,
-          queryParams: {
-            prompt: 'select_account',
-          },
-        }
-      });
-
-      if (oauthError) {
-        setError(oauthError.message);
-        setLoading(false);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Ocurrió un error inesperado de red. Verifica tu conexión.');
+      await beginGoogleSignIn('/engine');
+    } catch (err: unknown) {
+      setError(getAuthErrorMessage(err));
       setLoading(false);
     }
   };
@@ -181,4 +169,3 @@ export const CollabAuthModal: React.FC<CollabAuthModalProps> = ({ onClose, onSuc
     </div>
   );
 };
-

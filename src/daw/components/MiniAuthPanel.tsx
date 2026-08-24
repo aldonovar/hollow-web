@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, AlertCircle, ArrowLeft } from 'lucide-react';
 import { supabase } from '../services/supabase';
+import { beginGoogleSignIn, getAuthErrorMessage } from '../../lib/authFlow';
 import { useAuthStore } from '../../stores/authStore';
 import { platformService } from '../services/platformService';
 
@@ -88,15 +89,10 @@ export const MiniAuthPanel: React.FC<MiniAuthPanelProps> = ({ onSuccess, onBack 
               return;
             }
 
-            const { error: oauthError } = await supabase.auth.signInWithOAuth({
-              provider: 'google',
-              options: {
-                redirectTo: `${window.location.origin}/engine`,
-                queryParams: { prompt: 'select_account' },
-              }
-            });
-            if (oauthError) {
-              setError(oauthError.message);
+            try {
+              await beginGoogleSignIn('/engine');
+            } catch (oauthError: unknown) {
+              setError(getAuthErrorMessage(oauthError));
               setLoading(false);
             }
           }}
@@ -160,4 +156,3 @@ export const MiniAuthPanel: React.FC<MiniAuthPanelProps> = ({ onSuccess, onBack 
     </div>
   );
 };
-

@@ -1,149 +1,104 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowRight } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { useAuthStore } from '../stores/authStore';
-import { logService } from '../daw/services/logService';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, ExternalLink, ShieldCheck, X } from 'lucide-react';
+import { buildSafeDawfiDesktopCallbackFromSearch } from '../lib/oauthConsent';
 import './Auth.css';
 
-type BridgeStatus = 'checking' | 'ready' | 'redirecting' | 'error';
-
-const DEFAULT_RETURN_TO = 'hollowbits://auth/callback';
-
-function getSafeReturnTo(rawReturnTo: string | null): string {
-  if (!rawReturnTo) return DEFAULT_RETURN_TO;
-
-  try {
-    const parsed = new URL(rawReturnTo);
-    if (parsed.protocol === 'hollowbits:') return parsed.toString();
-  } catch {
-    // Ignore malformed return targets.
-  }
-
-  return DEFAULT_RETURN_TO;
-}
-
-function buildCurrentBridgeUrl(returnTo: string, state: string, prompt: string): string {
-  const url = new URL('/desktop-auth', window.location.origin);
-  url.searchParams.set('source', 'desktop');
-  url.searchParams.set('return_to', returnTo);
-  if (state) url.searchParams.set('state', state);
-  if (prompt) url.searchParams.set('prompt', prompt);
-  return url.toString();
-}
+type BridgeStatus = 'invalid' | 'opening' | 'delivered';
 
 export function DesktopAuthBridge() {
-  const session = useAuthStore((store) => store.session);
-  const isLoading = useAuthStore((store) => store.isLoading);
-  const params = useMemo(() => new URLSearchParams(window.location.search), []);
-  const returnTo = useMemo(() => getSafeReturnTo(params.get('return_to')), [params]);
-  const state = params.get('state') || '';
-  const prompt = params.get('prompt') === 'none' ? 'none' : 'select_account';
-  const [status, setStatus] = useState<BridgeStatus>('checking');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [handoffUrl, setHandoffUrl] = useState<string | null>(null);
+  const callbackUrl = useMemo(() => (
+    window.location.hash
+      ? null
+      : buildSafeDawfiDesktopCallbackFromSearch(window.location.search)
+  ), []);
+  const [status, setStatus] = useState<BridgeStatus>(callbackUrl ? 'opening' : 'invalid');
+  const [closeAttempted, setCloseAttempted] = useState(false);
+  const didOpenRef = useRef(false);
 
-  const createHandoffUrl = useCallback((accessToken: string, refreshToken: string): string => {
-    const callbackUrl = new URL(returnTo);
-    const hash = new URLSearchParams(callbackUrl.hash.startsWith('#') ? callbackUrl.hash.slice(1) : callbackUrl.hash);
-    hash.set('access_token', accessToken);
-    hash.set('refresh_token', refreshToken);
-    hash.set('type', 'desktop_handoff');
-    if (state) hash.set('desktop_state', state);
-    callbackUrl.hash = hash.toString();
-    return callbackUrl.toString();
-  }, [returnTo, state]);
-
-  const handoffSession = useCallback(async () => {
-    setStatus('checking');
-    setErrorMessage(null);
-
-    const { data, error } = await supabase.auth.getSession();
-    if (error) {
-      logService.error('Failed to get session during handoff', 'DesktopAuthBridge', error);
-      setStatus('error');
-      setErrorMessage(error.message);
-      return;
+  useLayoutEffect(() => {
+    if (window.location.search || window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname);
     }
-
-    const activeSession = data.session || session;
-    if (!activeSession?.access_token || !activeSession.refresh_token) {
-      logService.info('No active session found, waiting for user login', 'DesktopAuthBridge');
-      setStatus('ready');
-      return;
-    }
-
-    const nextHandoffUrl = createHandoffUrl(activeSession.access_token, activeSession.refresh_token);
-    logService.info('Session found, redirecting to desktop app', 'DesktopAuthBridge', { returnTo });
-    setHandoffUrl(nextHandoffUrl);
-    setStatus('redirecting');
-    window.location.assign(nextHandoffUrl);
-  }, [createHandoffUrl, session]);
+  }, []);
 
   useEffect(() => {
-    if (!isLoading) {
-      void handoffSession();
-    }
-  }, [handoffSession, isLoading]);
+    if (!callbackUrl || didOpenRef.current) return;
+    didOpenRef.current = true;
+    setStatus('delivered');
 
-  const handleGoogleLogin = async () => {
-    setStatus('checking');
-    setErrorMessage(null);
-    logService.info('Initiating Google OAuth for desktop bridge', 'DesktopAuthBridge');
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: buildCurrentBridgeUrl(returnTo, state, prompt),
-        queryParams: { prompt },
-      },
-    });
-
-    if (error) {
-      logService.error('Google OAuth failed for desktop bridge', 'DesktopAuthBridge', error);
-      setStatus('error');
-      setErrorMessage(error.message);
+    try {
+      window.location.assign(callbackUrl);
+    } catch {
+      // The visible fallback button remains available when a browser blocks
+      // automatic custom-protocol navigation.
     }
+
+    const closeTimer = window.setTimeout(() => {
+      setCloseAttempted(true);
+      window.close();
+    }, 2200);
+    return () => window.clearTimeout(closeTimer);
+  }, [callbackUrl]);
+
+  const openDesktop = () => {
+    if (!callbackUrl) return;
+    window.location.assign(callbackUrl);
   };
+
+  const closeTab = () => {
+    setCloseAttempted(true);
+    window.close();
+  };
+
+  const isInvalid = status === 'invalid';
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
+      <main className="auth-card" aria-live="polite">
         <div className="auth-card__glitch-bar" />
         <div className="auth-card__header">
-          <img src="/logo-sphere.svg" alt="HOLLOW bits" className="auth-card__logo" />
-          <h1 className="auth-card__title">Conectar Desktop</h1>
-          <p className="auth-card__subtitle">Sincronizando tu sesion web con Hollow Bits Desktop.</p>
+          <img src="/logo-sphere.svg" alt="DAW-fi" className="auth-card__logo" />
+          <h1 className="auth-card__title">
+            {isInvalid ? 'No se pudo vincular DAW-fi' : 'Sesión enviada a DAW-fi'}
+          </h1>
+          <p className="auth-card__subtitle">
+            {isInvalid
+              ? 'La respuesta de autenticación está incompleta o ya no es válida.'
+              : status === 'opening'
+                ? 'Abriendo la aplicación de escritorio…'
+                : 'Vuelve a la aplicación para continuar con tu cuenta.'}
+          </p>
         </div>
 
-        {status === 'error' && errorMessage && (
+        {isInvalid ? (
           <div className="auth-form__error">
             <AlertCircle size={16} />
-            <span>{errorMessage}</span>
+            <span>Regresa a DAW-fi e inicia nuevamente el acceso con Google.</span>
           </div>
-        )}
-
-        {status === 'ready' && (
-          <button type="button" className="auth-google-btn" onClick={handleGoogleLogin}>
-            Continuar con Google
-            <ArrowRight size={16} />
-          </button>
-        )}
-
-        {status !== 'ready' && (
+        ) : (
           <div className="auth-success">
+            <ShieldCheck className="auth-success__icon" size={28} aria-hidden="true" />
+            <h2 className="auth-success__title">Esta pestaña ya no es necesaria</h2>
             <p className="auth-success__desc">
-              {status === 'redirecting' ? 'Abriendo Hollow Bits Desktop...' : 'Verificando sesion activa...'}
+              Puedes cerrarla con seguridad. DAW-fi solo recibió un código temporal protegido por PKCE;
+              tu sesión no se mostró ni se copió en esta página.
             </p>
+            {closeAttempted && (
+              <p className="desktop-auth-bridge__note">
+                Si el navegador no permite cerrarla automáticamente, usa el botón Cerrar pestaña o ciérrala manualmente.
+              </p>
+            )}
+            <div className="desktop-auth-bridge__actions">
+              <button type="button" className="auth-form__submit" onClick={openDesktop}>
+                <ExternalLink size={16} aria-hidden="true" /> Abrir DAW-fi
+              </button>
+              <button type="button" className="auth-form__submit auth-form__submit--ghost" onClick={closeTab}>
+                <X size={16} aria-hidden="true" /> Cerrar pestaña
+              </button>
+            </div>
           </div>
         )}
-
-        {handoffUrl && (
-          <div className="auth-card__footer">
-            <p>
-              <a href={handoffUrl}>Abrir Hollow Bits Desktop</a>
-            </p>
-          </div>
-        )}
-      </div>
+      </main>
     </div>
   );
 }

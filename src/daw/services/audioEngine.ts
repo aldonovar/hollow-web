@@ -7,6 +7,7 @@ import {
 } from './automationService';
 import { sanitizeAudioSettingsCandidate } from './audioSettingsNormalizer';
 import { barTimeToPosition } from './transportStateService';
+import { decodeAiffPcm, isAiffPcmContainer } from './aiffPcmDecoder';
 
 interface ActiveSource {
     source?: AudioBufferSourceNode;
@@ -3999,20 +4000,46 @@ class AudioEngine {
     async decodeAudioData(arrayBuffer: ArrayBuffer): Promise<AudioBuffer> {
         if (!this.ctx) await this.init();
 
+        let aiffDecodeError: unknown;
+
         // 1. Try native Web Audio decode first (fast path)
         try {
             return await this.ctx!.decodeAudioData(arrayBuffer.slice(0));
         } catch (nativeError) {
             // Native decode failed — attempt FFmpeg fallback on desktop
-            console.warn('[AudioEngine] Native decodeAudioData failed, attempting FFmpeg fallback.', nativeError);
+            console.warn('[AudioEngine] Native decodeAudioData failed, attempting format fallbacks.', nativeError);
         }
 
-        // 2. Fallback: Transcode to WAV via FFmpeg (desktop only)
+        // 2. Browser fallback for uncompressed AIFF/AIFC PCM. Chromium does not
+        // decode AIFF natively, so create the AudioBuffer from validated PCM.
+        if (isAiffPcmContainer(arrayBuffer)) {
+            try {
+                const decoded = decodeAiffPcm(arrayBuffer);
+                const audioBuffer = this.ctx!.createBuffer(
+                    decoded.numberOfChannels,
+                    decoded.length,
+                    decoded.sampleRate
+                );
+                decoded.channelData.forEach((channel, index) => {
+                    audioBuffer.getChannelData(index).set(channel);
+                });
+                console.info('[AudioEngine] AIFF PCM browser fallback decoded successfully.');
+                return audioBuffer;
+            } catch (error) {
+                aiffDecodeError = error;
+                console.warn('[AudioEngine] AIFF PCM browser fallback failed.', error);
+            }
+        }
+
+        // 3. Fallback: Transcode to WAV via FFmpeg (desktop only)
         try {
             const { desktopRuntimeService } = await import('./desktopRuntimeService');
             const host = desktopRuntimeService.api;
 
             if (!host?.transcodeAudio) {
+                if (aiffDecodeError instanceof Error) {
+                    throw aiffDecodeError;
+                }
                 throw new Error(
                     'El formato de audio no es compatible con el navegador y FFmpeg no esta disponible.'
                 );

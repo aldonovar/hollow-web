@@ -1,4 +1,5 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
+import { sanitizeAuthNextPath } from '../lib/authFlow';
 import { useAuthStore } from '../stores/authStore';
 
 interface ProtectedRouteProps {
@@ -15,6 +16,7 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children, fallback = '/login' }: ProtectedRouteProps) {
   const session = useAuthStore((s) => s.session);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -35,7 +37,9 @@ export function ProtectedRoute({ children, fallback = '/login' }: ProtectedRoute
   }
 
   if (!session) {
-    return <Navigate to={fallback} replace />;
+    const nextPath = sanitizeAuthNextPath(`${location.pathname}${location.search}`);
+    const separator = fallback.includes('?') ? '&' : '?';
+    return <Navigate to={`${fallback}${separator}next=${encodeURIComponent(nextPath)}`} replace />;
   }
 
   return <>{children}</>;

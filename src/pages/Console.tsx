@@ -3,6 +3,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePageMotion } from '../components/usePageMotion';
 import { Plus, FolderOpen, Settings, Play, MoreVertical, Trash2, Copy, Pencil, Upload, Cloud, CloudOff, X, Check, Users, UserPlus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import {
+  CANONICAL_AUTH_ORIGIN,
+  buildCanonicalLoginUrl,
+  isProductionAuthHostname,
+} from '../lib/authFlow';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 import type { Project } from '../types/supabase';
@@ -111,34 +116,23 @@ export function Console() {
     }
   }, [contextMenuId]);
 
-  const handleOpenDaw = async (e?: React.MouseEvent, projectId?: string) => {
+  const handleOpenDaw = (e?: React.MouseEvent, projectId?: string) => {
     if (e) e.preventDefault();
-    const isPlayApp = window.location.hostname.startsWith('play.') || window.location.hostname.startsWith('console.');
 
     let urlSuffix = '/engine';
     if (projectId) {
       urlSuffix += `?project=${projectId}`;
     }
 
-    if (isPlayApp) {
+    const isProduction = isProductionAuthHostname(window.location.hostname);
+    const isCanonicalApp = window.location.origin === CANONICAL_AUTH_ORIGIN;
+
+    if (!isProduction || isCanonicalApp) {
       navigate(urlSuffix);
-    } else {
-      try {
-        const { data: { session: activeSession } } = await supabase.auth.getSession();
-        if (activeSession?.access_token && activeSession?.refresh_token) {
-          const params = new URLSearchParams({
-            access_token: activeSession.access_token,
-            refresh_token: activeSession.refresh_token,
-            token_type: 'bearer',
-          });
-          window.location.href = `https://play.hollowbits.com${urlSuffix}#${params.toString()}`;
-        } else {
-          window.location.href = `https://play.hollowbits.com${urlSuffix}`;
-        }
-      } catch {
-        window.location.href = `https://play.hollowbits.com${urlSuffix}`;
-      }
+      return;
     }
+
+    window.location.assign(buildCanonicalLoginUrl(urlSuffix));
   };
 
   const createProject = async () => {

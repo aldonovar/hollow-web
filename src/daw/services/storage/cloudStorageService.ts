@@ -1,4 +1,9 @@
 import { supabase } from '../../../lib/supabase';
+import {
+  AUDIO_ASSET_EXTENSIONS,
+  resolveAudioAssetFormat,
+  type AudioAssetExtension,
+} from './audioAssetFormat';
 
 /**
  * Service to manage cloud storage operations for audio files in Supabase.
@@ -6,33 +11,44 @@ import { supabase } from '../../../lib/supabase';
 class CloudStorageService {
   private readonly BUCKET_NAME = 'project-audio';
 
-  private buildAudioPath(projectId: string, fileId: string, extension: 'flac' | 'wav'): string {
+  private assertStorageSegment(value: string, label: string): string {
+    if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+      throw new Error(`Invalid ${label} for project audio storage.`);
+    }
+    return value;
+  }
+
+  private buildAudioPath(projectId: string, fileId: string, extension: AudioAssetExtension): string {
+    this.assertStorageSegment(projectId, 'project id');
+    this.assertStorageSegment(fileId, 'file id');
     return `${projectId}/${fileId}.${extension}`;
   }
 
-  private async buildScopedAudioPath(projectId: string, fileId: string, extension: 'flac' | 'wav'): Promise<string> {
-    const { data } = await supabase.auth.getUser();
+  private async buildScopedAudioPath(projectId: string, fileId: string, extension: AudioAssetExtension): Promise<string> {
+    const { data, error } = await supabase.auth.getUser();
     const userId = data.user?.id;
-    return userId
-      ? `${userId}/${projectId}/${fileId}.${extension}`
-      : this.buildAudioPath(projectId, fileId, extension);
+    if (error || !userId) {
+      throw new Error('An authenticated user is required to upload project audio.');
+    }
+    return `${this.assertStorageSegment(userId, 'user id')}/${this.buildAudioPath(projectId, fileId, extension)}`;
   }
 
   private async buildDownloadCandidates(projectId: string, fileId: string): Promise<string[]> {
     const { data } = await supabase.auth.getUser();
     const userId = data.user?.id;
-    const extensions: Array<'flac' | 'wav'> = ['flac', 'wav'];
+    const extensions = AUDIO_ASSET_EXTENSIONS;
     const scoped = userId
-      ? extensions.map((extension) => `${userId}/${projectId}/${fileId}.${extension}`)
+      ? extensions.map((extension) => `${this.assertStorageSegment(userId, 'user id')}/${this.buildAudioPath(projectId, fileId, extension)}`)
       : [];
     const legacy = extensions.map((extension) => this.buildAudioPath(projectId, fileId, extension));
     return [...scoped, ...legacy];
   }
 
-  public async uploadAudioToCloud(projectId: string, fileId: string, data: Blob): Promise<string> {
-    const isWav = data.type === 'audio/wav' || data.type === 'audio/x-wav' || data.type === '';
-    const extension = isWav ? 'wav' : 'flac';
-    const contentType = isWav ? 'audio/wav' : 'audio/flac';
+  public async uploadAudioToCloud(projectId: string, fileId: string, data: Blob, fileName?: string): Promise<string> {
+    const { extension, contentType } = resolveAudioAssetFormat(data, fileName);
+    if (extension === 'bin') {
+      throw new Error('Unsupported audio format: the original file type could not be identified.');
+    }
     const filePath = await this.buildScopedAudioPath(projectId, fileId, extension);
     
     const { data: uploadData, error } = await supabase.storage
@@ -40,7 +56,7 @@ class CloudStorageService {
       .upload(filePath, data, {
         cacheControl: '31536000',
         upsert: true,
-        contentType: contentType
+        contentType
       });
 
     if (error) {
@@ -51,8 +67,29 @@ class CloudStorageService {
     return uploadData.path;
   }
 
-  public async downloadAudioFromCloud(projectId: string, fileId: string): Promise<Blob> {
-    const candidates = await this.buildDownloadCandidates(projectId, fileId);
+  private assertAssetPath(path: string, projectId: string, fileId: string): string {
+    const segments = path.split('/');
+    const fileName = segments.at(-1) || '';
+    const hasExactAudioFileName = AUDIO_ASSET_EXTENSIONS.some(
+      (extension) => extension !== 'bin' && fileName === `${fileId}.${extension}`
+    );
+    if (
+      path.startsWith('/')
+      || path.includes('..')
+      || path.includes('//')
+      || !segments.includes(projectId)
+      || segments.some((segment) => !/^[a-zA-Z0-9_.-]+$/.test(segment))
+      || !hasExactAudioFileName
+    ) {
+      throw new Error('Invalid project audio asset path.');
+    }
+    return path;
+  }
+
+  public async downloadAudioFromCloud(projectId: string, fileId: string, assetPath?: string): Promise<Blob> {
+    const candidates = assetPath
+      ? [this.assertAssetPath(assetPath, projectId, fileId)]
+      : await this.buildDownloadCandidates(projectId, fileId);
     let lastError: { message?: string } | null = null;
 
     for (const filePath of candidates) {

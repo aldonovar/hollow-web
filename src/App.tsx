@@ -13,11 +13,14 @@ import { Console } from './pages/Console';
 import { Roadmap } from './pages/Roadmap';
 import { Contact } from './pages/Contact';
 import { Auth } from './pages/Auth';
+import { AuthCallback } from './pages/AuthCallback';
 import { Settings } from './pages/Settings';
 import { MfaChallenge } from './pages/MfaChallenge';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
 import { DesktopAuthBridge } from './pages/DesktopAuthBridge';
+import { OAuthConsent } from './pages/OAuthConsent';
+import { readAuthNextFromSearch } from './lib/authFlow';
 import { useAuthStore } from './stores/authStore';
 
 const DawApp = lazy(() => import('./daw/App'));
@@ -35,6 +38,8 @@ function ScrollToTop() {
 function GuestRoute({ children }: { children: React.ReactNode }) {
   const session = useAuthStore((s) => s.session);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const { search } = useLocation();
+  const nextPath = readAuthNextFromSearch(search);
 
   // While loading, show a minimal centered spinner instead of blank page
   if (isLoading) {
@@ -56,7 +61,7 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (session) return <Navigate to="/console" replace />;
+  if (session) return <Navigate to={nextPath} replace />;
   return <>{children}</>;
 }
 
@@ -92,6 +97,9 @@ function App() {
     <Router>
       <ScrollToTop />
       <Routes>
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/oauth/consent" element={<OAuthConsent />} />
+        <Route path="/desktop-auth" element={<DesktopAuthBridge />} />
         {isPlayApp ? (
           /* =========================================
              RUTAS DE LA APLICACIÓN DAW (play. / console.)
@@ -99,7 +107,6 @@ function App() {
           <>
             {/* Si entran a la raíz de play.hollowbits.com, van directo a la consola */}
             <Route path="/" element={<Navigate to="/console" replace />} />
-            <Route path="/desktop-auth" element={<DesktopAuthBridge />} />
             <Route path="/login" element={<GuestRoute><Auth type="login" /></GuestRoute>} />
             <Route path="/signup" element={<GuestRoute><Auth type="signup" /></GuestRoute>} />
             
@@ -142,7 +149,6 @@ function App() {
               <Route path="contact" element={<Contact />} />
               <Route path="privacy" element={<Privacy />} />
               <Route path="terms" element={<Terms />} />
-              <Route path="desktop-auth" element={<DesktopAuthBridge />} />
               <Route path="login" element={<GuestRoute><Auth type="login" /></GuestRoute>} />
               <Route path="signup" element={<GuestRoute><Auth type="signup" /></GuestRoute>} />
               
