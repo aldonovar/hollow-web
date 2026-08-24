@@ -23,6 +23,11 @@ import { engineAdapter, type EngineDiagnostics } from './services/engineAdapter'
 import { midiService, MidiDevice } from './services/MidiService';
 import { platformService } from './services/platformService';
 import { assetDb } from './services/db';
+import {
+    AUDIO_IMPORT_ACCEPT,
+    describeAudioImportFormats,
+    isSupportedAudioImportName
+} from './services/audioImportContract';
 import { audioResourceManager } from './services/storage/audioResourceManager';
 import {
     collectProjectAudioSourceRefs,
@@ -274,7 +279,9 @@ const AUDIO_EFFECTIVE_SETTINGS_STORAGE_KEY_LEGACY = 'ethereal.audio-effective-se
 const BLOCK1_KPI_STORAGE_KEY = 'hollowbits.block1-kpi.v1';
 const MIN_CLIP_LENGTH_BARS = 0.0625;
 const AUTOSAVE_DEBOUNCE_MS = 1200;
-const IMPORT_AUDIO_CONCURRENCY = 2;
+// Decode long stems sequentially so a multitrack selection does not duplicate
+// several hundreds of MB in browser memory at the same time.
+const IMPORT_AUDIO_CONCURRENCY = 1;
 
 const buildRuntimeId = (prefix: string): string => {
     return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
@@ -4315,21 +4322,29 @@ const App: React.FC = () => {
             throw new Error('Este proyecto está en modo visor y no permite importar audio.');
         }
 
+        const unsupportedNames = sources
+            .filter((source) => !isSupportedAudioImportName(source.name))
+            .map((source) => source.name);
+        const supportedSources = sources.filter((source) => isSupportedAudioImportName(source.name));
+        if (supportedSources.length === 0) {
+            throw new Error(`Formato no compatible. Importa ${describeAudioImportFormats()}.`);
+        }
+
         const importStamp = Date.now();
 
         setImportProgress({
-            total: sources.length,
+            total: supportedSources.length,
             completed: 0,
-            currentFile: sources[0]?.name || null
+            currentFile: supportedSources[0]?.name || null
         });
 
-        const importedTracks: Array<Track | null> = new Array(sources.length).fill(null);
+        const importedTracks: Array<Track | null> = new Array(supportedSources.length).fill(null);
         const importErrors: string[] = [];
-        const totalTrackCountAfterImport = tracks.length + sources.length;
+        const totalTrackCountAfterImport = tracks.length + supportedSources.length;
         let nextIndex = 0;
 
         const processSource = async (index: number) => {
-            const source = sources[index];
+            const source = supportedSources[index];
             if (!source) return;
 
             setImportProgress((prev) => prev ? { ...prev, currentFile: source.name } : prev);
@@ -4339,13 +4354,17 @@ const App: React.FC = () => {
                 if (!sourceBuffer) {
                     throw new Error('No se pudo leer el archivo seleccionado.');
                 }
-                console.log("Processing source:", source.name);
-                const arrayBuffer = sourceBuffer.slice(0);
-                const audioBuffer = await engineAdapter.decodeAudioData(arrayBuffer);
+                console.info('[audio-import] Processing source:', source.name);
+                const audioBuffer = await engineAdapter.decodeAudioData(sourceBuffer);
                 console.log("Decoded successfully!");
 
-                const blobToPersist = source.persistBlob || new Blob([sourceBuffer], { type: 'application/octet-stream' });
-                const sourceId = await assetDb.saveFile(blobToPersist);
+                let sourceId: string | undefined;
+                try {
+                    const blobToPersist = source.persistBlob || new Blob([sourceBuffer], { type: 'application/octet-stream' });
+                    sourceId = await assetDb.saveFile(blobToPersist);
+                } catch (persistError) {
+                    console.warn(`Asset cache unavailable for ${source.name}`, persistError);
+                }
 
                 const newTrack = createTrack({
                     id: `t-imp-${importStamp}-${index}`,
@@ -4372,9 +4391,9 @@ const App: React.FC = () => {
             }
         };
 
-        const workerCount = Math.min(IMPORT_AUDIO_CONCURRENCY, sources.length);
+        const workerCount = Math.min(IMPORT_AUDIO_CONCURRENCY, supportedSources.length);
         const workers = Array.from({ length: workerCount }, async () => {
-            while (nextIndex < sources.length) {
+            while (nextIndex < supportedSources.length) {
                 const currentIndex = nextIndex;
                 nextIndex += 1;
                 await processSource(currentIndex);
@@ -4403,8 +4422,12 @@ const App: React.FC = () => {
         setMainView('arrange');
         setBottomView('editor');
 
-        if (validTracks.length < sources.length) {
-            alert(`Se importaron ${validTracks.length} de ${sources.length} archivos. Fallos: ${importErrors.join(' | ')}`);
+        if (validTracks.length < supportedSources.length || unsupportedNames.length > 0) {
+            const failureDetails = [
+                ...importErrors,
+                ...unsupportedNames.map((name) => `${name}: extensión no admitida`)
+            ];
+            alert(`Se importaron ${validTracks.length} de ${sources.length} archivos. Fallos: ${failureDetails.join(' | ')}`);
         }
     }, [appendTracks, buildAudioClipFromBuffer, tracks.length, getProgressiveTrackColor, isReadOnly]);
 
@@ -5416,7 +5439,7 @@ const App: React.FC = () => {
                     </div>
                     {/* ─────────────────────────────────────────────────────────── */}
 
-                    <input type="file" ref={fileInputRef} className="hidden" multiple accept=".wav,.mp3,.aif,.aiff,.ogg,.flac" onChange={handleFileImport} />
+                    <input type="file" ref={fileInputRef} className="hidden" multiple accept={AUDIO_IMPORT_ACCEPT} onChange={handleFileImport} />
                     {/* Project Input removed in favor of platformService */}
                 </div>
 

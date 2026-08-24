@@ -11,6 +11,14 @@ test('preserves common browser audio formats instead of relabelling them as FLAC
     resolveAudioAssetFormat(new Blob(['recording'], { type: 'audio/webm' }), 'take'),
     { extension: 'webm', contentType: 'audio/webm' },
   );
+  assert.deepEqual(
+    resolveAudioAssetFormat(new Blob(['opus'], { type: 'audio/opus' }), 'take.opus'),
+    { extension: 'opus', contentType: 'audio/opus' },
+  );
+  assert.deepEqual(
+    resolveAudioAssetFormat(new Blob(['aac'], { type: 'audio/aac' }), 'take.aac'),
+    { extension: 'aac', contentType: 'audio/aac' },
+  );
 });
 
 test('uses a trusted filename extension when the desktop bridge supplies an opaque MIME', () => {
