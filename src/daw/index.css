@@ -10,9 +10,18 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+html,
+body,
 #root {
-  height: 100vh;
-  width: 100vw;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 100%;
+  overscroll-behavior: none;
+}
+
+#root {
+  isolation: isolate;
 }
 
 .daw-immersive-shell {
@@ -20,6 +29,28 @@ body {
     radial-gradient(1200px 520px at 50% -120px, rgba(168, 85, 247, 0.16), transparent 60%),
     radial-gradient(980px 480px at 90% 110%, rgba(244, 63, 94, 0.12), transparent 70%),
     linear-gradient(180deg, #101119 0%, #0d0e14 38%, #090a10 100%);
+}
+
+.daw-viewport {
+  width: 100%;
+  max-width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  contain: layout paint;
+}
+
+.daw-workspace-shell,
+.daw-main-surface,
+.daw-arrange-view,
+.daw-primary-view {
+  min-width: 0;
+  min-height: 0;
 }
 
 /* --- ANIMATIONS --- */
@@ -298,4 +329,434 @@ body {
 .daw-immersive-shell[data-audio-priority='critical'] .performer-shell {
   opacity: 0.94;
   filter: saturate(0.92);
+}
+
+/* Responsive workstation shell ------------------------------------------------
+   Keep the transport authoritative and reachable while secondary surfaces
+   become compact drawers/stacks. The visual language intentionally stays
+   neutral and tool-like on touch layouts. */
+@media (max-width: 1180px) {
+  .daw-transport {
+    width: 100%;
+    height: 104px !important;
+    min-height: 104px;
+    padding: 6px 8px !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    background: #16171b !important;
+    backdrop-filter: none !important;
+  }
+
+  .daw-transport-primary {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "brand context"
+      "controls controls";
+    grid-template-rows: 44px 46px;
+    gap: 4px 8px !important;
+    width: 100%;
+    min-width: 0;
+    padding-right: 96px;
+  }
+
+  .daw-transport-brand {
+    grid-area: brand;
+    min-width: 0;
+    height: 44px;
+    margin-right: 0 !important;
+  }
+
+  .daw-transport-context {
+    grid-area: context;
+    min-width: 0;
+    height: 44px !important;
+    padding-right: 0 !important;
+    border-right: 0 !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    touch-action: pan-x;
+  }
+
+  .daw-transport-context::-webkit-scrollbar,
+  .daw-transport-controls::-webkit-scrollbar,
+  .daw-tool-rail::-webkit-scrollbar,
+  .daw-status-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .daw-transport-context > * {
+    flex: 0 0 auto;
+  }
+
+  .daw-transport-controls {
+    grid-area: controls;
+    width: max-content;
+    max-width: 100%;
+    min-height: 46px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    touch-action: pan-x;
+    box-shadow: none !important;
+  }
+
+  .daw-transport-controls > [class*="w-px"] {
+    display: none;
+  }
+
+  .daw-transport-action,
+  .daw-transport-controls > .relative > .daw-transport-action,
+  .daw-transport-utility-action {
+    width: 44px !important;
+    min-width: 44px;
+    height: 44px !important;
+    min-height: 44px;
+    box-shadow: none !important;
+  }
+
+  .daw-transport-visualizer,
+  .daw-transport-cpu,
+  .daw-transport-utility-divider {
+    display: none !important;
+  }
+
+  .daw-transport-utilities {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    width: 92px;
+    height: 44px !important;
+    padding-left: 0 !important;
+    border-left: 0 !important;
+    gap: 4px !important;
+  }
+
+  .daw-transport-utilities > .flex {
+    gap: 4px !important;
+  }
+
+  .daw-transport-export {
+    justify-content: center;
+    padding: 0 !important;
+    background: #292a2f !important;
+    background-image: none !important;
+  }
+
+  .daw-transport-export span {
+    display: none;
+  }
+
+  .daw-bottom-panel {
+    height: clamp(140px, 32dvh, 240px) !important;
+    min-height: 0;
+  }
+
+  .daw-tool-rail {
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+    touch-action: pan-y;
+  }
+
+  .daw-tool-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .daw-tool-rail button {
+    width: 44px !important;
+    min-width: 44px;
+    height: 44px !important;
+    min-height: 44px;
+    background-image: none !important;
+    box-shadow: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .daw-immersive-shell {
+    background: #101114 !important;
+  }
+
+  .daw-workspace-shell {
+    position: relative;
+  }
+
+  .daw-tool-rail {
+    position: absolute !important;
+    inset: auto 0 0 0 !important;
+    width: 100% !important;
+    height: 56px;
+    min-height: 56px;
+    padding: 6px 8px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    touch-action: pan-x;
+    border: 0 !important;
+    border-top: 1px solid #303136 !important;
+    background: #18191d !important;
+    box-shadow: none !important;
+  }
+
+  .daw-tool-rail > .flex-col {
+    width: auto !important;
+    flex: 0 0 auto;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 4px !important;
+    margin-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .daw-tool-rail > .group,
+  .daw-tool-rail > .relative {
+    flex: 0 0 auto;
+  }
+
+  .daw-tool-separator {
+    width: 1px !important;
+    height: 28px !important;
+    margin: 0 2px !important;
+    background: #34353a !important;
+    flex: 0 0 auto;
+  }
+
+  .daw-tool-rail button {
+    width: 44px !important;
+    min-width: 44px;
+    height: 44px !important;
+    min-height: 44px;
+    border-radius: 3px !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+  }
+
+  .daw-tool-rail button[aria-pressed="true"] {
+    background: #2a2b30 !important;
+    outline: 1px solid #45464c;
+    outline-offset: -1px;
+  }
+
+  .daw-tool-rail button[aria-pressed="true"] span {
+    box-shadow: none !important;
+    background: #b7b8be !important;
+  }
+
+  .daw-main-surface {
+    margin-bottom: 56px;
+  }
+
+  .daw-browser-drawer,
+  .daw-ai-drawer-portal > div {
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 56px !important;
+    left: 0 !important;
+    width: min(100%, 420px) !important;
+    max-width: 100%;
+    height: auto !important;
+    border-right: 1px solid #36373c !important;
+    border-left: 0 !important;
+    background: #15161a !important;
+    box-shadow: 12px 0 28px rgba(0, 0, 0, 0.38) !important;
+  }
+
+  .daw-browser-drawer button,
+  .daw-ai-drawer-portal > div button,
+  .daw-file-menu button,
+  .daw-session-popover button,
+  .daw-recovery-banner button {
+    min-height: 44px;
+  }
+
+  .daw-file-menu,
+  .daw-session-popover {
+    position: fixed !important;
+    top: auto !important;
+    right: max(8px, env(safe-area-inset-right, 0px)) !important;
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+    left: max(8px, env(safe-area-inset-left, 0px)) !important;
+    width: auto !important;
+    max-height: min(68dvh, 560px);
+    overflow-y: auto;
+    border-radius: 4px !important;
+    background: #18191d !important;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55) !important;
+  }
+
+  .daw-import-progress {
+    right: max(8px, env(safe-area-inset-right, 0px)) !important;
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+    left: max(8px, env(safe-area-inset-left, 0px)) !important;
+    width: auto !important;
+  }
+
+  .daw-recovery-banner {
+    top: calc(112px + env(safe-area-inset-top, 0px)) !important;
+    right: max(8px, env(safe-area-inset-right, 0px)) !important;
+    left: max(8px, env(safe-area-inset-left, 0px)) !important;
+    flex-wrap: wrap;
+  }
+
+  .daw-recovery-banner > .flex:last-child {
+    width: 100%;
+  }
+
+  .daw-bottom-panel {
+    height: clamp(170px, 27dvh, 230px) !important;
+    box-shadow: none !important;
+  }
+
+  .daw-bottom-panel > :first-child {
+    min-height: 44px;
+    align-items: stretch !important;
+  }
+
+  .daw-bottom-panel > :first-child button {
+    min-height: 44px;
+    padding-right: 14px !important;
+    padding-left: 14px !important;
+  }
+
+  .daw-performer-dock {
+    display: none !important;
+  }
+
+  .daw-arrange-timeline {
+    right: 0 !important;
+    bottom: clamp(128px, 34%, 164px) !important;
+  }
+
+  .daw-take-panel {
+    top: auto !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: clamp(128px, 34%, 164px) !important;
+    border-top: 1px solid #34353a;
+  }
+
+  .daw-status-bar {
+    width: 100%;
+    height: 40px !important;
+    min-height: 40px;
+    padding-right: 8px !important;
+    padding-left: 8px !important;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    background: #17181c !important;
+    backdrop-filter: none !important;
+  }
+
+  .daw-status-bar > div {
+    flex: 0 0 auto;
+  }
+
+  .daw-status-bar > div:last-child > div:not(:last-child) {
+    display: none;
+  }
+
+  .daw-transport-controls button,
+  .daw-transport-controls button[aria-pressed="true"] {
+    box-shadow: none !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .daw-transport-brand > div:last-child {
+    display: none;
+  }
+
+  .daw-transport-brand {
+    width: 44px;
+  }
+
+  .daw-transport-context {
+    gap: 8px !important;
+  }
+
+  .daw-transport-context > div {
+    min-height: 44px;
+  }
+
+  .daw-transport-context .h-8 {
+    min-height: 44px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .daw-transport {
+    height: 96px !important;
+    min-height: 96px;
+  }
+
+  .daw-transport-primary {
+    grid-template-rows: 40px 42px;
+  }
+
+  .daw-transport-brand,
+  .daw-transport-context {
+    height: 40px !important;
+  }
+
+  .daw-bottom-panel {
+    height: 110px !important;
+  }
+
+  .daw-tool-rail {
+    overflow-x: hidden;
+    overflow-y: auto;
+    gap: 4px !important;
+    padding: 4px 3px !important;
+    scrollbar-width: none;
+    touch-action: pan-y;
+  }
+
+  .daw-tool-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .daw-tool-rail > .flex-col {
+    flex: 0 0 auto;
+    margin-top: 0 !important;
+  }
+
+  .daw-tool-rail button {
+    width: 44px !important;
+    min-width: 44px;
+    height: 44px !important;
+    min-height: 44px;
+    box-shadow: none !important;
+  }
+
+  .daw-status-bar {
+    height: 28px !important;
+    min-height: 28px;
+  }
+
+  .daw-take-panel {
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: auto !important;
+    width: min(220px, 34vw) !important;
+    height: auto !important;
+    border-top: 0;
+    border-left: 1px solid #34353a;
+  }
+
+  .daw-arrange-timeline {
+    right: min(220px, 34vw) !important;
+    bottom: 0 !important;
+  }
 }

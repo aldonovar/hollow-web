@@ -185,6 +185,8 @@ interface SidebarItemProps {
 const SidebarItem: React.FC<SidebarItemProps> = React.memo(({ icon: Icon, label, active = false, onClick, color }) => (
     <button
         onClick={onClick}
+        aria-label={label}
+        aria-pressed={active}
         className={`w-10 h-10 flex items-center justify-center relative group rounded-sm transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
           ${active
                 ? 'bg-gradient-to-br from-purple-500/20 to-rose-500/20 text-white shadow-[0_0_20px_rgba(168,85,247,0.15)] ring-1 ring-white/10 scale-100'
@@ -5176,7 +5178,7 @@ const App: React.FC = () => {
         <div
             data-audio-priority={globalAudioPriority.mode}
             data-visual-performance={visualPerformance.mode}
-            className={`daw-immersive-shell flex flex-col h-screen w-screen bg-[#111218] text-daw-text font-sans overflow-hidden selection:bg-daw-ruby selection:text-white ${visualPerformance.reduceAnimations ? 'audio-priority-reduced' : ''}`}
+            className={`daw-immersive-shell daw-viewport flex flex-col bg-[#111218] text-daw-text font-sans overflow-hidden selection:bg-daw-ruby selection:text-white ${visualPerformance.reduceAnimations ? 'audio-priority-reduced' : ''}`}
         >
 
             {loadingProject && (
@@ -5190,7 +5192,7 @@ const App: React.FC = () => {
             )}
 
             {importProgress && (
-                <div className="fixed right-4 bottom-12 z-[120] w-[320px] rounded-sm border border-daw-border bg-[#10131c]/96 backdrop-blur-md px-3 py-2 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <div className="daw-import-progress fixed right-4 bottom-12 z-[120] w-[320px] rounded-sm border border-daw-border bg-[#10131c]/96 backdrop-blur-md px-3 py-2 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
                     <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-gray-400">
                         <span>Importando audio</span>
                         <span className="font-mono text-gray-200">{importProgress.completed}/{importProgress.total}</span>
@@ -5216,7 +5218,7 @@ const App: React.FC = () => {
             )}
 
             {recordingRecoveryAttentionSummary.totalCount > 0 && activeModal !== 'recording-recovery' && (
-                <div className="fixed left-[64px] right-4 top-[56px] z-[129] rounded-sm border border-amber-400/25 bg-[#16120c]/94 backdrop-blur-md px-3 py-2 shadow-lg flex items-center justify-between gap-3">
+                <div className="daw-recovery-banner fixed left-[64px] right-4 top-[56px] z-[129] rounded-sm border border-amber-400/25 bg-[#16120c]/94 backdrop-blur-md px-3 py-2 shadow-lg flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-sm bg-amber-500/15 text-amber-300 flex items-center justify-center shrink-0">
                             <AlertTriangle size={16} />
@@ -5277,16 +5279,16 @@ const App: React.FC = () => {
                 engineStats={engineStats}
             />
 
-            <div className={`flex-1 overflow-hidden flex relative transition-[transform,opacity,filter] duration-500 ease-[cubic-bezier(0.22,0.84,0.26,1)] ${showSettings ? 'blur-[1px] scale-[0.995] pointer-events-none select-none brightness-90' : ''}`}>
+            <div className={`daw-workspace-shell flex-1 min-h-0 min-w-0 overflow-hidden flex relative transition-[transform,opacity,filter] duration-500 ease-[cubic-bezier(0.22,0.84,0.26,1)] ${showSettings ? 'blur-[1px] scale-[0.995] pointer-events-none select-none brightness-90' : ''}`}>
 
-                <div className="w-[50px] bg-[#1a1a1a] border-r border-daw-border flex flex-col items-center py-3 gap-3 z-[100] shrink-0 relative shadow-xl">
+                <div className="daw-tool-rail w-[50px] bg-[#1a1a1a] border-r border-daw-border flex flex-col items-center py-3 gap-3 z-[100] shrink-0 relative shadow-xl" aria-label="Herramientas del estudio">
                     {/* ... Sidebar Icons (unchanged) ... */}
                     <div className="relative group" ref={fileMenuRef}>
                         <button onClick={() => setShowFileMenu(!showFileMenu)} className={`w-10 h-10 flex items-center justify-center rounded-sm transition-all duration-100 relative ${showFileMenu ? 'bg-[#333] text-white' : 'text-gray-400 hover:text-white hover:bg-[#222]'}`} title="Menú de Proyecto">
                             <Folder size={20} strokeWidth={1.5} />
                         </button>
                         {showFileMenu && (
-                            <div className="absolute left-[52px] top-0 w-56 bg-[#1a1a1a] border border-[#444] shadow-[0_5px_15px_rgba(0,0,0,0.5)] z-[101] flex flex-col py-1 animate-in slide-in-from-left-2 duration-100">
+                            <div className="daw-file-menu absolute left-[52px] top-0 w-56 bg-[#1a1a1a] border border-[#444] shadow-[0_5px_15px_rgba(0,0,0,0.5)] z-[101] flex flex-col py-1 animate-in slide-in-from-left-2 duration-100">
                                 <div className="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-white/5 mb-1">Archivo</div>
                                 <button onClick={handleNewProject} className="text-xs text-left px-4 py-2 text-gray-300 hover:bg-white/10 hover:text-white transition-colors flex justify-between group"><span>Nuevo Proyecto</span></button>
                                 <button onClick={handleOpenProjectBrowser} className="text-xs text-left px-4 py-2 text-gray-300 hover:bg-white/10 hover:text-white transition-colors flex justify-between group"><span>Mis Proyectos</span></button>
@@ -5308,19 +5310,19 @@ const App: React.FC = () => {
                             </div>
                         )}
                     </div>
-                    <div className="w-6 h-px bg-white/5 my-1"></div>
+                    <div className="daw-tool-separator w-6 h-px bg-white/5 my-1"></div>
                     <div className="flex flex-col gap-2 w-full items-center">
                         <SidebarItem icon={Search} label="Navegador de Archivos" active={showBrowser} onClick={() => toggleToolPanel('browser')} />
                         <SidebarItem icon={Sparkles} label="Generador AI" active={showAI} onClick={() => toggleToolPanel('ai')} color="text-daw-cyan" />
                         <SidebarItem icon={Piano} label="Piano Score" active={showNoteScanner} onClick={() => toggleToolPanel('scanner')} color="text-daw-violet" />
                     </div>
-                    <div className="w-6 h-px bg-white/5 my-1"></div>
+                    <div className="daw-tool-separator w-6 h-px bg-white/5 my-1"></div>
                     <div className="flex flex-col gap-2 w-full items-center">
                         <SidebarItem icon={LayoutGrid} label="Vista de Arreglo" active={mainView === 'arrange'} onClick={() => setMainView('arrange')} />
                         <SidebarItem icon={PlayCircle} label="Vista de Sesión (Live)" active={mainView === 'session'} onClick={() => setMainView('session')} color="text-daw-ruby" />
                         <SidebarItem icon={Sliders} label="Mezclador" active={mainView === 'mixer'} onClick={() => setMainView('mixer')} />
                     </div>
-                    <div className="w-6 h-px bg-white/5 my-1"></div>
+                    <div className="daw-tool-separator w-6 h-px bg-white/5 my-1"></div>
                     <div className="flex flex-col gap-2 w-full items-center">
                         <SidebarItem icon={Cpu} label="Rack de Dispositivos" onClick={() => setBottomView('devices')} active={bottomView === 'devices'} />
                         <SidebarItem icon={Layers} label="Editor de Notas/Audio" onClick={() => setBottomView('editor')} active={bottomView === 'editor'} />
@@ -5352,7 +5354,7 @@ const App: React.FC = () => {
                     {/* ── SESSION WIDGET ─────────────────────────────────────── */}
                     <div className="relative w-full h-0">
                         {showSessionPopover && (
-                            <div className="absolute left-14 bottom-2 w-64 bg-[#0a0a0d] border border-white/10 rounded-lg shadow-[0_0_24px_rgba(0,0,0,0.8)] p-4 z-50 animate-in fade-in zoom-in-95"
+                            <div className="daw-session-popover absolute left-14 bottom-2 w-64 bg-[#0a0a0d] border border-white/10 rounded-lg shadow-[0_0_24px_rgba(0,0,0,0.8)] p-4 z-50 animate-in fade-in zoom-in-95"
                                  // Se removió onMouseLeave para evitar que se cierre accidentalmente
                             >
                                 {session ? (
@@ -5446,13 +5448,15 @@ const App: React.FC = () => {
 
                 {!isScannerImmersive && hasLoadedAISidebar && (
                     <React.Suspense fallback={null}>
-                        <AISidebar
-                            isOpen={showAI}
-                            onClose={closeAllToolPanels}
-                            bpm={transport.bpm}
-                            onPatternGenerated={handleAiPatternGenerated}
-                            tracks={tracks}
-                        />
+                        <div className="daw-ai-drawer-portal contents">
+                            <AISidebar
+                                isOpen={showAI}
+                                onClose={closeAllToolPanels}
+                                bpm={transport.bpm}
+                                onPatternGenerated={handleAiPatternGenerated}
+                                tracks={tracks}
+                            />
+                        </div>
                     </React.Suspense>
                 )}
 
@@ -5460,7 +5464,7 @@ const App: React.FC = () => {
                     <FluidPanel
                         isOpen={showBrowser}
                         direction="left"
-                        className="absolute left-[50px] top-0 bottom-0 w-[300px] z-30 h-full border-r border-[#333] shadow-2xl bg-[#1a1a1a]"
+                        className="daw-tool-drawer daw-browser-drawer absolute left-[50px] top-0 bottom-0 w-[300px] z-30 h-full border-r border-[#333] shadow-2xl bg-[#1a1a1a]"
                     >
                         <Browser
                             onImport={handleImportAudio}
@@ -5471,7 +5475,7 @@ const App: React.FC = () => {
                     </FluidPanel>
                 )}
 
-                <div className="flex-1 overflow-hidden relative flex flex-col bg-transparent">
+                <div className="daw-main-surface flex-1 min-h-0 min-w-0 overflow-hidden relative flex flex-col bg-transparent">
                     {isScannerImmersive ? (
                         <div className="flex-1 overflow-hidden bg-[#090b12] animate-view-enter">
                             {hasLoadedNoteScanner && (
@@ -5497,10 +5501,10 @@ const App: React.FC = () => {
                             )}
                         </div>
                     ) : mainView === 'arrange' ? (
-                        <div key="arrange" className="flex-1 overflow-hidden bg-transparent relative animate-view-enter">
+                        <div key="arrange" className="daw-arrange-view flex-1 min-h-0 overflow-hidden bg-transparent relative animate-view-enter">
                             <div
                                 ref={timelineContainerRef}
-                                className="absolute left-0 top-0 bottom-0 right-[292px] overflow-auto bg-transparent"
+                                className="daw-arrange-timeline absolute left-0 top-0 bottom-0 right-[292px] overflow-auto bg-transparent"
                                 style={{ scrollBehavior: 'auto' }}
                             >
                                 <Timeline
@@ -5537,7 +5541,7 @@ const App: React.FC = () => {
                                     simplifyPlaybackVisuals={visualPerformance.simplifyPlaybackVisuals}
                                 />
                             </div>
-                            <div className="absolute right-0 top-0 bottom-0 w-[292px] z-[85]">
+                            <div className="daw-take-panel absolute right-0 top-0 bottom-0 w-[292px] z-[85]">
                                 <TakeLanesPanel
                                     track={selectedAudioTrack}
                                     selectedClipId={selectedClipId}
@@ -5551,7 +5555,7 @@ const App: React.FC = () => {
                             </div>
                         </div>
                     ) : mainView === 'session' ? (
-                        <div key="session" className="flex-1 overflow-hidden animate-view-enter">
+                        <div key="session" className="daw-primary-view flex-1 min-h-0 overflow-hidden animate-view-enter">
                             <SessionView
                                 tracks={tracks}
                                 bpm={transport.bpm}
@@ -5563,7 +5567,7 @@ const App: React.FC = () => {
                             />
                         </div>
                     ) : (
-                        <div key="mixer" className="flex-1 bg-transparent overflow-hidden animate-view-enter">
+                        <div key="mixer" className="daw-primary-view flex-1 min-h-0 bg-transparent overflow-hidden animate-view-enter">
                             <Mixer
                                 tracks={tracks}
                                 onUpdate={handleMixerTrackUpdate}
@@ -5582,7 +5586,7 @@ const App: React.FC = () => {
                         </div>
                     )}
                     {!isScannerImmersive && (
-                        <div className="h-[300px] bg-[#1a1a1a] border-t border-daw-border relative z-50 shadow-[0_-5px_30px_rgba(0,0,0,0.3)] shrink-0 flex flex-col">
+                        <div className="daw-bottom-panel h-[300px] bg-[#1a1a1a] border-t border-daw-border relative z-50 shadow-[0_-5px_30px_rgba(0,0,0,0.3)] shrink-0 flex flex-col">
                             <div className="h-7 bg-[#121212] border-b border-daw-border flex items-end px-2 gap-1">
                                 <button onClick={() => setBottomView('devices')} className={`text-[9px] font-bold px-4 py-1.5 rounded-t-sm transition-all uppercase tracking-wider flex items-center gap-2 ${bottomView === 'devices' ? 'bg-[#1a1a1a] text-white border-t border-l border-r border-daw-border relative top-[1px]' : 'text-gray-500 hover:text-white bg-[#0e0e0e]'}`}><Cpu size={10} /> Dispositivos</button>
                                 <button onClick={() => setBottomView('editor')} className={`text-[9px] font-bold px-4 py-1.5 rounded-t-sm transition-all uppercase tracking-wider flex items-center gap-2 ${bottomView === 'editor' ? 'bg-[#1a1a1a] text-white border-t border-l border-r border-daw-border relative top-[1px]' : 'text-gray-500 hover:text-white bg-[#0e0e0e]'}`}><Layers size={10} /> Editor</button>
@@ -5611,7 +5615,7 @@ const App: React.FC = () => {
                                 </div>
                                 {bottomView === 'devices' && (
                                     <div
-                                        className="h-full shrink-0 border-l border-white/8 bg-[#0d0d14]"
+                                        className="daw-performer-dock h-full shrink-0 border-l border-white/8 bg-[#0d0d14]"
                                         style={{ width: 'clamp(220px, 24vw, 320px)', flex: '0 0 clamp(220px, 24vw, 320px)' }}
                                     >
                                         <AsciiPerformerDock
@@ -5627,7 +5631,7 @@ const App: React.FC = () => {
                 </div>
             </div>
             {!isScannerImmersive && (
-                <div className="h-8 bg-[#11131a]/96 border-t border-white/10 flex items-center justify-between px-4 select-none shrink-0 z-50 backdrop-blur-sm">
+                <div className="daw-status-bar h-8 bg-[#11131a]/96 border-t border-white/10 flex items-center justify-between px-4 select-none shrink-0 z-50 backdrop-blur-sm">
                     <div className="flex items-center gap-3">
                         <div
                             className="flex items-center gap-2 px-2.5 h-5 rounded-sm border border-white/10 bg-white/[0.03] text-gray-300 cursor-pointer hover:border-daw-violet/50 hover:bg-white/[0.06] transition-all group/name"
