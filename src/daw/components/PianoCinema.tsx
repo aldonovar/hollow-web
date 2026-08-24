@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Note } from '../types';
 import { buildScoreNoteKey, normalizeMidiVelocity } from '../services/pianoScoreConversionService';
+import { midiNoteLabel } from '../services/synthesiaLayoutService';
 
 interface PianoCinemaProps {
     notes: Note[];
@@ -12,6 +13,7 @@ interface PianoCinemaProps {
     activeNoteIndexes: number[];
     livePitches: number[];
     sustainActive: boolean;
+    pitchShiftSemitones?: number;
     zoom?: number;
     emptyTitle?: string;
     emptyMessage?: string;
@@ -23,6 +25,7 @@ interface PianoCinemaProps {
 interface PianoLaneNote extends Note {
     index: number;
     noteKey: string;
+    sourcePitch: number;
 }
 
 type DragMode = 'move' | 'trim-duration';
@@ -40,6 +43,7 @@ const PIANO_MIN_MIDI = 21;
 const PIANO_MAX_MIDI = 108;
 const WHITE_KEY_SET = new Set([0, 2, 4, 5, 7, 9, 11]);
 const BLACK_KEY_SET = new Set([1, 3, 6, 8, 10]);
+const MAX_RIBBON_MARKERS = 48;
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
@@ -117,6 +121,7 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
     activeNoteIndexes,
     livePitches,
     sustainActive,
+    pitchShiftSemitones = 0,
     zoom = 1,
     emptyTitle = 'Sin material en Piano Cinema',
     emptyMessage = 'Cuando haya notas, el editor inferior seguira el transporte en tiempo real.',
@@ -124,8 +129,12 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
     onSeekToTimeline16th,
     onUpdateNote
 }) => {
+    const displayPitchShift = clamp(Math.round(pitchShiftSemitones), -48, 48);
     const pitchRange = useMemo(() => {
-        const allPitches = [...notes.map((note) => note.pitch), ...livePitches];
+        const allPitches = [
+            ...notes.map((note) => clamp(note.pitch + displayPitchShift, PIANO_MIN_MIDI, PIANO_MAX_MIDI)),
+            ...livePitches
+        ];
         if (allPitches.length === 0) {
             return { min: 36, max: 84 };
         }
@@ -141,9 +150,10 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
         }
 
         return { min, max };
-    }, [livePitches, notes]);
+    }, [displayPitchShift, livePitches, notes]);
 
     const keyboard = useMemo(() => buildKeyboardLayout(pitchRange.min, pitchRange.max), [pitchRange.max, pitchRange.min]);
+    const idPrefix = useId().replace(/:/g, '');
     const svgRef = useRef<SVGSVGElement>(null);
     const motionLayerRef = useRef<SVGGElement>(null);
     const ribbonPlayheadRef = useRef<SVGLineElement>(null);
@@ -153,11 +163,13 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
         return [...notes]
             .map((note, index) => ({
                 ...note,
+                pitch: clamp(note.pitch + displayPitchShift, PIANO_MIN_MIDI, PIANO_MAX_MIDI),
                 index,
-                noteKey: buildScoreNoteKey(note, index)
+                noteKey: buildScoreNoteKey(note, index),
+                sourcePitch: note.pitch
             }))
             .sort((left, right) => left.start - right.start || left.pitch - right.pitch);
-    }, [notes]);
+    }, [displayPitchShift, notes]);
 
     const selectedNote = useMemo(() => {
         return laneNotes.find((note) => note.noteKey === selectedNoteKey) || null;
@@ -165,6 +177,13 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
 
     const activeIndexSet = useMemo(() => new Set(activeNoteIndexes), [activeNoteIndexes]);
     const livePitchSet = useMemo(() => new Set(livePitches), [livePitches]);
+    const activePitchSet = useMemo(() => {
+        const pitches = new Set(livePitches);
+        laneNotes.forEach((note) => {
+            if (activeIndexSet.has(note.index)) pitches.add(note.pitch);
+        });
+        return pitches;
+    }, [activeIndexSet, laneNotes, livePitches]);
     const pixelsPer16th = 16 * zoom;
     const lookAhead16ths = 56;
     const lookBehind16ths = 8;
@@ -173,6 +192,17 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
     const keyboardHeight = 72;
     const noteViewportHeight = mainHeight - keyboardHeight;
     const keyboardTop = noteViewportHeight + 18;
+    const totalBars = Math.max(1, Math.ceil(total16ths / 16));
+    const ribbonMarkerStep = Math.max(1, Math.ceil(totalBars / MAX_RIBBON_MARKERS));
+    const ribbonMarkers = useMemo(() => {
+        const markers: number[] = [];
+        for (let bar = 0; bar < totalBars; bar += ribbonMarkerStep) markers.push(bar);
+        return markers;
+    }, [ribbonMarkerStep, totalBars]);
+    const musicalBar = Math.max(1, Math.floor(playhead16th / 16) + 1);
+    const musicalBeat = Math.max(1, Math.floor((playhead16th % 16) / 4) + 1);
+    const stageTitleId = `${idPrefix}-piano-cinema-title`;
+    const stageDescriptionId = `${idPrefix}-piano-cinema-description`;
 
     useEffect(() => {
         const msPer16th = Math.max(1, 60000 / Math.max(1, bpm) / 4);
@@ -218,7 +248,7 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
 
             if (dragState.mode === 'move') {
                 onUpdateNote?.(dragState.noteIndex, {
-                    pitch: targetPitch,
+                    pitch: clamp(targetPitch - displayPitchShift, PIANO_MIN_MIDI, PIANO_MAX_MIDI),
                     start: Math.round(targetStart * 4) / 4,
                     duration: dragState.originDuration,
                     velocity: normalizeMidiVelocity(notes[dragState.noteIndex]?.velocity ?? 96)
@@ -228,7 +258,7 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
 
             const targetDuration = clamp(((keyboardTop - pointerY) / pixelsPer16th), 0.25, 64);
             onUpdateNote?.(dragState.noteIndex, {
-                pitch: dragState.originPitch,
+                pitch: clamp(dragState.originPitch - displayPitchShift, PIANO_MIN_MIDI, PIANO_MAX_MIDI),
                 start: dragState.originStart,
                 duration: Math.round(targetDuration * 4) / 4,
                 velocity: normalizeMidiVelocity(notes[dragState.noteIndex]?.velocity ?? 96)
@@ -245,7 +275,7 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
             window.removeEventListener('pointermove', handlePointerMove);
             window.removeEventListener('pointerup', handlePointerUp);
         };
-    }, [dragState, keyboard.keyFrames, keyboard.width, keyboardTop, mainHeight, notes, onUpdateNote, pixelsPer16th, total16ths]);
+    }, [displayPitchShift, dragState, keyboard.keyFrames, keyboard.width, keyboardTop, mainHeight, notes, onUpdateNote, pixelsPer16th, total16ths]);
 
     const handleSeekRibbonClick = (event: React.MouseEvent<SVGSVGElement>) => {
         const rect = event.currentTarget.getBoundingClientRect();
@@ -253,37 +283,79 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
         onSeekToTimeline16th?.(ratio * Math.max(16, total16ths));
     };
 
+    const handleSeekRibbonKeyDown = (event: React.KeyboardEvent<SVGSVGElement>) => {
+        let nextPlayhead: number | null = null;
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') nextPlayhead = playhead16th - 1;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowUp') nextPlayhead = playhead16th + 1;
+        if (event.key === 'PageDown') nextPlayhead = playhead16th - 16;
+        if (event.key === 'PageUp') nextPlayhead = playhead16th + 16;
+        if (event.key === 'Home') nextPlayhead = 0;
+        if (event.key === 'End') nextPlayhead = Math.max(16, total16ths);
+        if (nextPlayhead === null) return;
+        event.preventDefault();
+        onSeekToTimeline16th?.(clamp(nextPlayhead, 0, Math.max(16, total16ths)));
+    };
+
     return (
-        <div className="flex h-full w-full flex-col overflow-hidden rounded-sm border border-daw-border bg-[#12141b]">
-            <div className="flex h-9 items-center justify-between border-b border-daw-border bg-[#18181b] px-3">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Piano Cinema</span>
-                <div className="flex items-center gap-2">
-                    <span className={`rounded-sm border px-2 py-1 text-[9px] font-bold uppercase tracking-wider ${sustainActive ? 'border-cyan-400/35 bg-cyan-500/10 text-cyan-200' : 'border-white/10 bg-[#151824] text-gray-500'}`}>
+        <div
+            data-piano-cinema="studio"
+            className="flex h-full w-full flex-col overflow-hidden rounded-sm border border-[#303236] bg-[#151618]"
+        >
+            <div className="flex h-10 shrink-0 items-center justify-between border-b border-[#303236] bg-[#1b1c1e] px-3">
+                <div className="min-w-0">
+                    <div className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-[#d7d8da]">Falling Notes</div>
+                    <div className="mt-0.5 truncate text-[8px] font-semibold uppercase tracking-[0.14em] text-[#777a80]">Piano Cinema</div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <span className="hidden rounded-sm border border-[#34363a] bg-[#202124] px-2 py-1 text-[8px] font-semibold tabular-nums text-[#a2a5aa] sm:inline-flex">
+                        {bpm.toFixed(0)} BPM
+                    </span>
+                    <span className="rounded-sm border border-[#34363a] bg-[#202124] px-2 py-1 text-[8px] font-semibold text-[#a2a5aa]">
+                        {laneNotes.length} notas
+                    </span>
+                    <span className={`rounded-sm border px-2 py-1 text-[8px] font-semibold ${sustainActive ? 'border-[#7871b7] bg-[#37344f] text-[#dddafe]' : 'border-[#34363a] bg-[#202124] text-[#777a80]'}`}>
                         Sustain {sustainActive ? 'On' : 'Off'}
                     </span>
                     {livePitches.length > 0 && (
-                        <span className="rounded-sm border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-emerald-200">
+                        <span className="rounded-sm border border-[#7871b7] bg-[#37344f] px-2 py-1 text-[8px] font-semibold text-[#dddafe]">
                             Live {livePitches.length}
                         </span>
                     )}
                 </div>
             </div>
 
-            <div className="border-b border-daw-border bg-[#121620] px-3 py-2">
+            <div className="shrink-0 border-b border-[#303236] bg-[#18191b] px-3 py-2">
                 <svg
-                    className="h-8 w-full cursor-pointer"
+                    data-piano-cinema-ribbon="true"
+                    className="h-8 w-full cursor-pointer rounded-sm outline-none ring-[#8e86d8] focus-visible:ring-1 motion-reduce:transition-none"
                     viewBox={`0 0 ${keyboard.width} ${headerHeight}`}
                     preserveAspectRatio="none"
                     onClick={handleSeekRibbonClick}
+                    onKeyDown={handleSeekRibbonKeyDown}
+                    role="slider"
+                    tabIndex={0}
+                    aria-label="Posición del transporte de Falling Notes"
+                    aria-valuemin={0}
+                    aria-valuemax={Math.max(16, total16ths)}
+                    aria-valuenow={clamp(playhead16th, 0, Math.max(16, total16ths))}
+                    aria-valuetext={`Compás ${musicalBar}, pulso ${musicalBeat}`}
                 >
-                    <rect x={0} y={0} width={keyboard.width} height={headerHeight} fill="rgba(10,12,18,0.98)" />
-                    {Array.from({ length: Math.max(1, Math.ceil(total16ths / 16)) }, (_, index) => {
-                        const x = (index / Math.max(1, Math.ceil(total16ths / 16))) * keyboard.width;
+                    <rect x={0} y={0} width={keyboard.width} height={headerHeight} rx={2} fill="#111214" />
+                    <rect
+                        x={0}
+                        y={0}
+                        width={(clamp(playhead16th, 0, Math.max(16, total16ths)) / Math.max(16, total16ths)) * keyboard.width}
+                        height={headerHeight}
+                        rx={2}
+                        fill="rgba(142,134,216,0.16)"
+                    />
+                    {ribbonMarkers.map((bar) => {
+                        const x = (bar / totalBars) * keyboard.width;
                         return (
-                            <g key={`seek-bar-${index}`}>
-                                <line x1={x} y1={6} x2={x} y2={30} stroke="rgba(148,163,184,0.2)" strokeWidth={1} />
-                                <text x={x + 6} y={15} fill="rgba(148,163,184,0.58)" fontSize={9} letterSpacing="0.2em">
-                                    {index + 1}
+                            <g key={`seek-bar-${bar}`} data-piano-cinema-ribbon-marker={bar + 1}>
+                                <line x1={x} y1={6} x2={x} y2={30} stroke="#3d3f43" strokeWidth={bar % 4 === 0 ? 1.2 : 0.8} />
+                                <text x={x + 5} y={15} fill="#777a80" fontSize={8} fontWeight={600}>
+                                    {bar + 1}
                                 </text>
                             </g>
                         );
@@ -294,27 +366,25 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
                         y1={4}
                         x2={(clamp(playhead16th, 0, Math.max(16, total16ths)) / Math.max(16, total16ths)) * keyboard.width}
                         y2={32}
-                        stroke="rgba(52,211,242,0.95)"
-                        strokeWidth={3}
+                        stroke="#8e86d8"
+                        strokeWidth={2}
                     />
                 </svg>
             </div>
 
-            <div className="relative min-h-0 flex-1 bg-[#12141b] p-3">
+            <div className="relative min-h-0 flex-1 bg-[#151618] p-2">
                 <svg
                     ref={svgRef}
-                    className="block h-full w-full rounded-sm bg-[#0b0e14]"
+                    data-piano-cinema-stage="true"
+                    className="block h-full w-full rounded-sm bg-[#111214]"
                     viewBox={`0 0 ${keyboard.width} ${mainHeight}`}
-                    preserveAspectRatio="xMidYMid meet"
+                    preserveAspectRatio="none"
+                    role="group"
+                    aria-labelledby={`${stageTitleId} ${stageDescriptionId}`}
                 >
-                    <defs>
-                        <linearGradient id="cinema-note-fill" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stopColor="rgba(52,211,242,0.95)" />
-                            <stop offset="100%" stopColor="rgba(168,85,247,0.92)" />
-                        </linearGradient>
-                    </defs>
-
-                    <rect x={0} y={0} width={keyboard.width} height={mainHeight} fill="rgba(9,12,18,0.98)" />
+                    <title id={stageTitleId}>Visualizador Falling Notes</title>
+                    <desc id={stageDescriptionId}>Notas musicales descienden hacia un teclado sincronizado con el transporte. Las notas se pueden seleccionar, mover y redimensionar.</desc>
+                    <rect x={0} y={0} width={keyboard.width} height={mainHeight} fill="#111214" />
 
                     <g ref={motionLayerRef}>
                         {Array.from({ length: Math.ceil((lookAhead16ths + lookBehind16ths) / 4) }, (_, index) => {
@@ -327,8 +397,8 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
                                         y1={y}
                                         x2={keyboard.width}
                                         y2={y}
-                                        stroke={index % 4 === 0 ? 'rgba(148,163,184,0.16)' : 'rgba(71,85,105,0.12)'}
-                                        strokeWidth={index % 4 === 0 ? 1.2 : 1}
+                                        stroke={index % 4 === 0 ? '#34363a' : '#25272a'}
+                                        strokeWidth={index % 4 === 0 ? 1 : 0.75}
                                     />
                                 </g>
                             );
@@ -351,30 +421,40 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
                             const isActive = activeIndexSet.has(note.index) || livePitchSet.has(note.pitch);
                             const noteWidth = frame.black ? frame.width + 4 : frame.width - 4;
                             const noteX = frame.black ? frame.x - 2 : frame.x + 2;
-                            const glow = isActive ? 'rgba(52,211,242,0.35)' : 'rgba(168,85,247,0.12)';
+                            const velocity = normalizeMidiVelocity(note.velocity);
 
                             return (
                                 <g key={note.noteKey}>
                                     <rect
                                         x={noteX - 1}
-                                        y={noteTop - 2}
+                                        y={noteTop - 1}
                                         width={noteWidth + 2}
-                                        height={noteHeight + 4}
-                                        rx={4}
-                                        fill={glow}
-                                        opacity={isSelected || isActive ? 1 : 0.5}
+                                        height={noteHeight + 2}
+                                        rx={2}
+                                        fill={isSelected || isActive ? '#8e86d8' : '#45484d'}
+                                        opacity={isSelected || isActive ? 1 : 0.82}
+                                        pointerEvents="none"
                                     />
                                     <rect
                                         x={noteX}
                                         y={noteTop}
                                         width={noteWidth}
                                         height={noteHeight}
-                                        rx={4}
-                                        fill="url(#cinema-note-fill)"
-                                        opacity={isSelected || isActive ? 0.96 : 0.82}
-                                        stroke={isSelected ? '#f8fafc' : 'rgba(15,23,42,0.55)'}
-                                        strokeWidth={isSelected ? 1.75 : 1}
-                                        className="cursor-pointer"
+                                        rx={1.5}
+                                        fill={isSelected || isActive ? '#8e86d8' : '#70747b'}
+                                        opacity={isSelected || isActive ? 1 : 0.72 + ((velocity / 127) * 0.2)}
+                                        stroke={isSelected ? '#dedbf8' : '#27292c'}
+                                        strokeWidth={isSelected ? 1.5 : 0.75}
+                                        className="cursor-pointer outline-none"
+                                        role="button"
+                                        tabIndex={isSelected || (!selectedNoteKey && note.index === laneNotes[0]?.index) ? 0 : -1}
+                                        aria-label={`${midiNoteLabel(note.pitch)}, inicio ${note.start.toFixed(2)}, duración ${note.duration.toFixed(2)}, velocidad ${velocity}`}
+                                        aria-pressed={isSelected}
+                                        onKeyDown={(event) => {
+                                            if (event.key !== 'Enter' && event.key !== ' ') return;
+                                            event.preventDefault();
+                                            onSelectNoteKey?.(note.noteKey);
+                                        }}
                                         onPointerDown={(event) => {
                                             onSelectNoteKey?.(note.noteKey);
                                             setDragState({
@@ -387,14 +467,28 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
                                             });
                                         }}
                                     />
+                                    {noteHeight >= 24 && (
+                                        <text
+                                            x={noteX + (noteWidth / 2)}
+                                            y={noteTop + 14}
+                                            textAnchor="middle"
+                                            fill={isSelected || isActive ? '#f1efff' : '#e0e1e3'}
+                                            fontSize={7}
+                                            fontWeight={700}
+                                            pointerEvents="none"
+                                        >
+                                            {midiNoteLabel(note.pitch)}
+                                        </text>
+                                    )}
                                     <rect
                                         x={noteX}
                                         y={noteTop}
                                         width={noteWidth}
                                         height={5}
-                                        rx={2}
-                                        fill="rgba(248,250,252,0.7)"
+                                        rx={1}
+                                        fill="rgba(255,255,255,0.01)"
                                         className="cursor-ns-resize"
+                                        aria-hidden="true"
                                         onPointerDown={(event) => {
                                             event.stopPropagation();
                                             onSelectNoteKey?.(note.noteKey);
@@ -418,49 +512,74 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
                         y1={keyboardTop}
                         x2={keyboard.width}
                         y2={keyboardTop}
-                        stroke="rgba(52,211,242,0.75)"
-                        strokeWidth={2}
+                        stroke="#8e86d8"
+                        strokeWidth={1.5}
                     />
 
-                    {keyboard.whiteKeys.map((key) => {
-                        const isLit = livePitchSet.has(key.pitch) || laneNotes.some((note) => activeIndexSet.has(note.index) && note.pitch === key.pitch);
-                        return (
-                            <rect
-                                key={`white-${key.pitch}`}
-                                x={key.x}
-                                y={keyboardTop}
-                                width={key.width}
-                                height={keyboardHeight}
-                                fill={isLit ? 'rgba(224,242,254,0.96)' : 'rgba(245,247,250,0.95)'}
-                                stroke="rgba(15,23,42,0.3)"
-                                strokeWidth={1}
-                            />
-                        );
-                    })}
+                    <g data-piano-cinema-keyboard="true">
+                        {keyboard.whiteKeys.map((key) => {
+                            const isLit = activePitchSet.has(key.pitch);
+                            return (
+                                <g key={`white-${key.pitch}`}>
+                                    <rect
+                                        data-piano-key={midiNoteLabel(key.pitch)}
+                                        x={key.x}
+                                        y={keyboardTop}
+                                        width={key.width}
+                                        height={keyboardHeight}
+                                        fill={isLit ? '#d6d2f0' : '#dedfdf'}
+                                        stroke={isLit ? '#8e86d8' : '#63666b'}
+                                        strokeWidth={isLit ? 1.2 : 0.75}
+                                    />
+                                    {key.pitch % 12 === 0 && (
+                                        <text
+                                            x={key.x + (key.width / 2)}
+                                            y={keyboardTop + keyboardHeight - 9}
+                                            textAnchor="middle"
+                                            fill="#5e6065"
+                                            fontSize={7}
+                                            fontWeight={700}
+                                            pointerEvents="none"
+                                        >
+                                            {midiNoteLabel(key.pitch)}
+                                        </text>
+                                    )}
+                                </g>
+                            );
+                        })}
 
-                    {keyboard.blackKeys.map((key) => {
-                        const isLit = livePitchSet.has(key.pitch) || laneNotes.some((note) => activeIndexSet.has(note.index) && note.pitch === key.pitch);
-                        return (
-                            <rect
-                                key={`black-${key.pitch}`}
-                                x={key.x}
-                                y={keyboardTop}
-                                width={key.width}
-                                height={keyboardHeight * 0.62}
-                                rx={3}
-                                fill={isLit ? 'rgba(52,211,242,0.95)' : 'rgba(10,12,18,0.98)'}
-                                stroke={isLit ? 'rgba(224,242,254,0.4)' : 'rgba(255,255,255,0.04)'}
-                                strokeWidth={1}
-                            />
-                        );
-                    })}
+                        {keyboard.blackKeys.map((key) => {
+                            const isLit = activePitchSet.has(key.pitch);
+                            return (
+                                <rect
+                                    key={`black-${key.pitch}`}
+                                    data-piano-key={midiNoteLabel(key.pitch)}
+                                    x={key.x}
+                                    y={keyboardTop}
+                                    width={key.width}
+                                    height={keyboardHeight * 0.62}
+                                    rx={2}
+                                    fill={isLit ? '#8e86d8' : '#242629'}
+                                    stroke={isLit ? '#d6d2f0' : '#45484d'}
+                                    strokeWidth={isLit ? 1.1 : 0.7}
+                                />
+                            );
+                        })}
+                    </g>
                 </svg>
+
+                <div className="pointer-events-none absolute left-4 top-4 rounded-sm border border-[#34363a] bg-[#191a1c]/95 px-2 py-1 text-[8px] font-semibold tabular-nums text-[#a2a5aa]">
+                    Compás {musicalBar}.{musicalBeat}
+                </div>
+                <div className="pointer-events-none absolute right-4 top-4 rounded-sm border border-[#34363a] bg-[#191a1c]/95 px-2 py-1 text-[8px] font-semibold text-[#777a80]">
+                    {midiNoteLabel(pitchRange.min)} — {midiNoteLabel(pitchRange.max)}
+                </div>
 
                 {laneNotes.length === 0 && livePitches.length === 0 && (
                     <div className="pointer-events-none absolute inset-6 flex items-center justify-center">
-                        <div className="max-w-xl rounded-sm border border-dashed border-white/10 bg-[#0f1219]/96 px-5 py-4 text-center">
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{emptyTitle}</div>
-                            <div className="mt-2 text-sm leading-6 text-gray-400">
+                        <div className="max-w-xl rounded-sm border border-[#3a3c40] bg-[#191a1c] px-6 py-5 text-center">
+                            <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#b7b9bd]">{emptyTitle}</div>
+                            <div className="mt-2 text-sm leading-6 text-[#85888d]">
                                 {emptyMessage}
                             </div>
                         </div>
@@ -468,37 +587,43 @@ const PianoCinema: React.FC<PianoCinemaProps> = ({
                 )}
             </div>
 
-            <div className="flex items-center justify-between gap-4 border-t border-daw-border bg-[#11131a] px-3 py-2 text-xs text-gray-300">
+            <div className="flex min-h-10 shrink-0 items-center justify-between gap-4 border-t border-[#303236] bg-[#1b1c1e] px-3 py-2 text-xs text-[#c7c8ca]">
                 <div className="flex min-w-0 items-center gap-3">
-                    <span className="rounded-sm border border-white/10 bg-[#151824] px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">
-                        Editor Time
+                    <span className="rounded-sm border border-[#3a3c40] bg-[#202124] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.12em] text-[#8d9095]">
+                        Nota
                     </span>
-                    <span className="truncate">
+                    <span className="truncate text-[11px] text-[#a2a5aa]">
                         {selectedNote
-                            ? `Pitch ${selectedNote.pitch} | Start ${selectedNote.start.toFixed(2)} | Dur ${selectedNote.duration.toFixed(2)}`
+                            ? `${midiNoteLabel(selectedNote.pitch)} · Pitch ${selectedNote.pitch} · Inicio ${selectedNote.start.toFixed(2)} · Dur ${selectedNote.duration.toFixed(2)}`
                             : 'Selecciona una nota para editarla desde el piano inferior.'}
                     </span>
+                    {displayPitchShift !== 0 && (
+                        <span className="shrink-0 rounded-sm border border-[#7871b7] bg-[#37344f] px-2 py-1 text-[8px] font-semibold text-[#dddafe]">
+                            Audio {displayPitchShift > 0 ? '+' : ''}{displayPitchShift} st
+                        </span>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-3">
                     <label className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Velocity</span>
+                        <span className="text-[8px] font-bold uppercase tracking-[0.12em] text-[#777a80]">Velocity</span>
                         <input
                             type="range"
                             min={1}
                             max={127}
                             value={selectedNote ? normalizeMidiVelocity(selectedNote.velocity) : 96}
                             disabled={!selectedNote}
+                            aria-label="Velocidad de la nota seleccionada"
                             onChange={(event) => {
                                 if (!selectedNote) return;
                                 onUpdateNote?.(selectedNote.index, {
-                                    pitch: selectedNote.pitch,
+                                    pitch: selectedNote.sourcePitch,
                                     start: selectedNote.start,
                                     duration: selectedNote.duration,
                                     velocity: normalizeMidiVelocity(Number(event.target.value))
                                 });
                             }}
-                            className="accent-daw-cyan"
+                            className="accent-[#8e86d8]"
                         />
                     </label>
                 </div>
