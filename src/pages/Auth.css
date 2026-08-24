@@ -270,6 +270,20 @@
   color: var(--text);
 }
 
+.desktop-auth-bridge__actions {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.desktop-auth-bridge__note {
+  color: var(--text-3);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 0;
+}
+
 /* ─── Footer ─────────────────────────────────────────────────── */
 
 .auth-card__footer {

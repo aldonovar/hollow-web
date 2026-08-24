@@ -1,8 +1,9 @@
 import { supabase } from './supabase';
+import { DAWFI_AUTH_CONTRACT } from './authContract';
 import { sanitizeOAuthConsentNextPath } from './oauthConsent';
 
-export const CANONICAL_AUTH_ORIGIN = 'https://play.hollowbits.com';
-export const AUTH_CALLBACK_PATH = '/auth/callback';
+export const CANONICAL_AUTH_ORIGIN = DAWFI_AUTH_CONTRACT.canonicalAuthOrigin;
+export const AUTH_CALLBACK_PATH = DAWFI_AUTH_CONTRACT.authCallbackPath;
 
 const PRODUCTION_AUTH_HOSTNAMES = new Set([
   'hollowbits.com',

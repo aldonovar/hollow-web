@@ -99,6 +99,7 @@ function App() {
       <Routes>
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/oauth/consent" element={<OAuthConsent />} />
+        <Route path="/desktop-auth" element={<DesktopAuthBridge />} />
         {isPlayApp ? (
           /* =========================================
              RUTAS DE LA APLICACIÓN DAW (play. / console.)
@@ -106,7 +107,6 @@ function App() {
           <>
             {/* Si entran a la raíz de play.hollowbits.com, van directo a la consola */}
             <Route path="/" element={<Navigate to="/console" replace />} />
-            <Route path="/desktop-auth" element={<DesktopAuthBridge />} />
             <Route path="/login" element={<GuestRoute><Auth type="login" /></GuestRoute>} />
             <Route path="/signup" element={<GuestRoute><Auth type="signup" /></GuestRoute>} />
             
@@ -149,7 +149,6 @@ function App() {
               <Route path="contact" element={<Contact />} />
               <Route path="privacy" element={<Privacy />} />
               <Route path="terms" element={<Terms />} />
-              <Route path="desktop-auth" element={<DesktopAuthBridge />} />
               <Route path="login" element={<GuestRoute><Auth type="login" /></GuestRoute>} />
               <Route path="signup" element={<GuestRoute><Auth type="signup" /></GuestRoute>} />
               

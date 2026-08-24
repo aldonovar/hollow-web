@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   buildOAuthConsentLoginPath,
   buildOAuthConsentPath,
+  buildSafeDawfiDesktopCallbackFromSearch,
   DAWFI_DESKTOP_REDIRECT_URI,
   getSafeDawfiDesktopRedirectUrl,
   LEGACY_HOLLOWBITS_DESKTOP_REDIRECT_URI,
@@ -75,6 +76,39 @@ test('accepts the transitional HOLLOW bits callback only as an exact registered 
 test('accepts the exact Supabase denial redirect', () => {
   const redirect = `${DAWFI_DESKTOP_REDIRECT_URI}?error=access_denied&error_description=User+cancelled&state=${STATE}`;
   assert.equal(getSafeDawfiDesktopRedirectUrl(redirect), redirect);
+});
+
+test('bridges one HTTPS PKCE code and state into the primary desktop callback', () => {
+  assert.equal(
+    buildSafeDawfiDesktopCallbackFromSearch(`?code=one-time-code_123456789&state=${STATE}`),
+    `${DAWFI_DESKTOP_REDIRECT_URI}?code=one-time-code_123456789&state=${STATE}`,
+  );
+});
+
+test('bridges a provider denial without inventing a session', () => {
+  assert.equal(
+    buildSafeDawfiDesktopCallbackFromSearch(
+      `?error=access_denied&error_description=User+cancelled&state=${STATE}`,
+    ),
+    `${DAWFI_DESKTOP_REDIRECT_URI}?error=access_denied&error_description=User+cancelled&state=${STATE}`,
+  );
+});
+
+test('rejects malformed or credential-bearing HTTPS bridge queries', () => {
+  const forbiddenCredentialParameter = `access${'_token'}`;
+  for (const search of [
+    '',
+    '?code=short&state=' + STATE,
+    `?code=contains%20space&state=${STATE}`,
+    '?code=one-time-code_123456789',
+    `?code=one-time-code_123456789&state=${STATE}&state=${STATE}`,
+    `?code=one-time-code_123456789&state=${STATE}&next=/console`,
+    `?code=one-time-code_123456789&state=${STATE}&${forbiddenCredentialParameter}=secret`,
+    `?code=one-time-code_123456789&state=${STATE}#fragment`,
+    `?error=access_denied&code=one-time-code_123456789&state=${STATE}`,
+  ]) {
+    assert.equal(buildSafeDawfiDesktopCallbackFromSearch(search), null, search);
+  }
 });
 
 test('rejects redirects outside the DAW-fi desktop callback contract', () => {

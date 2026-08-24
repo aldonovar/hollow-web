@@ -1,10 +1,13 @@
-export const OAUTH_CONSENT_PATH = '/oauth/consent';
-export const DAWFI_DESKTOP_REDIRECT_URI = 'dawfi://auth/callback';
-export const LEGACY_HOLLOWBITS_DESKTOP_REDIRECT_URI = 'hollowbits://auth/callback';
+import { DAWFI_AUTH_CONTRACT } from './authContract.ts';
+
+export const OAUTH_CONSENT_PATH = DAWFI_AUTH_CONTRACT.oauthConsentPath;
+export const DAWFI_DESKTOP_REDIRECT_URI = DAWFI_AUTH_CONTRACT.desktopRedirectUri;
+export const LEGACY_HOLLOWBITS_DESKTOP_REDIRECT_URI = DAWFI_AUTH_CONTRACT.legacyDesktopRedirectUri;
 
 const INTERNAL_ORIGIN = 'https://dawfi.invalid';
 const AUTHORIZATION_ID_PATTERN = /^[A-Za-z0-9_-]{16,256}$/;
 const OAUTH_STATE_PATTERN = /^[A-Za-z0-9._~-]{16,512}$/;
+const OAUTH_CODE_PATTERN = /^[A-Za-z0-9._~-]{8,4096}$/;
 const OAUTH_ERROR_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
 const ALLOWED_REDIRECT_PARAMETERS = new Set([
   'code',
@@ -17,9 +20,14 @@ const ALLOWED_DESKTOP_REDIRECT_URIS = new Set([
   LEGACY_HOLLOWBITS_DESKTOP_REDIRECT_URI,
 ]);
 
-function isBoundedPrintableValue(value: string | null, maximumLength: number): value is string {
+function isBoundedPrintableValue(
+  value: string | null,
+  maximumLength: number,
+  minimumLength = 1,
+): value is string {
   return Boolean(
     value
+    && value.length >= minimumLength
     && value.length <= maximumLength
     && !/[\u0000-\u001f\u007f]/.test(value),
   );
@@ -145,7 +153,7 @@ export function getSafeDawfiDesktopRedirectUrl(
         oauthError
         || errorDescription
         || parameterKeys.length !== 2
-        || !isBoundedPrintableValue(code, 4096)
+        || !OAUTH_CODE_PATTERN.test(code)
       ) {
         return null;
       }
@@ -165,4 +173,37 @@ export function getSafeDawfiDesktopRedirectUrl(
   } catch {
     return null;
   }
+}
+
+/**
+ * Convert the HTTPS bridge query into the exact custom-protocol callback.
+ * Only the short-lived PKCE code (or a provider error) and bound state cross
+ * the bridge; session credentials are never accepted or reconstructed here.
+ */
+export function buildSafeDawfiDesktopCallbackFromSearch(search: string): string | null {
+  if (
+    !search
+    || search.trim() !== search
+    || search.includes('#')
+    || /[\u0000-\u001f\u007f]/.test(search)
+  ) {
+    return null;
+  }
+
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const parameterKeys = [...params.keys()];
+  if (
+    parameterKeys.length === 0
+    || parameterKeys.some((key) => !ALLOWED_REDIRECT_PARAMETERS.has(key))
+    || [...new Set(parameterKeys)].some((key) => params.getAll(key).length !== 1)
+  ) {
+    return null;
+  }
+
+  const callback = new URL(DAWFI_DESKTOP_REDIRECT_URI);
+  for (const [key, value] of params.entries()) {
+    callback.searchParams.set(key, value);
+  }
+
+  return getSafeDawfiDesktopRedirectUrl(callback.toString(), DAWFI_DESKTOP_REDIRECT_URI);
 }
