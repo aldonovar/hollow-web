@@ -1,0 +1,4 @@
+[submodule "vendor/dawfi-core"]
+	path = vendor/dawfi-core
+	url = https://github.com/aldonovar/hollow-bits.git
+	branch = recovery/dawfi-relaunch

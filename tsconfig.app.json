@@ -20,7 +20,7 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@hollowbits/core": ["src/hollowbits-core/index.ts"]
+      "@hollowbits/core": ["vendor/dawfi-core/hollowbits-core/index.ts"]
     },
     "noUnusedLocals": false,
     "noUnusedParameters": false,
