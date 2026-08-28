@@ -22,15 +22,16 @@ import { DesktopAuthBridge } from './pages/DesktopAuthBridge';
 import { OAuthConsent } from './pages/OAuthConsent';
 import { readAuthNextFromSearch } from './lib/authFlow';
 import { useAuthStore } from './stores/authStore';
+import { toDawfiSurfaceUrl } from '@hollowbits/core';
 
 const DawApp = lazy(() => import('./daw/App'));
 
 type DawProductMode = 'studio' | 'score' | 'keys';
 
 const PRODUCT_ROUTE_META: Record<DawProductMode, { title: string; loadingLabel: string }> = {
-  studio: { title: 'DAW-fi Studio | Hollow Bits', loadingLabel: 'CARGANDO DAW-FI STUDIO...' },
-  score: { title: 'Score-fi | Hollow Bits', loadingLabel: 'CARGANDO SCORE-FI...' },
-  keys: { title: 'Keys-fi | Hollow Bits', loadingLabel: 'CARGANDO KEYS-FI...' },
+  studio: { title: 'DAW-fi Studio', loadingLabel: 'CARGANDO DAW-FI STUDIO...' },
+  score: { title: 'Score-fi | DAW-fi', loadingLabel: 'CARGANDO SCORE-FI...' },
+  keys: { title: 'Keys-fi | DAW-fi', loadingLabel: 'CARGANDO KEYS-FI...' },
 };
 
 function DawProductRoute({ mode }: { mode: DawProductMode }) {
@@ -90,6 +91,32 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
 }
 
 const isPlayApp = window.location.hostname.startsWith('play.') || window.location.hostname.startsWith('console.');
+const CANONICAL_STUDIO_REDIRECT_HOSTS = new Set(['hollowbits.com', 'www.hollowbits.com']);
+
+/**
+ * A Supabase browser session is origin scoped.  Keeping login, console and
+ * product tools on `play.` prevents a successful login on `www.` from looking
+ * like a different account on the DAW surface.  Local development deliberately
+ * keeps the embedded routes so one Vite host remains useful offline.
+ */
+function CanonicalStudioRedirect({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const shouldRedirect = CANONICAL_STUDIO_REDIRECT_HOSTS.has(window.location.hostname.toLowerCase());
+
+  useEffect(() => {
+    if (!shouldRedirect) return;
+    const path = `${location.pathname}${location.search}${location.hash}`;
+    window.location.replace(toDawfiSurfaceUrl('studio', path));
+  }, [location.hash, location.pathname, location.search, shouldRedirect]);
+
+  if (!shouldRedirect) return <>{children}</>;
+
+  return (
+    <main className="page-shell" aria-live="polite" style={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
+      <p>Abriendo DAW-fi Studio…</p>
+    </main>
+  );
+}
 
 function App() {
   const initialize = useAuthStore((s) => s.initialize);
@@ -121,7 +148,7 @@ function App() {
     <Router>
       <ScrollToTop />
       <Routes>
-        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/auth/callback" element={<CanonicalStudioRedirect><AuthCallback /></CanonicalStudioRedirect>} />
         <Route path="/oauth/consent" element={<OAuthConsent />} />
         <Route path="/desktop-auth" element={<DesktopAuthBridge />} />
         {isPlayApp ? (
@@ -171,34 +198,30 @@ function App() {
               <Route path="contact" element={<Contact />} />
               <Route path="privacy" element={<Privacy />} />
               <Route path="terms" element={<Terms />} />
-              <Route path="login" element={<GuestRoute><Auth type="login" /></GuestRoute>} />
-              <Route path="signup" element={<GuestRoute><Auth type="signup" /></GuestRoute>} />
+              <Route path="login" element={<CanonicalStudioRedirect><GuestRoute><Auth type="login" /></GuestRoute></CanonicalStudioRedirect>} />
+              <Route path="signup" element={<CanonicalStudioRedirect><GuestRoute><Auth type="signup" /></GuestRoute></CanonicalStudioRedirect>} />
               
               {/* Se mantienen estas rutas temporalmente para entorno de desarrollo local si no usan play.localhost */}
               <Route
                 path="console"
                 element={
-                  <ProtectedRoute>
-                    <Console />
-                  </ProtectedRoute>
+                <CanonicalStudioRedirect><ProtectedRoute><Console /></ProtectedRoute></CanonicalStudioRedirect>
                 }
               />
               <Route
                 path="settings"
                 element={
-                  <ProtectedRoute>
-                    <Settings />
-                  </ProtectedRoute>
+                <CanonicalStudioRedirect><ProtectedRoute><Settings /></ProtectedRoute></CanonicalStudioRedirect>
                 }
               />
             </Route>
             
             <Route
               path="/engine"
-              element={<DawProductRoute mode="studio" />}
+              element={<CanonicalStudioRedirect><DawProductRoute mode="studio" /></CanonicalStudioRedirect>}
             />
-            <Route path="/score" element={<DawProductRoute mode="score" />} />
-            <Route path="/keys" element={<DawProductRoute mode="keys" />} />
+            <Route path="/score" element={<CanonicalStudioRedirect><DawProductRoute mode="score" /></CanonicalStudioRedirect>} />
+            <Route path="/keys" element={<CanonicalStudioRedirect><DawProductRoute mode="keys" /></CanonicalStudioRedirect>} />
           </>
         )}
       </Routes>

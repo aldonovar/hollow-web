@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { usePageMotion } from '../components/usePageMotion';
 import { formatCountLimit, formatStorageLimit, formatUsageMetric, getTierLimits, resolveTier } from '@hollowbits/core';
 import { projectOsService, type UsageSummary } from '../daw/services/projectOsService';
+import { formatSessionDate, loadActiveSessions, maskSessionIp, normalizeUserAgent, revokeRemoteSession, type ActiveSession } from '../lib/sessionControl';
 import './Settings.css';
 
 type FeedbackStatus = 'idle' | 'saving' | 'success' | 'error';
@@ -27,7 +28,9 @@ export function Settings() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   /* ─── License & Sessions state ──────────────────────────────── */
-  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<ActiveSession[]>([]);
+  const [sessionMessage, setSessionMessage] = useState('');
+  const [sessionBusy, setSessionBusy] = useState<string | null>(null);
   const [license, setLicense] = useState<any>(null);
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
   const [loadingExtra, setLoadingExtra] = useState(true);
@@ -112,8 +115,13 @@ export function Settings() {
       try {
         setLoadingExtra(true);
         // Fetch sessions
-        const { data: sessionData, error: sessionError } = await supabase.rpc('get_active_sessions');
-        if (!sessionError && sessionData) setSessions(sessionData);
+        try {
+          setSessions(await loadActiveSessions(session));
+          setSessionMessage('');
+        } catch (sessionError) {
+          console.error('[Settings] Failed to load sessions:', sessionError);
+          setSessionMessage('No se pudieron consultar las sesiones en este momento.');
+        }
 
         // Fetch license
         const { data: licenseData, error: licenseError } = await supabase
@@ -136,20 +144,50 @@ export function Settings() {
     };
 
     fetchExtraData();
-  }, [user]);
+  }, [user, session]);
+
+  useEffect(() => {
+    if (!user || !session) return;
+    const interval = window.setInterval(() => {
+      void loadActiveSessions(session).then(setSessions).catch(() => undefined);
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, [user, session]);
 
   const handleRevokeSession = async (sessionId: string) => {
+    const target = sessions.find((item) => item.id === sessionId);
+    if (!target || target.is_current) {
+      setSessionMessage('La sesión de este dispositivo se cierra desde “Cerrar sesión”.');
+      return;
+    }
+    if (!window.confirm('¿Revocar el acceso de este dispositivo?')) return;
+    setSessionBusy(sessionId);
     try {
-      const { data, error } = await supabase.rpc('revoke_device_session', { target_session_id: sessionId });
-      if (error) {
-        console.error('[Settings] Failed to revoke session:', error);
-        return;
-      }
-      if (data) {
-        setSessions(s => s.filter(x => x.id !== sessionId));
-      }
+      const result = await revokeRemoteSession(sessionId);
+      if (!result.revoked) throw new Error(result.reason || 'La sesión ya no está activa.');
+      setSessions(await loadActiveSessions(session));
+      setSessionMessage('Acceso revocado. El cambio se reflejará cuando ese dispositivo renueve su sesión.');
     } catch (err) {
       console.error('[Settings] Revoke error:', err);
+      setSessionMessage('No se pudo revocar el dispositivo. Intenta de nuevo.');
+    } finally {
+      setSessionBusy(null);
+    }
+  };
+
+  const handleSignOutOthers = async () => {
+    if (!window.confirm('Se cerrarán las demás sesiones activas. ¿Continuar?')) return;
+    setSessionBusy('others');
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'others' });
+      if (error) throw error;
+      setSessions(await loadActiveSessions(session));
+      setSessionMessage('Las demás sesiones fueron cerradas.');
+    } catch (error) {
+      console.error('[Settings] Sign out others error:', error);
+      setSessionMessage('No se pudieron cerrar las demás sesiones.');
+    } finally {
+      setSessionBusy(null);
     }
   };
 
@@ -302,7 +340,7 @@ export function Settings() {
 
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
-        friendlyName: 'HollowBits Auth',
+        friendlyName: 'DAW-fi Auth',
       });
 
       if (error || !data) {
@@ -895,9 +933,13 @@ export function Settings() {
             <h3 className="settings__card-title">
               <MonitorSmartphone size={18} /> Dispositivos Activos
             </h3>
-            <p className="settings__card-desc">
-              Revisa y revoca el acceso a dispositivos donde tienes sesiones abiertas.
-            </p>
+            <p className="settings__card-desc">Revisa cada sesión, su navegador, IP parcialmente ocultada y última actividad. La lista se actualiza automáticamente.</p>
+
+            <div className="settings__session-actions">
+              <button className="settings__save-btn settings__save-btn--secondary" onClick={handleSignOutOthers} disabled={sessionBusy !== null || sessions.filter((item) => !item.is_current).length === 0}>
+                {sessionBusy === 'others' ? <Loader2 size={15} className="settings__spinner" /> : <Shield size={15} />} Cerrar otras sesiones
+              </button>
+            </div>
 
             <div className="settings__sessions-list" style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {loadingExtra ? (
@@ -905,47 +947,47 @@ export function Settings() {
                    <Loader2 size={16} className="settings__spinner" /> Cargando sesiones...
                  </div>
               ) : sessions.length === 0 ? (
-                <p style={{ color: 'var(--text-2)', fontSize: '13px' }}>No hay sesiones activas adicionales.</p>
+                <p style={{ color: 'var(--text-2)', fontSize: '13px' }}>No hay sesiones activas registradas.</p>
               ) : (
                 sessions.map(s => {
-                  const isCurrent = false; // Cannot reliably determine session ID from frontend without decoding JWT
-                  const userAgent = s.user_agent || '';
-                  const isDesktop = userAgent.toLowerCase().includes('windows') || userAgent.toLowerCase().includes('macintosh') || userAgent.toLowerCase().includes('linux');
-                  const parsedName = userAgent.split(' ').slice(0, 3).join(' ') || 'Dispositivo Desconocido';
+                  const device = normalizeUserAgent(s.user_agent);
+                  const isCurrent = s.is_current;
                   
                   return (
                     <div key={s.id} className="settings__session-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px' }}>
                       <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                         <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-1)' }}>
-                          {isDesktop ? <Laptop size={18} /> : <Globe size={18} />}
+                          {device.kind === 'desktop' ? <Laptop size={18} /> : <Globe size={18} />}
                         </div>
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <h4 style={{ margin: 0, fontSize: '14px', color: '#fff' }}>{parsedName}</h4>
+                            <h4 style={{ margin: 0, fontSize: '14px', color: '#fff' }}>{device.label}</h4>
                             {isCurrent && (
-                              <span style={{ fontSize: '10px', background: 'rgba(168, 85, 247, 0.2)', color: '#a855f7', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Este Dispositivo
+                            <span style={{ fontSize: '10px', background: 'rgba(168, 85, 247, 0.2)', color: '#a855f7', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Este dispositivo
                               </span>
                             )}
                           </div>
                           <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-2)' }}>
-                            IP: {s.ip || 'Oculta'} • Última act: {new Date(s.last_active).toLocaleString('es-MX')}
+                            IP: {maskSessionIp(s.ip)} · Alta: {formatSessionDate(s.created_at)} · Última actividad: {formatSessionDate(s.last_active)}
                           </p>
                         </div>
                       </div>
                       <button 
-                        onClick={() => handleRevokeSession(s.id)}
+                        onClick={() => void handleRevokeSession(s.id)}
+                        disabled={isCurrent || sessionBusy !== null}
                         title="Revocar sesión"
                         style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', padding: '8px', transition: 'all 0.2s' }}
                         onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
                         onMouseLeave={e => e.currentTarget.style.color = 'var(--text-2)'}
                       >
-                        <Trash2 size={18} />
+                        {sessionBusy === s.id ? <Loader2 size={18} className="settings__spinner" /> : <Trash2 size={18} />}
                       </button>
                     </div>
                   );
                 })
               )}
+              {sessionMessage && <div className="settings__feedback settings__feedback--info"><AlertCircle size={15} /> {sessionMessage}</div>}
             </div>
           </div>
         </section>
