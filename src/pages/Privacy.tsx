@@ -12,7 +12,7 @@ export function Privacy() {
           Política de<br />Privacidad.
         </h1>
         <p className="hero__subtitle">
-          Última actualización: {new Date().toLocaleDateString('es-ES')}. Transparencia total sobre cómo manejamos tus datos en el ecosistema Hollow Bits.
+          Última actualización: {new Date().toLocaleDateString('es-ES')}. Transparencia total sobre cómo manejamos tus datos en el ecosistema DAW-fi.
         </p>
       </section>
 
@@ -21,7 +21,7 @@ export function Privacy() {
           <article className="glass-card" data-stagger-item>
             <h3 className="glass-card__title" style={{ fontSize: '1.4rem', color: 'var(--purple)' }}>1. Información que recopilamos</h3>
             <p className="glass-card__text" style={{ fontSize: '1.05rem', lineHeight: '1.7' }}>
-              Recopilamos información básica indispensable para el funcionamiento de nuestra plataforma, incluyendo tu dirección de correo electrónico (a través de nuestro proveedor de autenticación de Supabase/Google) e información de tu perfil público. De igual manera, almacenamos los proyectos de audio, samples y metadatos que decides sincronizar con la nube de Hollow Bits.
+              Recopilamos información básica indispensable para el funcionamiento de nuestra plataforma, incluyendo tu dirección de correo electrónico (a través de nuestro proveedor de autenticación de Supabase/Google) e información de tu perfil público. De igual manera, almacenamos los proyectos de audio, samples y metadatos que decides sincronizar con la nube de DAW-fi.
             </p>
           </article>
 
@@ -31,7 +31,7 @@ export function Privacy() {
               Tus datos son el combustible que permite que tu estudio sea portátil. Utilizamos tu información exclusivamente para:
             </p>
             <ul className="glass-card__text" style={{ paddingLeft: '1.5rem', marginTop: '1rem', listStyle: 'disc' }}>
-              <li style={{ marginBottom: '0.5rem' }}>Proporcionar, mantener y mejorar el servicio de Hollow Bits Engine y Console.</li>
+              <li style={{ marginBottom: '0.5rem' }}>Proporcionar, mantener y mejorar DAW-fi Studio y el Hub.</li>
               <li style={{ marginBottom: '0.5rem' }}>Autenticar tu identidad y mantener un entorno seguro libre de intrusos.</li>
               <li style={{ marginBottom: '0.5rem' }}>Procesar y facilitar la colaboración en tiempo real con los usuarios que tú autorizas.</li>
             </ul>

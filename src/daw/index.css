@@ -26,9 +26,7 @@ body,
 
 .daw-immersive-shell {
   background:
-    radial-gradient(1200px 520px at 50% -120px, rgba(168, 85, 247, 0.16), transparent 60%),
-    radial-gradient(980px 480px at 90% 110%, rgba(244, 63, 94, 0.12), transparent 70%),
-    linear-gradient(180deg, #101119 0%, #0d0e14 38%, #090a10 100%);
+    linear-gradient(180deg, #16171a 0%, #111216 38%, #0d0e11 100%);
 }
 
 .daw-viewport {

@@ -13,7 +13,6 @@ import AppLogo from './components/AppLogo';
 import SessionView from './components/SessionView';
 import Modal from './components/Modal';
 import { FluidPanel } from './components/FluidPanel';
-import AsciiPerformerDock from './components/AsciiPerformerDock';
 import CollabPanel, { CollabActivityEntry } from './components/CollabPanel';
 import { CollabAuthModal } from './components/CollabAuthModal';
 import { MiniAuthPanel } from './components/MiniAuthPanel';
@@ -5250,7 +5249,6 @@ const App: React.FC<DawAppProps> = ({ surfaceMode = 'studio' }) => {
     const timelineMaxActiveMeterTracks = visualPerformance.maxActiveMeterTracks;
     const mixerMeterUpdateIntervalMs = visualPerformance.mixerMeterUpdateIntervalMs;
     const mixerMaxMeterTracks = visualPerformance.mixerMaxMeterTracks;
-    const performerFrameIntervalMs = visualPerformance.performerFrameIntervalMs;
     const diagnosticsVisible = diagnosticsVisibilityMode === 'debug';
 
     return (
@@ -5366,7 +5364,7 @@ const App: React.FC<DawAppProps> = ({ surfaceMode = 'studio' }) => {
                         <AppLogo size={18} />
                         <span className="text-[11px] font-bold uppercase tracking-[0.16em]">{activeProductName}</span>
                     </a>
-                    <div className="flex min-w-max items-center gap-1" aria-label="Productos Hollow Bits">
+                    <div className="flex min-w-max items-center gap-1" aria-label="Productos DAW-fi">
                         <a href={`/engine${window.location.search}`} className="daw-product-switcher__link" aria-current={surfaceMode === 'studio' ? 'page' : undefined}>DAW-fi Studio</a>
                         <a href={`/score${window.location.search}`} className="daw-product-switcher__link" aria-current={surfaceMode === 'score' ? 'page' : undefined}>Score-fi</a>
                         <a href={`/keys${window.location.search}`} className="daw-product-switcher__link" aria-current={surfaceMode === 'keys' ? 'page' : undefined}>Keys-fi</a>
@@ -5474,7 +5472,7 @@ const App: React.FC<DawAppProps> = ({ surfaceMode = 'studio' }) => {
                                             </div>
                                         </div>
                                         <div className="h-px bg-white/10 w-full my-1" />
-                                        <button onClick={() => { setShowSessionPopover(false); window.location.href = import.meta.env.PROD ? 'https://hollowbits.com/console' : '/console'; }} className="w-full py-2 text-xs text-gray-300 hover:bg-white/5 hover:text-white rounded text-left px-2 transition-colors flex items-center gap-2">
+                                        <button onClick={() => { setShowSessionPopover(false); window.location.href = import.meta.env.PROD ? 'https://play.hollowbits.com/console' : '/console'; }} className="w-full py-2 text-xs text-gray-300 hover:bg-white/5 hover:text-white rounded text-left px-2 transition-colors flex items-center gap-2">
                                             <span>Ir al Dashboard</span>
                                         </button>
                                         <button onClick={() => { setShowSessionPopover(false); authSignOut(); }} className="w-full py-2 text-xs text-rose-400 hover:bg-rose-500/10 rounded text-left px-2 transition-colors flex items-center gap-2">
@@ -5508,7 +5506,7 @@ const App: React.FC<DawAppProps> = ({ surfaceMode = 'studio' }) => {
                                                     Vincular Cuenta
                                                 </button>
                                                 <button 
-                                                    onClick={() => { setShowSessionPopover(false); window.location.href = import.meta.env.PROD ? 'https://hollowbits.com/login' : '/login'; }}
+                                                    onClick={() => { setShowSessionPopover(false); window.location.href = import.meta.env.PROD ? 'https://play.hollowbits.com/login' : '/login'; }}
                                                     className="w-full py-2 text-xs font-medium text-gray-400 hover:text-white bg-transparent border border-white/10 hover:bg-white/5 rounded transition-colors text-center"
                                                 >
                                                     Ir al Portal de Login
@@ -5719,18 +5717,6 @@ const App: React.FC<DawAppProps> = ({ surfaceMode = 'studio' }) => {
                                         </div>
                                     )}
                                 </div>
-                                {bottomView === 'devices' && (
-                                    <div
-                                        className="daw-performer-dock h-full shrink-0 border-l border-white/8 bg-[#0d0d14]"
-                                        style={{ width: 'clamp(220px, 24vw, 320px)', flex: '0 0 clamp(220px, 24vw, 320px)' }}
-                                    >
-                                        <AsciiPerformerDock
-                                            isPlaying={transport.isPlaying}
-                                            suspendAnimation={transport.isPlaying || transport.isRecording || visualPerformance.freezePerformerDock || globalAudioPriority.disableHeavyVisuals}
-                                            frameIntervalMs={performerFrameIntervalMs}
-                                        />
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}

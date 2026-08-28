@@ -60,10 +60,10 @@ export function Layout() {
       <header className={`site-nav ${scrolled ? 'site-nav--scrolled' : ''}`}>
         <div className="site-nav__inner">
           <Link className="brand-lockup" to="/">
-            <img src="/logo-sphere.svg" alt="HOLLOW bits" className="brand-lockup__icon" />
+            <img src="/logo-sphere.svg" alt="" className="brand-lockup__icon" />
             <div className="brand-lockup__text">
-              <span className="brand-lockup__hollow">HOLLOW</span>
-              <span className="brand-lockup__bits">bits</span>
+              <span className="brand-lockup__wordmark">DAW-fi</span>
+              <span className="brand-lockup__edition">Music workspace</span>
             </div>
           </Link>
 
@@ -163,9 +163,9 @@ export function Layout() {
                 </div>
               ) : (
                 <>
-                  <Link className="site-nav__login" to="/login">Log In</Link>
+                  <Link className="site-nav__login" to="/login">Ingresar</Link>
                   <Link className="site-nav__cta" to="/signup">
-                    Sign Up
+                    Crear cuenta
                     <User className="site-nav__icon" size={16} />
                   </Link>
                 </>
@@ -185,19 +185,19 @@ export function Layout() {
         <div className="site-footer__inner">
           <div className="site-footer__brand">
             <Link className="brand-lockup brand-lockup--footer" to="/">
-              <img src="/logo-sphere.svg" alt="HOLLOW bits" className="brand-lockup__icon" />
+              <img src="/logo-sphere.svg" alt="" className="brand-lockup__icon" />
               <div className="brand-lockup__text">
-                <span className="brand-lockup__hollow">HOLLOW</span>
-                <span className="brand-lockup__bits">bits</span>
+                <span className="brand-lockup__wordmark">DAW-fi</span>
+                <span className="brand-lockup__edition">Music workspace</span>
               </div>
             </Link>
-            <p>El DAW que fusiona rendimiento nativo, colaboración en tiempo real y una estética sin precedentes.</p>
+            <p>Producción, partitura y aprendizaje visual en un entorno musical claro y unificado.</p>
           </div>
           <div className="site-footer__col">
             <h4>Producto</h4>
-            <Link to="/features">Features</Link>
-            <Link to="/pricing">Pricing</Link>
-            <Link to="/console">Console</Link>
+            <Link to="/features">Funciones</Link>
+            <Link to="/pricing">Planes</Link>
+            <Link to="/console">Hub</Link>
             <Link to="/roadmap">Roadmap</Link>
           </div>
           <div className="site-footer__col">
@@ -212,8 +212,8 @@ export function Layout() {
           </div>
         </div>
         <div className="site-footer__bottom">
-          <span>© {new Date().getFullYear()} HOLLOW BITS — ALLYX</span>
-          <span>Desktop-first. Web-ready.</span>
+          <span>© {new Date().getFullYear()} DAW-fi — ALLYX</span>
+          <span>Escritorio y web. Un mismo proyecto.</span>
         </div>
       </footer>
     </div>
