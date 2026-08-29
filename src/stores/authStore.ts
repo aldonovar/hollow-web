@@ -144,7 +144,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   signOut: async () => {
     set({ isLoading: true });
     try {
-      await supabase.auth.signOut();
+      // “Cerrar sesión” is intentionally local. Revoking every other device
+      // is an explicit action in account security, never a side effect here.
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) console.error('[authStore] Sign-out error:', error.message);
     } catch (err) {
       console.error('[authStore] Sign-out error:', err);
     }

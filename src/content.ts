@@ -26,9 +26,9 @@ export interface ConsoleFeature {
 
 export const routeMeta: RouteMeta[] = [
   { id: 'home', label: 'Inicio', path: '/' },
-  { id: 'features', label: 'Features', path: '/features' },
-  { id: 'pricing', label: 'Pricing', path: '/pricing' },
-  { id: 'console', label: 'Console', path: '/console' },
+  { id: 'features', label: 'Funciones', path: '/features' },
+  { id: 'pricing', label: 'Planes', path: '/pricing' },
+  { id: 'console', label: 'Hub', path: '/console' },
   { id: 'roadmap', label: 'Roadmap', path: '/roadmap' },
   { id: 'contact', label: 'Contacto', path: '/contact' },
 ];

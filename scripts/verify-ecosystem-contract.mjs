@@ -6,6 +6,9 @@ const root = process.cwd();
 const localCoreCandidates = [
   path.join(root, 'src', 'hollowbits-core', 'index.ts'),
   path.join(root, 'hollowbits-core', 'index.ts'),
+  // The web shell consumes the pinned desktop recovery submodule. Keep the
+  // contract check pointed at the same source that Vite/TypeScript resolve.
+  path.join(root, 'vendor', 'dawfi-core', 'hollowbits-core', 'index.ts'),
 ];
 
 const peerCoreCandidates = [

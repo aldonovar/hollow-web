@@ -1,8 +1,16 @@
 import { supabase } from './supabase';
 import { DAWFI_AUTH_CONTRACT } from './authContract';
 import { sanitizeOAuthConsentNextPath } from './oauthConsent';
+import {
+  DAWFI_CANONICAL_ORIGINS,
+  DAWFI_STUDIO_PATHS,
+  isSafeDawfiPath,
+} from '@hollowbits/core';
 
 export const CANONICAL_AUTH_ORIGIN = DAWFI_AUTH_CONTRACT.canonicalAuthOrigin;
+if (CANONICAL_AUTH_ORIGIN !== DAWFI_CANONICAL_ORIGINS.studio) {
+  throw new Error('El origen de autenticación no coincide con la topología DAW-fi compartida.');
+}
 export const AUTH_CALLBACK_PATH = DAWFI_AUTH_CONTRACT.authCallbackPath;
 
 const PRODUCTION_AUTH_HOSTNAMES = new Set([
@@ -12,10 +20,8 @@ const PRODUCTION_AUTH_HOSTNAMES = new Set([
   'console.hollowbits.com',
 ]);
 
-const ALLOWED_AUTH_NEXT_PATHS = new Set([
-  '/console',
-  '/engine',
-  '/settings',
+const ALLOWED_AUTH_NEXT_PATHS = new Set<string>([
+  ...DAWFI_STUDIO_PATHS,
 ]);
 
 interface AuthLocation {
@@ -36,7 +42,7 @@ export function sanitizeAuthNextPath(
   fallback = '/console',
 ): string {
   const safeFallback = ALLOWED_AUTH_NEXT_PATHS.has(fallback) ? fallback : '/console';
-  if (!rawNext || !rawNext.startsWith('/') || rawNext.startsWith('//') || rawNext.includes('\\')) {
+  if (!isSafeDawfiPath(rawNext)) {
     return safeFallback;
   }
 

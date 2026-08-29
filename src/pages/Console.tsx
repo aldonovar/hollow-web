@@ -513,7 +513,7 @@ export function Console() {
         <section className="console-products" aria-labelledby="console-products-title">
           <div className="console-products__heading">
             <div>
-              <span className="console-products__eyebrow">Hollow Bits Suite</span>
+              <span className="console-products__eyebrow">DAW-fi Suite</span>
               <h2 id="console-products-title">Elige tu espacio de trabajo</h2>
             </div>
             <p>Un proyecto, tres herramientas enfocadas y el mismo motor musical.</p>

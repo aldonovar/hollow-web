@@ -20,18 +20,8 @@ const TitleBar: React.FC = () => {
         style={{ WebkitAppRegion: 'drag' } as AppRegionStyle}
       >
         <AppLogo size={16} />
-        <span className="text-[10px] font-bold tracking-[0.2em] text-gray-400 uppercase flex items-center gap-1">
-          <span>HOLLOW</span>
-          <span
-            className="normal-case text-[14px] tracking-[0.01em] text-daw-violet"
-            style={{
-              fontFamily: "'Brittany', 'Brittany Signature', cursive",
-              transform: 'scaleX(1.2)',
-              transformOrigin: 'center center'
-            }}
-          >
-            bits
-          </span>
+        <span className="text-[10px] font-bold tracking-[0.2em] text-gray-300 uppercase flex items-center gap-2">
+          <span>DAW-fi</span>
           <span className="text-gray-600">| Desktop</span>
         </span>
       </div>
@@ -40,18 +30,21 @@ const TitleBar: React.FC = () => {
       <div className="flex h-full" style={{ WebkitAppRegion: 'no-drag' } as AppRegionStyle}>
         <button
           onClick={() => platformService.minimize()}
+          aria-label="Minimizar ventana"
           className="w-10 h-full flex items-center justify-center hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
         >
           <Minus size={14} />
         </button>
         <button
           onClick={() => platformService.maximize()}
+          aria-label="Maximizar o restaurar ventana"
           className="w-10 h-full flex items-center justify-center hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
         >
           <Square size={12} />
         </button>
         <button
           onClick={() => platformService.close()}
+          aria-label="Cerrar ventana"
           className="w-10 h-full flex items-center justify-center hover:bg-red-600 text-gray-400 hover:text-white transition-colors"
         >
           <X size={14} />

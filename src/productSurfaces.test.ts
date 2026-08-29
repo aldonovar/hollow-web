@@ -36,8 +36,8 @@ test('SPA router gives every product a reloadable route and product title', () =
   assert.match(routerSource, /path="\/engine"[\s\S]*?<DawProductRoute mode="studio"/);
   assert.match(routerSource, /path="\/score" element=\{<DawProductRoute mode="score"/);
   assert.match(routerSource, /path="\/keys" element=\{<DawProductRoute mode="keys"/);
-  assert.match(routerSource, /Score-fi \| Hollow Bits/);
-  assert.match(routerSource, /Keys-fi \| Hollow Bits/);
+  assert.match(routerSource, /Score-fi \| DAW-fi/);
+  assert.match(routerSource, /Keys-fi \| DAW-fi/);
   assert.match(redirects, /^\/\*\s+\/index\.html\s+200/m);
 });
 

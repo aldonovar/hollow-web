@@ -7,7 +7,10 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@hollowbits/core': path.resolve(__dirname, 'src/hollowbits-core/index.ts'),
+      // The web shell consumes the exact same versioned DAW-fi domain contract
+      // as Electron.  `vendor/dawfi-core` is a pinned public submodule of the
+      // desktop recovery branch, so Vercel receives the identical source.
+      '@hollowbits/core': path.resolve(__dirname, 'vendor/dawfi-core/hollowbits-core/index.ts'),
     },
   },
 

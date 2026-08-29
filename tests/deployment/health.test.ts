@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { GET, HEAD } from './health.ts';
+import { GET, HEAD } from '../../api/health.ts';
 
 test('production health endpoint returns DAW-fi JSON without caching', async () => {
   const response = GET();
@@ -21,7 +21,7 @@ test('health HEAD response is bodyless and the SPA fallback excludes API routes'
   assert.equal(response.status, 200);
   assert.equal(await response.text(), '');
 
-  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8')) as {
+  const config = JSON.parse(await readFile(new URL('../../vercel.json', import.meta.url), 'utf8')) as {
     rewrites?: Array<{ source?: string; destination?: string }>;
   };
   assert.equal(config.rewrites?.[0]?.destination, '/index.html');

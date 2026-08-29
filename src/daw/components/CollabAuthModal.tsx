@@ -79,7 +79,7 @@ export const CollabAuthModal: React.FC<CollabAuthModalProps> = ({ onClose, onSuc
 
         <div className="auth-card__glitch-bar" />
         <div className="auth-card__header">
-          <img src="/logo-sphere.svg" alt="HOLLOW bits" className="auth-card__logo" />
+          <img src="/logo-sphere.svg" alt="DAW-fi" className="auth-card__logo" />
           <h1 className="auth-card__title">Iniciar Sesión</h1>
           <p className="auth-card__subtitle">
             Accede a tu cuenta para sincronizar proyectos DAW

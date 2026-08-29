@@ -17,6 +17,7 @@ test('web and desktop authentication share the restored DAW-fi project contract'
   assert.equal(DAWFI_AUTH_CONTRACT.oauthTokenPath, '/auth/v1/oauth/token');
   assert.equal(DAWFI_AUTH_CONTRACT.oauthConsentPath, '/oauth/consent');
   assert.equal(DAWFI_AUTH_CONTRACT.authCallbackPath, '/auth/callback');
+  assert.equal(DAWFI_AUTH_CONTRACT.siteOrigin, 'https://www.hollowbits.com');
   assert.equal(DAWFI_AUTH_CONTRACT.canonicalAuthOrigin, 'https://play.hollowbits.com');
   assert.equal(DAWFI_AUTH_CONTRACT.desktopBridgeUrl, 'https://www.hollowbits.com/desktop-auth');
   assert.equal(DAWFI_AUTH_CONTRACT.desktopRedirectUri, 'dawfi://auth/callback');

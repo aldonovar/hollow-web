@@ -18,7 +18,7 @@ export function Contact() {
           Acceso temprano<br />para quienes sienten el hueco.
         </h1>
         <p className="hero__subtitle">
-          HOLLOW BITS todavía está tomando forma. Eso es precisamente lo que vuelve
+          DAW-fi todavía está tomando forma. Eso es precisamente lo que vuelve
           valioso entrar ahora.
         </p>
       </section>

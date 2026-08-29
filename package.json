@@ -16,7 +16,7 @@
     "test:ai-safety": "node --test --experimental-strip-types src/daw/services/aiGatewayService.test.ts",
     "test:app-resilience": "node --test --experimental-strip-types src/appErrorBoundary.test.ts",
     "test:products": "node --test --experimental-strip-types src/productSurfaces.test.ts",
-    "test:deployment-routing": "node --test --experimental-strip-types api/health.test.ts",
+    "test:deployment-routing": "node --test --experimental-strip-types tests/deployment/health.test.ts",
     "test:basic-pitch-model": "node scripts/verify-basic-pitch-model.mjs",
     "test:music-surfaces": "npm run test:basic-pitch-model && node --experimental-strip-types src/daw/services/transcriptionPrecisionService.test.ts && node --test src/daw/services/pianoTranscriptionService.test.mjs src/daw/services/scoreTransportSyncService.test.mjs",
     "test:auth-hardening": "node scripts/verify-auth-hardening.mjs && node --test --experimental-strip-types src/lib/authContract.test.ts src/lib/oauthConsent.test.ts",

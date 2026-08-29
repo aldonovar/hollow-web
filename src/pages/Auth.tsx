@@ -138,7 +138,7 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
       <div className="auth-page">
         <div className="auth-card">
           <div className="auth-card__header">
-            <img src="/logo-sphere.svg" alt="HOLLOW bits" className="auth-card__logo" />
+            <img src="/logo-sphere.svg" alt="DAW-fi" className="auth-card__logo" />
             <h1 className="auth-card__title">Verifica tu Identidad</h1>
             <p className="auth-card__subtitle">Hemos enviado un correo a {email}</p>
           </div>
@@ -157,7 +157,7 @@ export function Auth({ type }: { type: 'login' | 'signup' }) {
       <div className="auth-card">
         <div className="auth-card__glitch-bar" />
         <div className="auth-card__header">
-          <img src="/logo-sphere.svg" alt="HOLLOW bits" className="auth-card__logo" />
+          <img src="/logo-sphere.svg" alt="DAW-fi" className="auth-card__logo" />
           <h1 className="auth-card__title">
             {type === 'login' ? 'Iniciar Sesión' : 'Registro de Operador'}
           </h1>
