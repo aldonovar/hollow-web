@@ -10,6 +10,8 @@ const pianoScoreSource = readSource('./components/PianoScoreWorkspace.tsx');
 const pianoCinemaSource = readSource('./components/PianoCinema.tsx');
 const trackHeaderSource = readSource('./components/TrackHeader.tsx');
 const stylesheet = readSource('./index.css');
+const settingsSource = readSource('../pages/Settings.tsx');
+const settingsStylesheet = readSource('../pages/Settings.css');
 
 test('the DAW shell uses dynamic viewport units and safe-area insets', () => {
     assert.match(appSource, /daw-immersive-shell daw-viewport/);
@@ -104,4 +106,15 @@ test('destructive track actions stay named, focusable and touch reachable', () =
     assert.match(trackHeaderSource, /aria-label=\{`Eliminar pista \$\{track\.name\}`\}/);
     assert.match(trackHeaderSource, /focus-visible:opacity-100/);
     assert.match(stylesheet, /\.daw-track-delete-action[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px[\s\S]*?opacity:\s*1 !important/);
+});
+
+test('active-device management remains readable and touch reachable at mobile widths', () => {
+    assert.match(settingsSource, /className="settings__session-main"/);
+    assert.match(settingsSource, /className="settings__session-meta"/);
+    assert.match(settingsSource, /className="settings__session-revoke"/);
+    assert.match(settingsSource, /aria-label=\{isCurrent \? 'Sesión actual;/);
+    assert.match(settingsStylesheet, /@media \(max-width:\s*700px\)/);
+    assert.match(settingsStylesheet, /\.settings__session-meta\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+    assert.match(settingsStylesheet, /\.settings__session-revoke\s*\{[\s\S]*?width:\s*44px[\s\S]*?height:\s*44px/);
+    assert.match(settingsStylesheet, /\.settings__save-btn,[\s\S]*?min-height:\s*44px/);
 });
