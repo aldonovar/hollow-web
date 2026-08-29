@@ -483,6 +483,138 @@
   border-color: var(--rose);
 }
 
+/* ─── Active devices ─────────────────────────────────────────── */
+
+.settings__session-actions {
+  display: flex;
+}
+
+.settings__session-actions .settings__save-btn {
+  margin-top: 0;
+}
+
+.settings__sessions-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.settings__session-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.settings__session-main {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.settings__session-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.settings__session-copy {
+  min-width: 0;
+}
+
+.settings__session-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings__session-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.settings__session-current {
+  padding: 3px 7px;
+  color: var(--lilac);
+  background: rgba(168, 85, 247, 0.14);
+  border: 1px solid rgba(168, 85, 247, 0.24);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', var(--fm);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.settings__session-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin: 10px 0 0;
+}
+
+.settings__session-meta div {
+  min-width: 0;
+}
+
+.settings__session-meta dt {
+  margin-bottom: 2px;
+  color: var(--text-3);
+  font-family: 'JetBrains Mono', var(--fm);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.settings__session-meta dd {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.settings__session-revoke {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.settings__session-revoke:hover:not(:disabled),
+.settings__session-revoke:focus-visible {
+  color: var(--rose);
+  background: rgba(244, 63, 94, 0.08);
+  border-color: rgba(244, 63, 94, 0.22);
+  outline: none;
+}
+
+.settings__session-revoke:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
 /* ─── Back Button ────────────────────────────────────────────── */
 
 .settings__back {
@@ -516,6 +648,72 @@
 
 @keyframes settingsSpin {
   to { transform: rotate(360deg); }
+}
+
+@media (max-width: 700px) {
+  .settings {
+    padding: 0 16px 64px;
+  }
+
+  .settings__header {
+    margin-bottom: 32px;
+  }
+
+  .settings__title {
+    font-size: clamp(1.55rem, 8vw, 2rem);
+  }
+
+  .settings__card {
+    padding: 20px;
+    border-radius: 8px;
+  }
+
+  .settings__fields,
+  .settings__fields--security {
+    grid-template-columns: 1fr;
+  }
+
+  .settings__avatar-area,
+  .settings__mfa-active,
+  .settings__session-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .settings__save-btn,
+  .settings__signout-btn,
+  .settings__session-actions .settings__save-btn {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .settings__session-item {
+    align-items: start;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .settings__session-meta {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+}
+
+@media (max-width: 420px) {
+  .settings__session-item {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .settings__session-main {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .settings__session-icon {
+    width: 32px;
+    height: 32px;
+  }
 }
 
 /* ─── Responsive ─────────────────────────────────────────────── */

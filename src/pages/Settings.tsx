@@ -941,7 +941,7 @@ export function Settings() {
               </button>
             </div>
 
-            <div className="settings__sessions-list" style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="settings__sessions-list">
               {loadingExtra ? (
                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: 'var(--text-2)' }}>
                    <Loader2 size={16} className="settings__spinner" /> Cargando sesiones...
@@ -950,36 +950,37 @@ export function Settings() {
                 <p style={{ color: 'var(--text-2)', fontSize: '13px' }}>No hay sesiones activas registradas.</p>
               ) : (
                 sessions.map(s => {
-                  const device = normalizeUserAgent(s.user_agent);
+                  const device = normalizeUserAgent(s.user_agent, s.tag);
                   const isCurrent = s.is_current;
                   
                   return (
-                    <div key={s.id} className="settings__session-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px' }}>
-                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                        <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-1)' }}>
+                    <div key={s.id} className="settings__session-item">
+                      <div className="settings__session-main">
+                        <div className="settings__session-icon">
                           {device.kind === 'desktop' ? <Laptop size={18} /> : <Globe size={18} />}
                         </div>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <h4 style={{ margin: 0, fontSize: '14px', color: '#fff' }}>{device.label}</h4>
+                        <div className="settings__session-copy">
+                          <div className="settings__session-heading">
+                            <h4 className="settings__session-title">{device.label}</h4>
                             {isCurrent && (
-                            <span style={{ fontSize: '10px', background: 'rgba(168, 85, 247, 0.2)', color: '#a855f7', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              <span className="settings__session-current">
                                 Este dispositivo
                               </span>
                             )}
                           </div>
-                          <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-2)' }}>
-                            IP: {maskSessionIp(s.ip)} · Alta: {formatSessionDate(s.created_at)} · Última actividad: {formatSessionDate(s.last_active)}
-                          </p>
+                          <dl className="settings__session-meta">
+                            <div><dt>IP</dt><dd>{maskSessionIp(s.ip)}</dd></div>
+                            <div><dt>Alta</dt><dd>{formatSessionDate(s.created_at)}</dd></div>
+                            <div><dt>Última actividad</dt><dd>{formatSessionDate(s.last_active)}</dd></div>
+                          </dl>
                         </div>
                       </div>
                       <button 
+                        className="settings__session-revoke"
                         onClick={() => void handleRevokeSession(s.id)}
                         disabled={isCurrent || sessionBusy !== null}
-                        title="Revocar sesión"
-                        style={{ background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', padding: '8px', transition: 'all 0.2s' }}
-                        onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-2)'}
+                        title={isCurrent ? 'Usa Cerrar sesión para este dispositivo' : `Revocar ${device.label}`}
+                        aria-label={isCurrent ? 'Sesión actual; se cierra desde Cerrar sesión' : `Revocar sesión de ${device.label}`}
                       >
                         {sessionBusy === s.id ? <Loader2 size={18} className="settings__spinner" /> : <Trash2 size={18} />}
                       </button>

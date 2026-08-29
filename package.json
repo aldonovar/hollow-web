@@ -20,8 +20,9 @@
     "test:basic-pitch-model": "node scripts/verify-basic-pitch-model.mjs",
     "test:music-surfaces": "npm run test:basic-pitch-model && node --experimental-strip-types src/daw/services/transcriptionPrecisionService.test.ts && node --test src/daw/services/pianoTranscriptionService.test.mjs src/daw/services/scoreTransportSyncService.test.mjs",
     "test:auth-hardening": "node scripts/verify-auth-hardening.mjs && node --test --experimental-strip-types src/lib/authContract.test.ts src/lib/oauthConsent.test.ts",
+    "test:sessions": "node --experimental-strip-types src/lib/sessionPresentation.test.ts",
     "test:contract": "node scripts/verify-ecosystem-contract.mjs",
-    "quality:gates": "npm run typecheck && npm run test:audio-cloud && npm run test:audio-import && npm run test:portable-project && npm run test:responsive && npm run test:transport && npm run test:midi && npm run test:ai-safety && npm run test:app-resilience && npm run test:products && npm run test:deployment-routing && npm run test:music-surfaces && npm run test:auth-hardening && npm run test:contract && npm run build",
+    "quality:gates": "npm run typecheck && npm run test:audio-cloud && npm run test:audio-import && npm run test:portable-project && npm run test:responsive && npm run test:transport && npm run test:midi && npm run test:ai-safety && npm run test:app-resilience && npm run test:products && npm run test:deployment-routing && npm run test:music-surfaces && npm run test:auth-hardening && npm run test:sessions && npm run test:contract && npm run build",
     "preview:edge": "npm run build && wrangler pages dev dist",
     "preview:vite": "vite preview"
   },
