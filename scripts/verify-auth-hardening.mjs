@@ -39,6 +39,9 @@ const [
   desktopBridge,
   oauthConsentPage,
   oauthConsentContract,
+  createTeamModal,
+  workspaceSlug,
+  desktopHubVendor,
 ] = await Promise.all([
   read('src/lib/supabase.ts'),
   read('src/lib/authFlow.ts'),
@@ -52,12 +55,53 @@ const [
   read('src/pages/DesktopAuthBridge.tsx'),
   read('src/pages/OAuthConsent.tsx'),
   read('src/lib/oauthConsent.ts'),
+  read('src/components/CreateTeamModal.tsx'),
+  read('src/lib/workspaceSlug.ts'),
+  read('vendor/dawfi-core/components/desktop/DesktopHub.tsx'),
 ]);
 
 const sourceFiles = await collectSourceFiles(path.join(repositoryRoot, 'src'));
 const allSource = (await Promise.all(sourceFiles.map((file) => readFile(file, 'utf8')))).join('\n');
 const authContractSource = await read('src/lib/authContract.ts');
 const authContract = JSON.parse(await read('src/lib/dawfi-auth.json'));
+const legacyRlsMigration = await read(
+  'supabase/migrations/20260830144311_optimize_legacy_rls_initplans.sql',
+);
+
+const legacyRlsSql = legacyRlsMigration
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/--.*$/gm, '')
+  .trim();
+
+const createdLegacyPolicies = [
+  ...legacyRlsSql.matchAll(/create\s+policy\s+"([^"]+)"[\s\S]*?;/gi),
+].map(([sql, name]) => ({ name, sql }));
+
+const droppedLegacyPolicyNames = new Set(
+  [...legacyRlsSql.matchAll(/drop\s+policy\s+if\s+exists\s+"([^"]+)"/gi)]
+    .map(([, name]) => name),
+);
+
+const membershipPolicy = createdLegacyPolicies.find(
+  ({ name }) => name === 'Owners and admins can add members',
+)?.sql ?? '';
+
+function extractFunctionSql(qualifiedName) {
+  const escapedName = qualifiedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return legacyRlsSql.match(
+    new RegExp(`create\\s+or\\s+replace\\s+function\\s+${escapedName}\\s*\\([\\s\\S]*?\\$\\$;`, 'i'),
+  )?.[0] ?? '';
+}
+
+const membershipHelperSql = extractFunctionSql(
+  'hollow_private.dawfi_can_add_workspace_member',
+);
+const createWorkspaceRpcSql = extractFunctionSql(
+  'public.create_workspace_with_owner',
+);
+const preserveWorkspaceCreatorSql = extractFunctionSql(
+  'hollow_private.dawfi_preserve_workspace_creator',
+);
 
 assert(supabaseClient.includes("flowType: 'pkce'"), 'Supabase Auth must use PKCE.');
 assert(supabaseClient.includes('detectSessionInUrl: false'), 'OAuth callback exchange must be explicit.');
@@ -120,5 +164,148 @@ assert(authContract.canonicalAuthOrigin === 'https://play.hollowbits.com', 'The 
 assert(authContract.desktopBridgeUrl === 'https://www.hollowbits.com/desktop-auth', 'The Desktop HTTPS bridge drifted.');
 assert(authContract.desktopRedirectUri === 'dawfi://auth/callback', 'The Desktop redirect drifted.');
 assert(authContractSource.includes('isDawfiSupabaseUrl'), 'The shared contract lacks a project guard.');
+
+assert(
+  /^begin;\s*/i.test(legacyRlsSql) && /commit;\s*$/i.test(legacyRlsSql),
+  'The legacy RLS optimization must be transactional.',
+);
+assert(
+  createdLegacyPolicies.length === 18,
+  'The legacy RLS optimization must recreate all 18 intended policies.',
+);
+assert(
+  createdLegacyPolicies.every(({ sql }) => /\bto\s+authenticated\b/i.test(sql)),
+  'Every recreated legacy RLS policy must be scoped to authenticated.',
+);
+assert(
+  createdLegacyPolicies.every(({ name }) => droppedLegacyPolicyNames.has(name)),
+  'Every recreated legacy RLS policy must first be dropped idempotently.',
+);
+
+const dropOnlyLegacyPolicies = [...droppedLegacyPolicyNames]
+  .filter((name) => !createdLegacyPolicies.some((policy) => policy.name === name));
+
+const expectedDropOnlyLegacyPolicies = new Set([
+  'Authenticated users can create workspaces',
+  'Service role has full access to licenses',
+]);
+
+assert(
+  dropOnlyLegacyPolicies.length === expectedDropOnlyLegacyPolicies.size
+    && dropOnlyLegacyPolicies.every((name) => expectedDropOnlyLegacyPolicies.has(name)),
+  'Only the direct workspace INSERT and obsolete service-role policies may be removed.',
+);
+assert(
+  !createdLegacyPolicies.some(({ name }) => name === 'Service role has full access to licenses'),
+  'The obsolete service-role license policy must not be recreated.',
+);
+
+const withoutInitPlanAuthUid = legacyRlsSql.replace(
+  /\(\s*select\s+auth\.uid\(\)\s*\)/gi,
+  '',
+);
+
+assert(
+  !/\bauth\.uid\(\)/i.test(withoutInitPlanAuthUid),
+  'Legacy RLS policies must evaluate auth.uid() through an init-plan SELECT.',
+);
+assert(
+  !/\bauth\.role\(\)/i.test(legacyRlsSql),
+  'The legacy RLS migration must not restore an auth.role() service-role policy.',
+);
+assert(
+  membershipHelperSql.length > 0,
+  'The membership policy needs a private non-recursive authorization helper.',
+);
+assert(
+  /security\s+definer/i.test(membershipHelperSql)
+    && /set\s+search_path\s*=\s*''/i.test(membershipHelperSql),
+  'The membership helper must bypass recursive RLS with an empty search path.',
+);
+assert(
+  /revoke\s+all\s+on\s+function\s+hollow_private\.dawfi_can_add_workspace_member[\s\S]*?from\s+public\s*,\s*anon\s*,\s*authenticated\s*,\s*service_role\s*;/i
+    .test(legacyRlsSql)
+    && /grant\s+execute\s+on\s+function\s+hollow_private\.dawfi_can_add_workspace_member[\s\S]*?to\s+authenticated\s*;/i
+      .test(legacyRlsSql),
+  'The membership helper must be executable only by authenticated users.',
+);
+assert(
+  membershipPolicy.includes('hollow_private.dawfi_can_add_workspace_member(')
+    && !/from\s+public\.workspace_members/i.test(membershipPolicy),
+  'The membership INSERT policy must not recursively query workspace_members.',
+);
+assert(
+  /lower\(p_new_role\)\s+in\s*\('owner',\s*'admin',\s*'editor',\s*'viewer'\)/i
+    .test(membershipHelperSql)
+    && /wm\.user_id\s*=\s*v_actor_id/i.test(membershipHelperSql)
+    && /lower\(coalesce\(wm\.role::text,\s*'viewer'\)\)\s+in\s*\('owner',\s*'admin'\)/i
+      .test(membershipHelperSql)
+    && !/from\s+public\.workspaces/i.test(membershipHelperSql),
+  'The membership helper must allow only existing owners/admins and known roles.',
+);
+assert(
+  createWorkspaceRpcSql.length > 0
+    && /security\s+definer/i.test(createWorkspaceRpcSql)
+    && /set\s+search_path\s*=\s*''/i.test(createWorkspaceRpcSql)
+    && /v_user_id\s+uuid\s*:=\s*\(select\s+auth\.uid\(\)\)/i.test(createWorkspaceRpcSql)
+    && /v_workspace_id\s+uuid\s*:=\s*pg_catalog\.gen_random_uuid\(\)/i.test(createWorkspaceRpcSql)
+    && /insert\s+into\s+public\.workspaces/i.test(createWorkspaceRpcSql)
+    && /insert\s+into\s+public\.workspace_members/i.test(createWorkspaceRpcSql),
+  'Workspace creation must use one authenticated, atomic, empty-search-path definer RPC.',
+);
+assert(
+  /revoke\s+all\s+on\s+function\s+public\.create_workspace_with_owner[\s\S]*?from\s+public\s*,\s*anon\s*,\s*authenticated\s*,\s*service_role\s*;/i
+    .test(legacyRlsSql)
+    && /grant\s+execute\s+on\s+function\s+public\.create_workspace_with_owner[\s\S]*?to\s+authenticated\s*;/i
+      .test(legacyRlsSql),
+  'The workspace creation RPC must be callable only by authenticated users.',
+);
+assert(
+  !createdLegacyPolicies.some(({ name }) => name === 'Authenticated users can create workspaces')
+    && /alter\s+table\s+public\.workspaces\s+enable\s+row\s+level\s+security/i.test(legacyRlsSql),
+  'Direct authenticated workspace INSERT must stay disabled behind RLS.',
+);
+assert(
+  preserveWorkspaceCreatorSql.length > 0
+    && /returns\s+trigger/i.test(preserveWorkspaceCreatorSql)
+    && /new\.created_by\s+is\s+distinct\s+from\s+old\.created_by/i
+      .test(preserveWorkspaceCreatorSql)
+    && /create\s+trigger\s+dawfi_preserve_workspace_creator[\s\S]*?before\s+update\s+of\s+created_by/i
+      .test(legacyRlsSql),
+  'Workspace created_by must be immutable so quota ownership cannot be reassigned.',
+);
+assert(
+  createTeamModal.includes("supabase.rpc('create_workspace_with_owner'")
+    && createTeamModal.includes("from '../lib/workspaceSlug'")
+    && !createTeamModal.includes(".from('workspaces')")
+    && !createTeamModal.includes(".from('workspace_members')")
+    && workspaceSlug.includes('crypto.getRandomValues')
+    && workspaceSlug.includes(".slice(0, WORKSPACE_SLUG_BASE_LIMIT)\n    .replace(/-+$/g, '')"),
+  'Team creation must call the atomic RPC with a collision-resistant slug.',
+);
+assert(
+  desktopHubVendor.includes("supabase.rpc('create_workspace_with_owner'")
+    && desktopHubVendor.includes('crypto.getRandomValues')
+    && desktopHubVendor.includes(".slice(0, 96)\n    .replace(/-+$/g, '')")
+    && !desktopHubVendor.includes(".from('workspaces')\n        .insert")
+    && !desktopHubVendor.includes(".from('workspace_members')\n        .insert")
+    && !desktopHubVendor.includes('Math.random()'),
+  'Vendored Desktop workspace creation must stay atomic and collision-resistant.',
+);
+
+for (const policyName of [
+  'Users can update their own profile',
+  'Owners and admins can update their workspaces',
+  'Editors and above can update projects in their workspaces',
+  'Users can update their own notifications',
+]) {
+  const statement = createdLegacyPolicies.find(({ name }) => name === policyName)?.sql ?? '';
+  assert(
+    /\bfor\s+update\b/i.test(statement)
+      && /\busing\s*\(/i.test(statement)
+      && /\bwith\s+check\s*\(/i.test(statement),
+    `${policyName} must retain both USING and WITH CHECK predicates.`,
+  );
+}
 
 console.log('Auth hardening contract passed.');

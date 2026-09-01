@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { buildWorkspaceSlug } from '../lib/workspaceSlug';
 import { useAuthStore } from '../stores/authStore';
 import { X, Cloud } from 'lucide-react';
 
@@ -21,31 +22,13 @@ export function CreateTeamModal({ onClose, onSuccess }: CreateTeamModalProps) {
     setError(null);
 
     try {
-      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.random().toString(36).substring(2, 7);
-
-      const { data: newWorkspace, error: createError } = await supabase
-        .from('workspaces')
-        .insert([{
-          name: name.trim(),
-          slug,
-          created_by: user.id,
-          category
-        }])
-        .select()
-        .single();
+      const { error: createError } = await supabase.rpc('create_workspace_with_owner', {
+        p_name: name.trim(),
+        p_slug: buildWorkspaceSlug(name),
+        p_category: category,
+      });
 
       if (createError) throw createError;
-
-      // Automatically add the creator as an owner
-      const { error: memberError } = await supabase
-        .from('workspace_members')
-        .insert([{
-          workspace_id: newWorkspace.id,
-          user_id: user.id,
-          role: 'owner'
-        }]);
-
-      if (memberError) throw memberError;
 
       onSuccess();
     } catch (err: any) {
