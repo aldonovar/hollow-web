@@ -148,6 +148,7 @@ function App() {
     <Router>
       <ScrollToTop />
       <Routes>
+        <Route path="/auth" element={<Navigate to="/login" replace />} />
         <Route path="/auth/callback" element={<CanonicalStudioRedirect><AuthCallback /></CanonicalStudioRedirect>} />
         <Route path="/oauth/consent" element={<OAuthConsent />} />
         <Route path="/desktop-auth" element={<DesktopAuthBridge />} />

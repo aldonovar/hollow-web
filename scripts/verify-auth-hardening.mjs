@@ -130,6 +130,10 @@ for (const [name, source] of [
 }
 
 assert(app.includes('path="/auth/callback"'), 'The explicit OAuth callback route is missing.');
+assert(
+  app.includes('path="/auth" element={<Navigate to="/login" replace />}'),
+  'The legacy /auth entrypoint must redirect to the canonical login route.',
+);
 assert(app.includes('path="/oauth/consent"'), 'The Supabase OAuth consent route is missing.');
 assert(authCallback.includes('exchangeCodeForSession'), 'The callback must exchange the PKCE code explicitly.');
 assert(authCallback.includes('window.history.replaceState'), 'The callback code must be removed from browser history.');
