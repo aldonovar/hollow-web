@@ -99,6 +99,9 @@ const membershipHelperSql = extractFunctionSql(
 const createWorkspaceRpcSql = extractFunctionSql(
   'public.create_workspace_with_owner',
 );
+const createWorkspaceInternalSql = extractFunctionSql(
+  'hollow_private.dawfi_create_workspace_with_owner',
+);
 const preserveWorkspaceCreatorSql = extractFunctionSql(
   'hollow_private.dawfi_preserve_workspace_creator',
 );
@@ -245,13 +248,31 @@ assert(
 );
 assert(
   createWorkspaceRpcSql.length > 0
-    && /security\s+definer/i.test(createWorkspaceRpcSql)
+    && /security\s+invoker/i.test(createWorkspaceRpcSql)
     && /set\s+search_path\s*=\s*''/i.test(createWorkspaceRpcSql)
-    && /v_user_id\s+uuid\s*:=\s*\(select\s+auth\.uid\(\)\)/i.test(createWorkspaceRpcSql)
-    && /v_workspace_id\s+uuid\s*:=\s*pg_catalog\.gen_random_uuid\(\)/i.test(createWorkspaceRpcSql)
-    && /insert\s+into\s+public\.workspaces/i.test(createWorkspaceRpcSql)
-    && /insert\s+into\s+public\.workspace_members/i.test(createWorkspaceRpcSql),
-  'Workspace creation must use one authenticated, atomic, empty-search-path definer RPC.',
+    && /select\s+hollow_private\.dawfi_create_workspace_with_owner\(\$1,\s*\$2,\s*\$3\)/i
+      .test(createWorkspaceRpcSql)
+    && !/security\s+definer/i.test(createWorkspaceRpcSql)
+    && !/insert\s+into/i.test(createWorkspaceRpcSql),
+  'The exposed workspace RPC must be an empty-search-path invoker-only wrapper.',
+);
+assert(
+  createWorkspaceInternalSql.length > 0
+    && /security\s+definer/i.test(createWorkspaceInternalSql)
+    && /set\s+search_path\s*=\s*''/i.test(createWorkspaceInternalSql)
+    && /v_user_id\s+uuid\s*:=\s*\(select\s+auth\.uid\(\)\)/i.test(createWorkspaceInternalSql)
+    && /v_workspace_id\s+uuid\s*:=\s*pg_catalog\.gen_random_uuid\(\)/i
+      .test(createWorkspaceInternalSql)
+    && /insert\s+into\s+public\.workspaces/i.test(createWorkspaceInternalSql)
+    && /insert\s+into\s+public\.workspace_members/i.test(createWorkspaceInternalSql),
+  'Privileged workspace creation must remain authenticated and private.',
+);
+assert(
+  /revoke\s+all\s+on\s+function\s+hollow_private\.dawfi_create_workspace_with_owner[\s\S]*?from\s+public\s*,\s*anon\s*,\s*authenticated\s*,\s*service_role\s*;/i
+    .test(legacyRlsSql)
+    && /grant\s+execute\s+on\s+function\s+hollow_private\.dawfi_create_workspace_with_owner[\s\S]*?to\s+authenticated\s*;/i
+      .test(legacyRlsSql),
+  'The private workspace implementation must be reachable only by authenticated callers.',
 );
 assert(
   /revoke\s+all\s+on\s+function\s+public\.create_workspace_with_owner[\s\S]*?from\s+public\s*,\s*anon\s*,\s*authenticated\s*,\s*service_role\s*;/i

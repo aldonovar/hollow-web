@@ -53,10 +53,10 @@ grant execute on function hollow_private.dawfi_can_add_workspace_member(uuid, uu
 to authenticated;
 
 -- Creating a workspace and its initial owner in two browser requests can leave
--- an inaccessible orphan when the second request is interrupted. This narrowly
--- granted definer RPC is the only authenticated workspace INSERT surface and
--- keeps both writes in one database transaction.
-create or replace function public.create_workspace_with_owner(
+-- an inaccessible orphan when the second request is interrupted. Keep the
+-- privileged implementation in a non-exposed schema; the public RPC below is
+-- an invoker-only wrapper with no direct table access.
+create or replace function hollow_private.dawfi_create_workspace_with_owner(
   p_name text,
   p_slug text,
   p_category text default null
@@ -106,6 +106,24 @@ begin
 
   return v_workspace_id;
 end;
+$$;
+
+revoke all on function hollow_private.dawfi_create_workspace_with_owner(text, text, text)
+from public, anon, authenticated, service_role;
+grant execute on function hollow_private.dawfi_create_workspace_with_owner(text, text, text)
+to authenticated;
+
+create or replace function public.create_workspace_with_owner(
+  p_name text,
+  p_slug text,
+  p_category text default null
+)
+returns uuid
+language sql
+security invoker
+set search_path = ''
+as $$
+  select hollow_private.dawfi_create_workspace_with_owner($1, $2, $3);
 $$;
 
 revoke all on function public.create_workspace_with_owner(text, text, text)
