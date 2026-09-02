@@ -57,7 +57,10 @@ test('Vercel serves the security and immutable asset headers used by production'
   assert.equal(globalHeaders.get('Cross-Origin-Opener-Policy'), 'same-origin');
   assert.equal(globalHeaders.get('Cross-Origin-Embedder-Policy'), 'require-corp');
   assert.match(globalHeaders.get('Strict-Transport-Security') ?? '', /includeSubDomains/);
-  assert.match(globalHeaders.get('Content-Security-Policy') ?? '', /frame-ancestors 'none'/);
+  const contentSecurityPolicy = globalHeaders.get('Content-Security-Policy') ?? '';
+  assert.match(contentSecurityPolicy, /style-src[^;]*https:\/\/fonts\.googleapis\.com/);
+  assert.match(contentSecurityPolicy, /font-src[^;]*data:[^;]*https:\/\/fonts\.gstatic\.com/);
+  assert.match(contentSecurityPolicy, /frame-ancestors 'none'/);
   assert.equal(assetHeaders.get('Cache-Control'), 'public, max-age=31536000, immutable');
   assert.equal(desktopAuthHeaders.get('Cache-Control'), 'no-store');
   assert.equal(desktopAuthHeaders.get('Referrer-Policy'), 'no-referrer');
